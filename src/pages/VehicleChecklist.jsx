@@ -32,33 +32,44 @@ import {
   saidas: [
     {
       id: 1,
-      vehicle: 'ABC1234',
-      date: '2025-01-01',
-      mileage: 50000,
-      tireCondition: 'Bom',
-      oilLevel: 'Normal',
-      brakeCondition: 'Bom',
-      attachments: [ 'foto1.jpg', 'doc.pdf', ... ],
-      observations: 'Veículo saiu em bom estado.',
+      empresa: '298 DISTRIBUIDORA PRINCESA',
+      departamento: '100 TRANSPORTE URBANO',
+      vehicle: 'HHK1G29',         // Placa principal
+      semiReboque: '',
+      placaSemiReboque: '',
+      kmRodado: 152,
+      capacidadeCarga: 0,
+      dataSaida: '2025-02-05T06:25',
+      horimetroSaida: 0,
+      kmSaida: 0,
+      cargaSaida: 0,
+      inspecionadoPor: '',
+      motorista1: '',
+      motorista2: '',
+      motorista3: '',
+      motivoSaida: '',
+      destino: '',
+      funcionalAtendido: '',
+      observacoesSaida: '',
+      attachments: [],
       closed: false,
-      additionalFields: [ { label: 'Filtro de ar', value: 'Ok' }, ... ]
     },
-    ...
   ]
 
-  retornos: [
+  chegadas: [
     {
       id: 1,
-      saidaId: 1,         // Relaciona a qual "Saída" corresponde
-      vehicle: 'ABC1234', // Copiado da saída
-      date: '2025-01-05',
-      mileage: 50400,
-      tireCondition: 'Regular',
-      oilLevel: 'Baixo',
-      brakeCondition: 'Regular',
-      attachments: [...],
-      observations: 'Observações de retorno',
-      additionalFields: [...]
+      saidaId: 1,                // Relaciona a qual "Saída" corresponde
+      dataChegada: '2025-02-05T20:14',
+      horimetroChegada: 0,
+      kmChegada: 0,
+      cargaChegada: 0,
+      motorista1Cheg: '',
+      motorista2Cheg: '',
+      motorista3Cheg: '',
+      observacoesChegada: '',
+      attachments: [],
+      ...
     },
     ...
   ]
@@ -68,75 +79,93 @@ export default function CheckList() {
   const [saidas, setSaidas] = useState([
     {
       id: 1,
-      vehicle: 'ABC1234',
-      date: '2025-01-01',
-      mileage: 50000,
-      tireCondition: 'Bom',
-      oilLevel: 'Normal',
-      brakeCondition: 'Bom',
+      empresa: '298 DISTRIBUIDORA PRINCESA',
+      departamento: '100 TRANSPORTE URBANO',
+      vehicle: 'HHK1G29',
+      semiReboque: '',
+      placaSemiReboque: '',
+      kmRodado: 152,
+      capacidadeCarga: 0,
+      dataSaida: '2025-02-05T06:25',
+      horimetroSaida: 0,
+      kmSaida: 377115,
+      cargaSaida: 0,
+      inspecionadoPor: '',
+      motorista1: '1057 - José Raimundo',
+      motorista2: '',
+      motorista3: '',
+      motivoSaida: 'Entrega Capital',
+      destino: 'Santa Izabel / Belém',
+      funcionalAtendido: '',
+      observacoesSaida: '',
       attachments: ['saida_foto1.png'],
-      observations: 'Veículo saiu em bom estado.',
       closed: false,
-      additionalFields: [
-        { label: 'Filtro de Ar', value: 'Ok' },
-        { label: 'Pintura', value: 'Sem arranhões' },
-      ],
     },
   ]);
 
-  const [retornos, setRetornos] = useState([]);
+  // Agora chamamos de chegadas
+  const [chegadas, setChegadas] = useState([]);
 
   // -- Estados de abertura dos diálogos
   const [openSaidaDialog, setOpenSaidaDialog] = useState(false);
-  const [openRetornoDialog, setOpenRetornoDialog] = useState(false);
+  const [openChegadaDialog, setOpenChegadaDialog] = useState(false);
   const [openCompareDialog, setOpenCompareDialog] = useState(false);
 
   // -- Formulário de Saída
   const [newSaida, setNewSaida] = useState(initialSaidaForm());
-  //  Campos adicionais dinâmicos (rascunho para inserir)
-  const [saidaFieldLabel, setSaidaFieldLabel] = useState('');
-  const [saidaFieldValue, setSaidaFieldValue] = useState('');
 
-  // -- Formulário de Retorno
-  const [newRetorno, setNewRetorno] = useState(initialRetornoForm());
-  //  Campos adicionais dinâmicos (rascunho para inserir)
-  const [retornoFieldLabel, setRetornoFieldLabel] = useState('');
-  const [retornoFieldValue, setRetornoFieldValue] = useState('');
+  // -- Formulário de Chegada
+  const [newChegada, setNewChegada] = useState(initialChegadaForm());
 
   // -- Dados para comparar
-  const [compareData, setCompareData] = useState({ saida: null, retorno: null });
+  const [compareData, setCompareData] = useState({ saida: null, chegada: null });
 
-  // Colunas da grid de SAÍDAS
+  // --------------------- Colunas de SAÍDAS ---------------------
   const saidaColumns = [
-    { field: 'vehicle', headerName: 'Veículo', width: 120 },
-    { field: 'date', headerName: 'Data Saída', width: 110 },
-    { field: 'mileage', headerName: 'KM Saída', width: 100 },
-    { field: 'tireCondition', headerName: 'Pneu', width: 100 },
-    { field: 'oilLevel', headerName: 'Óleo', width: 90 },
-    { field: 'brakeCondition', headerName: 'Freios', width: 100 },
+    { field: 'empresa', headerName: 'Empresa', width: 200 },
+    { field: 'vehicle', headerName: 'Placa', width: 100 },
+    {
+      field: 'dataSaida',
+      headerName: 'Data/Hora Saída',
+      width: 160,
+      valueGetter: (params) => {
+        const dt = params.row.dataSaida;
+        if (!dt) return '';
+        const d = new Date(dt);
+        return d.toLocaleString('pt-BR');
+      },
+    },
+    { field: 'kmSaida', headerName: 'KM Saída', width: 100 },
+    { field: 'motivoSaida', headerName: 'Motivo', width: 150 },
     {
       field: 'status',
-      headerName: 'Retorno?',
+      headerName: 'Chegou?',
       width: 120,
-      renderCell: (params) => (params.row.closed ? 'Concluído' : 'Em uso'),
+      renderCell: (params) => (params.row.closed ? 'Sim' : 'Não'),
     },
   ];
 
-  // Colunas da grid de RETORNOS
-  const retornoColumns = [
+  // --------------------- Colunas de CHEGADAS ---------------------
+  const chegadaColumns = [
     { field: 'saidaId', headerName: 'ID Saída', width: 90 },
-    { field: 'vehicle', headerName: 'Veículo', width: 120 },
-    { field: 'date', headerName: 'Data Retorno', width: 110 },
-    { field: 'mileage', headerName: 'KM Retorno', width: 110 },
-    { field: 'tireCondition', headerName: 'Pneu', width: 100 },
-    { field: 'oilLevel', headerName: 'Óleo', width: 80 },
-    { field: 'brakeCondition', headerName: 'Freios', width: 100 },
+    {
+      field: 'dataChegada',
+      headerName: 'Data/Hora Chegada',
+      width: 160,
+      valueGetter: (params) => {
+        const dt = params.row.dataChegada;
+        if (!dt) return '';
+        const d = new Date(dt);
+        return d.toLocaleString('pt-BR');
+      },
+    },
+    { field: 'kmChegada', headerName: 'KM Chegada', width: 110 },
     {
       field: 'actions',
       headerName: 'Comparar',
       width: 100,
       renderCell: (params) => (
-        <Tooltip title="Comparar Saída vs Retorno">
+        <Tooltip title="Comparar Saída vs Chegada">
           <IconButton color="primary" onClick={() => handleCompare(params.row)}>
             <CompareArrows />
           </IconButton>
@@ -148,123 +177,87 @@ export default function CheckList() {
   // --------------------- MANIPULAÇÃO DE DIÁLOGOS ---------------------
   function handleOpenSaidaDialog() {
     setNewSaida(initialSaidaForm());
-    setSaidaFieldLabel('');
-    setSaidaFieldValue('');
     setOpenSaidaDialog(true);
   }
   function handleCloseSaidaDialog() {
     setOpenSaidaDialog(false);
   }
 
-  function handleOpenRetornoDialog() {
-    setNewRetorno(initialRetornoForm());
-    setRetornoFieldLabel('');
-    setRetornoFieldValue('');
-    setOpenRetornoDialog(true);
+  function handleOpenChegadaDialog() {
+    setNewChegada(initialChegadaForm());
+    setOpenChegadaDialog(true);
   }
-  function handleCloseRetornoDialog() {
-    setOpenRetornoDialog(false);
+  function handleCloseChegadaDialog() {
+    setOpenChegadaDialog(false);
   }
 
   function handleCloseCompareDialog() {
-    setCompareData({ saida: null, retorno: null });
+    setCompareData({ saida: null, chegada: null });
     setOpenCompareDialog(false);
   }
 
   // --------------------- SALVAR SAÍDA ---------------------
   function handleSaveSaida() {
     const newId = saidas.length ? saidas[saidas.length - 1].id + 1 : 1;
+
     const saidaToAdd = {
       ...newSaida,
       id: newId,
-      mileage: Number(newSaida.mileage) || 0,
+      kmRodado: Number(newSaida.kmRodado) || 0,
+      capacidadeCarga: Number(newSaida.capacidadeCarga) || 0,
+      horimetroSaida: Number(newSaida.horimetroSaida) || 0,
+      kmSaida: Number(newSaida.kmSaida) || 0,
+      cargaSaida: Number(newSaida.cargaSaida) || 0,
       closed: false,
     };
+
     setSaidas((prev) => [...prev, saidaToAdd]);
     setOpenSaidaDialog(false);
   }
 
-  // --------------------- SALVAR RETORNO ---------------------
-  function handleSaveRetorno() {
-    // Vincula este retorno a uma saída não-fechada
-    const saidaId = Number(newRetorno.saidaId);
+  // --------------------- SALVAR CHEGADA ---------------------
+  function handleSaveChegada() {
+    // Vincula esta chegada a uma saída não-fechada
+    const saidaId = Number(newChegada.saidaId);
     const saidaRef = saidas.find((s) => s.id === saidaId);
+
     if (!saidaRef) {
       alert('Saída inválida ou não encontrada!');
       return;
     }
-    // Cria o retorno
-    const newId = retornos.length ? retornos[retornos.length - 1].id + 1 : 1;
-    const retornoToAdd = {
-      ...newRetorno,
+
+    // Cria a chegada
+    const newId = chegadas.length ? chegadas[chegadas.length - 1].id + 1 : 1;
+    const chegadaToAdd = {
+      ...newChegada,
       id: newId,
-      vehicle: saidaRef.vehicle,
-      mileage: Number(newRetorno.mileage) || 0,
+      horimetroChegada: Number(newChegada.horimetroChegada) || 0,
+      kmChegada: Number(newChegada.kmChegada) || 0,
+      cargaChegada: Number(newChegada.cargaChegada) || 0,
     };
+
     // Marca a saída como fechada
     setSaidas((prev) =>
       prev.map((s) => (s.id === saidaId ? { ...s, closed: true } : s))
     );
-    // Adiciona na lista
-    setRetornos((prev) => [...prev, retornoToAdd]);
-    setOpenRetornoDialog(false);
+    // Adiciona na lista de chegadas
+    setChegadas((prev) => [...prev, chegadaToAdd]);
+    setOpenChegadaDialog(false);
   }
 
   // --------------------- COMPARAÇÃO ---------------------
-  function handleCompare(retorno) {
-    const saidaRef = saidas.find((s) => s.id === retorno.saidaId);
+  function handleCompare(chegada) {
+    const saidaRef = saidas.find((s) => s.id === chegada.saidaId);
     if (!saidaRef) {
       alert('Saída correspondente não encontrada!');
       return;
     }
-    setCompareData({ saida: saidaRef, retorno: retorno });
+    setCompareData({ saida: saidaRef, chegada: chegada });
     setOpenCompareDialog(true);
   }
 
-  // Lista de saídas disponíveis para retorno (closed = false)
+  // Lista de saídas disponíveis para chegada (closed = false)
   const availableSaidas = saidas.filter((s) => !s.closed);
-
-  // --------------------- CAMPOS ADICIONAIS DINÂMICOS (SAÍDA) ---------------------
-  function handleAddSaidaField() {
-    if (!saidaFieldLabel.trim()) return;
-    setNewSaida((prev) => ({
-      ...prev,
-      additionalFields: [
-        ...prev.additionalFields,
-        { label: saidaFieldLabel, value: saidaFieldValue },
-      ],
-    }));
-    setSaidaFieldLabel('');
-    setSaidaFieldValue('');
-  }
-  function handleRemoveSaidaField(index) {
-    setNewSaida((prev) => {
-      const newFields = [...prev.additionalFields];
-      newFields.splice(index, 1);
-      return { ...prev, additionalFields: newFields };
-    });
-  }
-
-  // --------------------- CAMPOS ADICIONAIS DINÂMICOS (RETORNO) ---------------------
-  function handleAddRetornoField() {
-    if (!retornoFieldLabel.trim()) return;
-    setNewRetorno((prev) => ({
-      ...prev,
-      additionalFields: [
-        ...prev.additionalFields,
-        { label: retornoFieldLabel, value: retornoFieldValue },
-      ],
-    }));
-    setRetornoFieldLabel('');
-    setRetornoFieldValue('');
-  }
-  function handleRemoveRetornoField(index) {
-    setNewRetorno((prev) => {
-      const newFields = [...prev.additionalFields];
-      newFields.splice(index, 1);
-      return { ...prev, additionalFields: newFields };
-    });
-  }
 
   // --------------------- UPLOAD DE ARQUIVOS (ANEXOS) ---------------------
   function handleSaidaAttachments(e) {
@@ -277,11 +270,11 @@ export default function CheckList() {
     }));
   }
 
-  function handleRetornoAttachments(e) {
+  function handleChegadaAttachments(e) {
     const files = e.target.files;
     if (!files) return;
     const names = Array.from(files).map((f) => f.name);
-    setNewRetorno((prev) => ({
+    setNewChegada((prev) => ({
       ...prev,
       attachments: [...prev.attachments, ...names],
     }));
@@ -290,7 +283,7 @@ export default function CheckList() {
   return (
     <Box>
       <Typography variant="h4" sx={{ mb: 3 }}>
-        Checklist de Veículos
+        Saída/Chegada de Veículos
       </Typography>
 
       {/** SEÇÃO DE SAÍDAS */}
@@ -317,23 +310,23 @@ export default function CheckList() {
         </CardContent>
       </Card>
 
-      {/** SEÇÃO DE RETORNOS */}
+      {/** SEÇÃO DE CHEGADAS */}
       <Card sx={{ mb: 4 }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h6">Retornos</Typography>
+            <Typography variant="h6">Chegadas</Typography>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={handleOpenRetornoDialog}
+              onClick={handleOpenChegadaDialog}
             >
-              Novo Retorno
+              Nova Chegada
             </Button>
           </Box>
 
           <DataGrid
-            rows={retornos}
-            columns={retornoColumns}
+            rows={chegadas}
+            columns={chegadaColumns}
             pageSize={5}
             autoHeight
             sx={{ bgcolor: 'background.paper' }}
@@ -348,9 +341,32 @@ export default function CheckList() {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>Nova Saída</DialogTitle>
+        <DialogTitle>Saída do Veículo</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2}>
+            {/* Empresa */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Empresa"
+                fullWidth
+                value={newSaida.empresa}
+                onChange={(e) => setNewSaida({ ...newSaida, empresa: e.target.value })}
+              />
+            </Grid>
+
+            {/* Departamento */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Departamento do veículo"
+                fullWidth
+                value={newSaida.departamento}
+                onChange={(e) =>
+                  setNewSaida({ ...newSaida, departamento: e.target.value })
+                }
+              />
+            </Grid>
+
+            {/* Placa Principal */}
             <Grid item xs={12} sm={6}>
               <TextField
                 label="Veículo (Placa)"
@@ -360,91 +376,189 @@ export default function CheckList() {
               />
             </Grid>
 
+            {/* Semi-Reboque */}
             <Grid item xs={12} sm={6}>
               <TextField
-                label="Data Saída"
-                type="date"
+                label="Semi-reboque"
                 fullWidth
-                InputLabelProps={{ shrink: true }}
-                value={newSaida.date}
-                onChange={(e) => setNewSaida({ ...newSaida, date: e.target.value })}
+                value={newSaida.semiReboque}
+                onChange={(e) =>
+                  setNewSaida({ ...newSaida, semiReboque: e.target.value })
+                }
               />
             </Grid>
 
+            {/* Placa do Semi-Reboque */}
             <Grid item xs={12} sm={6}>
               <TextField
-                label="KM Saída"
+                label="Placa do Semi-reboque"
+                fullWidth
+                value={newSaida.placaSemiReboque}
+                onChange={(e) =>
+                  setNewSaida({ ...newSaida, placaSemiReboque: e.target.value })
+                }
+              />
+            </Grid>
+
+            {/* KM Rodado (info) */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="KM Rodado (info)"
                 type="number"
                 fullWidth
-                value={newSaida.mileage}
-                onChange={(e) => setNewSaida({ ...newSaida, mileage: e.target.value })}
+                value={newSaida.kmRodado}
+                onChange={(e) =>
+                  setNewSaida({ ...newSaida, kmRodado: e.target.value })
+                }
               />
             </Grid>
 
-            {/* Pneu */}
+            {/* Capacidade de Carga */}
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Pneu</InputLabel>
-                <Select
-                  value={newSaida.tireCondition}
-                  label="Pneu"
-                  onChange={(e) =>
-                    setNewSaida({ ...newSaida, tireCondition: e.target.value })
-                  }
-                >
-                  <MenuItem value="Bom">Bom</MenuItem>
-                  <MenuItem value="Regular">Regular</MenuItem>
-                  <MenuItem value="Ruim">Ruim</MenuItem>
-                </Select>
-              </FormControl>
+              <TextField
+                label="Capacidade de Carga (kg)"
+                type="number"
+                fullWidth
+                value={newSaida.capacidadeCarga}
+                onChange={(e) =>
+                  setNewSaida({ ...newSaida, capacidadeCarga: e.target.value })
+                }
+              />
             </Grid>
 
-            {/* Óleo */}
+            {/* Data/Hora Saída */}
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Óleo</InputLabel>
-                <Select
-                  value={newSaida.oilLevel}
-                  label="Óleo"
-                  onChange={(e) =>
-                    setNewSaida({ ...newSaida, oilLevel: e.target.value })
-                  }
-                >
-                  <MenuItem value="Normal">Normal</MenuItem>
-                  <MenuItem value="Baixo">Baixo</MenuItem>
-                  <MenuItem value="Muito Baixo">Muito Baixo</MenuItem>
-                </Select>
-              </FormControl>
+              <TextField
+                label="Data/Hora de Saída"
+                type="datetime-local"
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                value={newSaida.dataSaida}
+                onChange={(e) =>
+                  setNewSaida({ ...newSaida, dataSaida: e.target.value })
+                }
+              />
             </Grid>
 
-            {/* Freios */}
+            {/* Horímetro Saída */}
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Freios</InputLabel>
-                <Select
-                  value={newSaida.brakeCondition}
-                  label="Freios"
-                  onChange={(e) =>
-                    setNewSaida({ ...newSaida, brakeCondition: e.target.value })
-                  }
-                >
-                  <MenuItem value="Bom">Bom</MenuItem>
-                  <MenuItem value="Regular">Regular</MenuItem>
-                  <MenuItem value="Ruim">Ruim</MenuItem>
-                </Select>
-              </FormControl>
+              <TextField
+                label="Horímetro (Saída)"
+                type="number"
+                fullWidth
+                value={newSaida.horimetroSaida}
+                onChange={(e) =>
+                  setNewSaida({ ...newSaida, horimetroSaida: e.target.value })
+                }
+              />
             </Grid>
 
-            {/* Observações */}
+            {/* KM Saída */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="KM (Saída)"
+                type="number"
+                fullWidth
+                value={newSaida.kmSaida}
+                onChange={(e) => setNewSaida({ ...newSaida, kmSaida: e.target.value })}
+              />
+            </Grid>
+
+            {/* Carga Útil Saída */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Carga útil (Saída)"
+                type="number"
+                fullWidth
+                value={newSaida.cargaSaida}
+                onChange={(e) =>
+                  setNewSaida({ ...newSaida, cargaSaida: e.target.value })
+                }
+              />
+            </Grid>
+
+            {/* Inspecionado por */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Inspecionado por"
+                fullWidth
+                value={newSaida.inspecionadoPor}
+                onChange={(e) =>
+                  setNewSaida({ ...newSaida, inspecionadoPor: e.target.value })
+                }
+              />
+            </Grid>
+
+            {/* Motoristas */}
+            <Grid item xs={12} sm={4}>
+              <TextField
+                label="1° Motorista"
+                fullWidth
+                value={newSaida.motorista1}
+                onChange={(e) => setNewSaida({ ...newSaida, motorista1: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                label="2° Motorista"
+                fullWidth
+                value={newSaida.motorista2}
+                onChange={(e) => setNewSaida({ ...newSaida, motorista2: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                label="3° Motorista"
+                fullWidth
+                value={newSaida.motorista3}
+                onChange={(e) => setNewSaida({ ...newSaida, motorista3: e.target.value })}
+              />
+            </Grid>
+
+            {/* Motivo de saída */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Motivo de Saída"
+                fullWidth
+                value={newSaida.motivoSaida}
+                onChange={(e) =>
+                  setNewSaida({ ...newSaida, motivoSaida: e.target.value })
+                }
+              />
+            </Grid>
+
+            {/* Destino */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Destino"
+                fullWidth
+                value={newSaida.destino}
+                onChange={(e) => setNewSaida({ ...newSaida, destino: e.target.value })}
+              />
+            </Grid>
+
+            {/* Funcional Atendido (caso exista) */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Funcional Atendido"
+                fullWidth
+                value={newSaida.funcionalAtendido}
+                onChange={(e) =>
+                  setNewSaida({ ...newSaida, funcionalAtendido: e.target.value })
+                }
+              />
+            </Grid>
+
+            {/* Observações (Saída) */}
             <Grid item xs={12}>
               <TextField
-                label="Observações"
+                label="Observações (Saída)"
                 multiline
                 minRows={2}
                 fullWidth
-                value={newSaida.observations}
+                value={newSaida.observacoesSaida}
                 onChange={(e) =>
-                  setNewSaida({ ...newSaida, observations: e.target.value })
+                  setNewSaida({ ...newSaida, observacoesSaida: e.target.value })
                 }
               />
             </Grid>
@@ -459,56 +573,6 @@ export default function CheckList() {
               />
             </Grid>
           </Grid>
-
-          {/* Campos adicionais dinâmicos */}
-          <Box sx={{ mt: 3, borderTop: '1px solid #ccc', pt: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1 }}>
-              Campos Opcionais (Saída)
-            </Typography>
-
-            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-              <TextField
-                label="Nome do campo (ex: Filtro de ar)"
-                value={saidaFieldLabel}
-                onChange={(e) => setSaidaFieldLabel(e.target.value)}
-              />
-              <TextField
-                label="Valor (ex: Sujo, Ok)"
-                value={saidaFieldValue}
-                onChange={(e) => setSaidaFieldValue(e.target.value)}
-              />
-              <Button variant="contained" onClick={handleAddSaidaField}>
-                Adicionar
-              </Button>
-            </Box>
-
-            {newSaida.additionalFields.length > 0 && (
-              <Box>
-                {newSaida.additionalFields.map((field, idx) => (
-                  <Box
-                    key={idx}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      mb: 1,
-                    }}
-                  >
-                    <Typography variant="body2">
-                      <strong>{field.label}:</strong> {field.value}
-                    </Typography>
-                    <IconButton
-                      color="error"
-                      onClick={() => handleRemoveSaidaField(idx)}
-                      size="small"
-                    >
-                      <DeleteIcon fontSize="inherit" />
-                    </IconButton>
-                  </Box>
-                ))}
-              </Box>
-            )}
-          </Box>
         </DialogContent>
 
         <DialogActions>
@@ -519,24 +583,25 @@ export default function CheckList() {
         </DialogActions>
       </Dialog>
 
-      {/** DIALOG - NOVO RETORNO */}
+      {/** DIALOG - NOVA CHEGADA */}
       <Dialog
-        open={openRetornoDialog}
-        onClose={handleCloseRetornoDialog}
+        open={openChegadaDialog}
+        onClose={handleCloseChegadaDialog}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>Novo Retorno</DialogTitle>
+        <DialogTitle>Chegada do Veículo</DialogTitle>
         <DialogContent dividers>
           <Grid container spacing={2}>
+            {/* Selecione a Saída */}
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
                 <InputLabel>Saída (disponível)</InputLabel>
                 <Select
-                  value={newRetorno.saidaId}
+                  value={newChegada.saidaId}
                   label="Saída (disponível)"
                   onChange={(e) =>
-                    setNewRetorno({ ...newRetorno, saidaId: e.target.value })
+                    setNewChegada({ ...newChegada, saidaId: e.target.value })
                   }
                 >
                   {availableSaidas.map((s) => (
@@ -548,167 +613,128 @@ export default function CheckList() {
               </FormControl>
             </Grid>
 
+            {/* Data/Hora Chegada */}
             <Grid item xs={12} sm={6}>
               <TextField
-                label="Data Retorno"
-                type="date"
+                label="Data/Hora de Chegada"
+                type="datetime-local"
                 fullWidth
                 InputLabelProps={{ shrink: true }}
-                value={newRetorno.date}
-                onChange={(e) => setNewRetorno({ ...newRetorno, date: e.target.value })}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="KM Retorno"
-                type="number"
-                fullWidth
-                value={newRetorno.mileage}
+                value={newChegada.dataChegada}
                 onChange={(e) =>
-                  setNewRetorno({ ...newRetorno, mileage: e.target.value })
+                  setNewChegada({ ...newChegada, dataChegada: e.target.value })
                 }
               />
             </Grid>
 
-            {/* Pneu */}
+            {/* Horímetro Chegada */}
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Pneu</InputLabel>
-                <Select
-                  value={newRetorno.tireCondition}
-                  label="Pneu"
-                  onChange={(e) =>
-                    setNewRetorno({ ...newRetorno, tireCondition: e.target.value })
-                  }
-                >
-                  <MenuItem value="Bom">Bom</MenuItem>
-                  <MenuItem value="Regular">Regular</MenuItem>
-                  <MenuItem value="Ruim">Ruim</MenuItem>
-                </Select>
-              </FormControl>
+              <TextField
+                label="Horímetro (Chegada)"
+                type="number"
+                fullWidth
+                value={newChegada.horimetroChegada}
+                onChange={(e) =>
+                  setNewChegada({ ...newChegada, horimetroChegada: e.target.value })
+                }
+              />
             </Grid>
 
-            {/* Óleo */}
+            {/* KM Chegada */}
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Óleo</InputLabel>
-                <Select
-                  value={newRetorno.oilLevel}
-                  label="Óleo"
-                  onChange={(e) =>
-                    setNewRetorno({ ...newRetorno, oilLevel: e.target.value })
-                  }
-                >
-                  <MenuItem value="Normal">Normal</MenuItem>
-                  <MenuItem value="Baixo">Baixo</MenuItem>
-                  <MenuItem value="Muito Baixo">Muito Baixo</MenuItem>
-                </Select>
-              </FormControl>
+              <TextField
+                label="KM (Chegada)"
+                type="number"
+                fullWidth
+                value={newChegada.kmChegada}
+                onChange={(e) =>
+                  setNewChegada({ ...newChegada, kmChegada: e.target.value })
+                }
+              />
             </Grid>
 
-            {/* Freios */}
+            {/* Carga Útil Chegada */}
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Freios</InputLabel>
-                <Select
-                  value={newRetorno.brakeCondition}
-                  label="Freios"
-                  onChange={(e) =>
-                    setNewRetorno({ ...newRetorno, brakeCondition: e.target.value })
-                  }
-                >
-                  <MenuItem value="Bom">Bom</MenuItem>
-                  <MenuItem value="Regular">Regular</MenuItem>
-                  <MenuItem value="Ruim">Ruim</MenuItem>
-                </Select>
-              </FormControl>
+              <TextField
+                label="Carga útil (Chegada)"
+                type="number"
+                fullWidth
+                value={newChegada.cargaChegada}
+                onChange={(e) =>
+                  setNewChegada({ ...newChegada, cargaChegada: e.target.value })
+                }
+              />
             </Grid>
 
-            {/* Observações */}
+            {/* Motoristas (Chegada) */}
+            <Grid item xs={12} sm={4}>
+              <TextField
+                label="1° Motorista"
+                fullWidth
+                value={newChegada.motorista1Cheg}
+                onChange={(e) =>
+                  setNewChegada({ ...newChegada, motorista1Cheg: e.target.value })
+                }
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                label="2° Motorista"
+                fullWidth
+                value={newChegada.motorista2Cheg}
+                onChange={(e) =>
+                  setNewChegada({ ...newChegada, motorista2Cheg: e.target.value })
+                }
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                label="3° Motorista"
+                fullWidth
+                value={newChegada.motorista3Cheg}
+                onChange={(e) =>
+                  setNewChegada({ ...newChegada, motorista3Cheg: e.target.value })
+                }
+              />
+            </Grid>
+
+            {/* Observações Chegada */}
             <Grid item xs={12}>
               <TextField
-                label="Observações Retorno"
+                label="Observações (Chegada)"
                 multiline
                 minRows={2}
                 fullWidth
-                value={newRetorno.observations}
+                value={newChegada.observacoesChegada}
                 onChange={(e) =>
-                  setNewRetorno({ ...newRetorno, observations: e.target.value })
+                  setNewChegada({
+                    ...newChegada,
+                    observacoesChegada: e.target.value,
+                  })
                 }
               />
             </Grid>
 
-            {/* Anexos */}
+            {/* Anexos (Chegada) */}
             <Grid item xs={12}>
-              <Typography variant="subtitle2">Anexos (Retorno)</Typography>
+              <Typography variant="subtitle2">Anexos (Chegada)</Typography>
               <TextField
                 type="file"
                 inputProps={{ multiple: true }}
-                onChange={handleRetornoAttachments}
+                onChange={handleChegadaAttachments}
               />
             </Grid>
           </Grid>
-
-          {/* Campos opcionais (dinâmicos) no Retorno */}
-          <Box sx={{ mt: 3, borderTop: '1px solid #ccc', pt: 2 }}>
-            <Typography variant="h6" sx={{ mb: 1 }}>
-              Campos Opcionais (Retorno)
-            </Typography>
-
-            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-              <TextField
-                label="Nome do campo (ex: Filtro de ar)"
-                value={retornoFieldLabel}
-                onChange={(e) => setRetornoFieldLabel(e.target.value)}
-              />
-              <TextField
-                label="Valor (ex: Sujo, Ok)"
-                value={retornoFieldValue}
-                onChange={(e) => setRetornoFieldValue(e.target.value)}
-              />
-              <Button variant="contained" onClick={handleAddRetornoField}>
-                Adicionar
-              </Button>
-            </Box>
-
-            {newRetorno.additionalFields.length > 0 && (
-              <Box>
-                {newRetorno.additionalFields.map((field, idx) => (
-                  <Box
-                    key={idx}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      mb: 1,
-                    }}
-                  >
-                    <Typography variant="body2">
-                      <strong>{field.label}:</strong> {field.value}
-                    </Typography>
-                    <IconButton
-                      color="error"
-                      onClick={() => handleRemoveRetornoField(idx)}
-                      size="small"
-                    >
-                      <DeleteIcon fontSize="inherit" />
-                    </IconButton>
-                  </Box>
-                ))}
-              </Box>
-            )}
-          </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseRetornoDialog}>Cancelar</Button>
-          <Button variant="contained" onClick={handleSaveRetorno}>
+          <Button onClick={handleCloseChegadaDialog}>Cancelar</Button>
+          <Button variant="contained" onClick={handleSaveChegada}>
             Salvar
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/** DIALOG - COMPARAR SAÍDA vs RETORNO */}
+      {/** DIALOG - COMPARAR SAÍDA vs CHEGADA */}
       <Dialog
         open={openCompareDialog}
         onClose={handleCloseCompareDialog}
@@ -716,7 +742,7 @@ export default function CheckList() {
         fullWidth
       >
         <DialogTitle>
-          Comparar Saída x Retorno
+          Comparar Saída x Chegada
           <IconButton
             onClick={handleCloseCompareDialog}
             sx={{ position: 'absolute', right: 8, top: 8 }}
@@ -725,10 +751,10 @@ export default function CheckList() {
           </IconButton>
         </DialogTitle>
 
-        {compareData.saida && compareData.retorno && (
+        {compareData.saida && compareData.chegada && (
           <DialogContent dividers>
             <Typography variant="subtitle1" sx={{ mb: 2 }}>
-              <strong>Veículo:</strong> {compareData.saida.vehicle}
+              <strong>Veículo (Placa):</strong> {compareData.saida.vehicle}
             </Typography>
 
             <Grid container spacing={2}>
@@ -737,61 +763,79 @@ export default function CheckList() {
                 <Typography variant="h6" gutterBottom>
                   Saída
                 </Typography>
-                <Typography>Data: {compareData.saida.date}</Typography>
-                <Typography>KM: {compareData.saida.mileage}</Typography>
-                <Typography>Pneu: {compareData.saida.tireCondition}</Typography>
-                <Typography>Óleo: {compareData.saida.oilLevel}</Typography>
-                <Typography>Freios: {compareData.saida.brakeCondition}</Typography>
+                <Typography>
+                  <strong>Data/Hora:</strong>{' '}
+                  {new Date(compareData.saida.dataSaida).toLocaleString('pt-BR')}
+                </Typography>
+                <Typography>
+                  <strong>KM Saída:</strong> {compareData.saida.kmSaida}
+                </Typography>
+                <Typography>
+                  <strong>Horímetro:</strong> {compareData.saida.horimetroSaida}
+                </Typography>
+                <Typography>
+                  <strong>Carga Útil Saída:</strong> {compareData.saida.cargaSaida}
+                </Typography>
+                <Typography>
+                  <strong>Motorista 1:</strong> {compareData.saida.motorista1}
+                </Typography>
+                <Typography>
+                  <strong>Motorista 2:</strong> {compareData.saida.motorista2}
+                </Typography>
+                <Typography>
+                  <strong>Motorista 3:</strong> {compareData.saida.motorista3}
+                </Typography>
+                <Typography>
+                  <strong>Motivo:</strong> {compareData.saida.motivoSaida}
+                </Typography>
+                <Typography>
+                  <strong>Destino:</strong> {compareData.saida.destino}
+                </Typography>
                 <Typography sx={{ mt: 1 }}>
-                  <strong>Observações:</strong> {compareData.saida.observations}
+                  <strong>Observações:</strong> {compareData.saida.observacoesSaida}
                 </Typography>
                 <Typography sx={{ mt: 1 }}>
                   <strong>Anexos:</strong>{' '}
                   {compareData.saida.attachments.join(', ')}
                 </Typography>
-
-                {/* Campos adicionais da saída */}
-                {compareData.saida.additionalFields?.length > 0 && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2">Campos Opcionais (Saída)</Typography>
-                    {compareData.saida.additionalFields.map((field, idx) => (
-                      <Typography key={idx}>
-                        - <strong>{field.label}:</strong> {field.value}
-                      </Typography>
-                    ))}
-                  </Box>
-                )}
               </Grid>
 
-              {/* COLUNA RETORNO */}
+              {/* COLUNA CHEGADA */}
               <Grid item xs={12} sm={6}>
                 <Typography variant="h6" gutterBottom>
-                  Retorno
+                  Chegada
                 </Typography>
-                <Typography>Data: {compareData.retorno.date}</Typography>
-                <Typography>KM: {compareData.retorno.mileage}</Typography>
-                <Typography>Pneu: {compareData.retorno.tireCondition}</Typography>
-                <Typography>Óleo: {compareData.retorno.oilLevel}</Typography>
-                <Typography>Freios: {compareData.retorno.brakeCondition}</Typography>
+                <Typography>
+                  <strong>Data/Hora:</strong>{' '}
+                  {new Date(compareData.chegada.dataChegada).toLocaleString('pt-BR')}
+                </Typography>
+                <Typography>
+                  <strong>KM Chegada:</strong> {compareData.chegada.kmChegada}
+                </Typography>
+                <Typography>
+                  <strong>Horímetro:</strong> {compareData.chegada.horimetroChegada}
+                </Typography>
+                <Typography>
+                  <strong>Carga Útil Chegada:</strong>{' '}
+                  {compareData.chegada.cargaChegada}
+                </Typography>
+                <Typography>
+                  <strong>Motorista 1:</strong> {compareData.chegada.motorista1Cheg}
+                </Typography>
+                <Typography>
+                  <strong>Motorista 2:</strong> {compareData.chegada.motorista2Cheg}
+                </Typography>
+                <Typography>
+                  <strong>Motorista 3:</strong> {compareData.chegada.motorista3Cheg}
+                </Typography>
                 <Typography sx={{ mt: 1 }}>
-                  <strong>Observações:</strong> {compareData.retorno.observations}
+                  <strong>Observações:</strong>{' '}
+                  {compareData.chegada.observacoesChegada}
                 </Typography>
                 <Typography sx={{ mt: 1 }}>
                   <strong>Anexos:</strong>{' '}
-                  {compareData.retorno.attachments.join(', ')}
+                  {compareData.chegada.attachments.join(', ')}
                 </Typography>
-
-                {/* Campos adicionais do retorno */}
-                {compareData.retorno.additionalFields?.length > 0 && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2">Campos Opcionais (Retorno)</Typography>
-                    {compareData.retorno.additionalFields.map((field, idx) => (
-                      <Typography key={idx}>
-                        - <strong>{field.label}:</strong> {field.value}
-                      </Typography>
-                    ))}
-                  </Box>
-                )}
               </Grid>
             </Grid>
           </DialogContent>
@@ -804,28 +848,41 @@ export default function CheckList() {
 // ------------- FORMULÁRIOS INICIAIS -------------
 function initialSaidaForm() {
   return {
+    empresa: '298 DISTRIBUIDORA PRINCESA',
+    departamento: '100 TRANSPORTE URBANO',
     vehicle: '',
-    date: '',
-    mileage: '',
-    tireCondition: 'Bom',
-    oilLevel: 'Normal',
-    brakeCondition: 'Bom',
+    semiReboque: '',
+    placaSemiReboque: '',
+    kmRodado: 0,
+    capacidadeCarga: 0,
+    dataSaida: '',
+    horimetroSaida: 0,
+    kmSaida: 0,
+    cargaSaida: 0,
+    inspecionadoPor: '',
+    motorista1: '',
+    motorista2: '',
+    motorista3: '',
+    motivoSaida: '',
+    destino: '',
+    funcionalAtendido: '',
+    observacoesSaida: '',
     attachments: [],
-    observations: '',
-    additionalFields: [],
+    closed: false,
   };
 }
 
-function initialRetornoForm() {
+function initialChegadaForm() {
   return {
     saidaId: '',
-    date: '',
-    mileage: '',
-    tireCondition: 'Bom',
-    oilLevel: 'Normal',
-    brakeCondition: 'Bom',
+    dataChegada: '',
+    horimetroChegada: 0,
+    kmChegada: 0,
+    cargaChegada: 0,
+    motorista1Cheg: '',
+    motorista2Cheg: '',
+    motorista3Cheg: '',
+    observacoesChegada: '',
     attachments: [],
-    observations: '',
-    additionalFields: [],
   };
 }

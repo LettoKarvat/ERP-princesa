@@ -83,8 +83,9 @@ function Layout() {
           }}
         >
           <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
-            <FaCrown style={{ marginRight: 8 }} />
+
             Princesa
+            <FaCrown style={{ marginRight: 8 }} />
           </Typography>
         </Box>
 
