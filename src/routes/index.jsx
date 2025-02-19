@@ -5,6 +5,10 @@ import Dashboard from '../pages/Dashboard';
 import VehicleList from '../pages/VehicleList';
 import VehicleChecklist from '../pages/VehicleChecklist';
 import ConsumptionControl from '../pages/ConsumptionControl';
+
+// IMPORTANTE: importar o componente de abastecimento
+import Refueling from '../pages/Refueling';
+
 import Layout from '../components/Layout';
 
 const PrivateRoute = ({ children }) => {
@@ -24,11 +28,16 @@ function AppRoutes() {
           </PrivateRoute>
         }
       >
+        {/* Redireciona / para /dashboard */}
         <Route index element={<Navigate to="/dashboard" replace />} />
+
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="vehicles" element={<VehicleList />} />
         <Route path="checklist" element={<VehicleChecklist />} />
         <Route path="consumption" element={<ConsumptionControl />} />
+
+        {/* <-- AQUI adicionamos a rota de abastecimento */}
+        <Route path="refueling" element={<Refueling />} />
       </Route>
     </Routes>
   );

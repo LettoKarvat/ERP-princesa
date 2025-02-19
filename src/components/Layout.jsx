@@ -27,16 +27,17 @@ import {
   FaSignOutAlt,
   FaWhatsapp,
   FaCrown,
+  FaGasPump, // Importante para ícone de abastecimento
 } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
 
-// Largura fixa da sidebar
+// Define a largura fixa da sidebar
 const SIDEBAR_WIDTH = 240;
 
 // Estilo padrão para os botões da lista
 const listItemButtonStyle = {
   color: '#fff',
-  textTransform: 'none', // Não deixar tudo em uppercase
+  textTransform: 'none', // não deixar tudo em maiúsculo
   '&.active': {
     backgroundColor: '#333', // fundo diferente no item ativo
   },
@@ -58,16 +59,16 @@ function Layout() {
     <Box sx={{ display: 'flex' }}>
       <CssBaseline />
 
-      {/** SIDEBAR FIXA */}
+      {/* SIDEBAR FIXA */}
       <Box
         sx={{
           width: SIDEBAR_WIDTH,
           height: '100vh',
-          backgroundColor: '#1f2937', // fundo escuro, semelhante ao Tailwind
+          backgroundColor: '#1f2937', // fundo escuro (estilo Tailwind)
           color: '#fff',
           display: 'flex',
           flexDirection: 'column',
-          position: 'fixed', // Fica fixo na lateral
+          position: 'fixed', // fica fixo na lateral
           zIndex: 999,
         }}
       >
@@ -90,6 +91,7 @@ function Layout() {
         {/* Menu principal */}
         <Box component="nav" sx={{ flex: 1 }}>
           <List>
+            {/* Dashboard */}
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
@@ -103,7 +105,7 @@ function Layout() {
               </ListItemButton>
             </ListItem>
 
-            {/* Exemplos de mais rotas (ajuste conforme seu projeto) */}
+            {/* Veículos */}
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
@@ -117,6 +119,7 @@ function Layout() {
               </ListItemButton>
             </ListItem>
 
+            {/* Checklist */}
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
@@ -130,6 +133,7 @@ function Layout() {
               </ListItemButton>
             </ListItem>
 
+            {/* Consumo */}
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
@@ -143,7 +147,19 @@ function Layout() {
               </ListItemButton>
             </ListItem>
 
-            {/* Coloque aqui outras rotas (Clientes, Técnicos, etc.) */}
+            {/* Abastecimento (NOVO ITEM) */}
+            <ListItem disablePadding>
+              <ListItemButton
+                component={NavLink}
+                to="/refueling"
+                sx={listItemButtonStyle}
+              >
+                <ListItemIcon sx={{ color: 'inherit' }}>
+                  <FaGasPump />
+                </ListItemIcon>
+                <ListItemText primary="Abastecimento" />
+              </ListItemButton>
+            </ListItem>
 
             {/* Botão de sair */}
             <ListItem disablePadding>
@@ -187,18 +203,18 @@ function Layout() {
         </Box>
       </Box>
 
-      {/** CONTEÚDO PRINCIPAL */}
+      {/* CONTEÚDO PRINCIPAL */}
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          ml: `${SIDEBAR_WIDTH}px`, // empurra o conteúdo para direita
+          ml: `${SIDEBAR_WIDTH}px`, // empurra o conteúdo para a direita
           p: 3,
-          backgroundColor: '#f5f6fa', // um cinza clarinho
+          backgroundColor: '#f5f6fa', // cinza clarinho
           minHeight: '100vh',
         }}
       >
-        {/* Se quiser uma barra de ferramenta ou espaçamento no topo */}
+        {/* Espaço no topo (caso queira) */}
         <Toolbar />
         <Outlet />
       </Box>
