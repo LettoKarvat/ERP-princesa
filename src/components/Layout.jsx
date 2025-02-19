@@ -83,10 +83,13 @@ function Layout() {
           }}
         >
           <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
-
-            Princesa
-            <FaCrown style={{ marginRight: 8 }} />
+            <img
+              src="https://iili.io/39JTE5Q.png"
+              alt="Logo Princesa"
+              style={{ height: '100px', marginRight: '2px' }}
+            />
           </Typography>
+
         </Box>
 
         {/* Menu principal */}
