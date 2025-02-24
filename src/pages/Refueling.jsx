@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     Box,
     Button,
@@ -13,6 +13,8 @@ import {
     InputLabel,
     Select,
     MenuItem,
+    useMediaQuery,
+    Tooltip,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import {
@@ -21,6 +23,8 @@ import {
     Delete as DeleteIcon,
 } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
+import SignatureCanvas from 'react-signature-canvas';
+import { useTheme } from '@mui/material/styles';
 
 export default function Refueling() {
     // Lista de abastecimentos salvos
@@ -38,6 +42,8 @@ export default function Refueling() {
             mileage: 376918,
             tankMeasurement: 100,
             observation: 'Tanque cheio',
+            signature: '',        // Assinatura do motorista
+            attachments: [],      // Anexos
         },
         {
             id: 2,
@@ -52,26 +58,40 @@ export default function Refueling() {
             mileage: 42000,
             tankMeasurement: 50,
             observation: '',
+            signature: '',
+            attachments: [],
         },
     ]);
 
-    // Controles do diálogo
+    // Controles do diálogo principal (novo/editar)
     const [open, setOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState(null);
 
-    // Estado para o abastecimento "em edição/criação"
+    // Objeto abastecimento em edição
     const [newRefueling, setNewRefueling] = useState(initialRefueling());
 
-    // Estado para anexos
+    // Estado para anexos (no momento da criação/edição)
     const [attachments, setAttachments] = useState([]);
 
-    // Handler para o input de arquivos
+    // -- CONTROLES DE ASSINATURA --
+    const [openSignatureModal, setOpenSignatureModal] = useState(false);
+    const signatureRef = useRef(null);
+
+    const theme = useTheme();
+    const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
+    // --------------------------------------------------------------------------------
+    // UPLOAD DE ARQUIVOS (ANEXOS)
+    // --------------------------------------------------------------------------------
     const handleFileChange = (e) => {
+        if (!e.target.files) return;
         setAttachments(Array.from(e.target.files));
     };
 
-    // Função para exportar os registros para Excel (.xlsx) com cabeçalhos em português e formatação simples
+    // --------------------------------------------------------------------------------
+    // EXPORTAR PARA EXCEL
+    // --------------------------------------------------------------------------------
     const exportToExcel = () => {
         // Definindo os títulos das colunas em português
         const headers = [
@@ -86,7 +106,10 @@ export default function Refueling() {
             "KM",
             "Medição Tanque",
             "Observação",
+            "Assinatura",
+            "Anexos",
         ];
+
         // Monta os dados (array de arrays)
         const data = [headers];
         refuelings.forEach((r) => {
@@ -102,6 +125,8 @@ export default function Refueling() {
                 r.mileage,
                 r.tankMeasurement,
                 r.observation,
+                r.signature ? "Sim" : "Não",
+                r.attachments.map((f) => f.name || f).join(', '),
             ]);
         });
 
@@ -109,7 +134,6 @@ export default function Refueling() {
         const worksheet = XLSX.utils.aoa_to_sheet(data);
 
         // Aplica formatação simples nos cabeçalhos (primeira linha)
-        // Pode ser necessário utilizar uma versão que suporte estilos, como o xlsx-style ou a versão Pro do SheetJS.
         const range = XLSX.utils.decode_range(worksheet["!ref"]);
         for (let C = range.s.c; C <= range.e.c; C++) {
             const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
@@ -133,6 +157,8 @@ export default function Refueling() {
             { wpx: 80 },
             { wpx: 120 },
             { wpx: 150 },
+            { wpx: 90 },
+            { wpx: 160 },
         ];
 
         const workbook = XLSX.utils.book_new();
@@ -140,7 +166,9 @@ export default function Refueling() {
         XLSX.writeFile(workbook, "registros_abastecimentos.xlsx");
     };
 
-    // Colunas do DataGrid
+    // --------------------------------------------------------------------------------
+    // COLUNAS DO DATA GRID
+    // --------------------------------------------------------------------------------
     const columns = [
         { field: 'vehicle', headerName: 'Veículo', width: 130 },
         { field: 'fuelType', headerName: 'Combustível', width: 120 },
@@ -168,40 +196,58 @@ export default function Refueling() {
             flex: 1,
         },
         {
+            field: 'signature',
+            headerName: 'Assinatura',
+            width: 100,
+            renderCell: (params) => params.value ? 'OK' : 'Falta'
+        },
+        {
             field: 'actions',
             headerName: 'Ações',
-            width: 100,
+            width: 130,
             renderCell: (params) => (
                 <>
-                    <IconButton
-                        color="primary"
-                        onClick={() => handleEdit(params.row.id)}
-                        size="small"
-                    >
-                        <EditIcon />
-                    </IconButton>
-                    <IconButton
-                        color="error"
-                        onClick={() => handleDelete(params.row.id)}
-                        size="small"
-                    >
-                        <DeleteIcon />
-                    </IconButton>
+                    <Tooltip title="Editar">
+                        <IconButton
+                            color="primary"
+                            onClick={() => handleEdit(params.row.id)}
+                            size="small"
+                        >
+                            <EditIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Excluir">
+                        <IconButton
+                            color="error"
+                            onClick={() => handleDelete(params.row.id)}
+                            size="small"
+                        >
+                            <DeleteIcon />
+                        </IconButton>
+                    </Tooltip>
                 </>
             ),
         },
     ];
 
-    // Handler para abrir o diálogo de novo abastecimento
+    // --------------------------------------------------------------------------------
+    // AÇÕES DE ABRIR/FECHAR DIÁLOGO
+    // --------------------------------------------------------------------------------
     const handleOpenDialog = () => {
         setIsEditing(false);
         setEditId(null);
         setNewRefueling(initialRefueling());
-        setAttachments([]); // Limpa os anexos
+        setAttachments([]);
         setOpen(true);
     };
 
-    // Handler para abrir o diálogo em modo edição
+    const handleCloseDialog = () => {
+        setOpen(false);
+    };
+
+    // --------------------------------------------------------------------------------
+    // EDIÇÃO E EXCLUSÃO
+    // --------------------------------------------------------------------------------
     const handleEdit = (id) => {
         const refuelToEdit = refuelings.find((r) => r.id === id);
         if (!refuelToEdit) return;
@@ -220,30 +266,29 @@ export default function Refueling() {
             mileage: refuelToEdit.mileage,
             tankMeasurement: refuelToEdit.tankMeasurement,
             observation: refuelToEdit.observation,
+            signature: refuelToEdit.signature,  // Carrega a assinatura já existente
         });
-        setAttachments([]); // Opcional: carregar anexos se houver
+        setAttachments(refuelToEdit.attachments || []);
         setOpen(true);
     };
 
-    // Exclui um registro
     const handleDelete = (id) => {
         const confirmed = window.confirm('Deseja excluir este abastecimento?');
         if (!confirmed) return;
         setRefuelings((prev) => prev.filter((r) => r.id !== id));
     };
 
-    // Fecha o diálogo
-    const handleCloseDialog = () => {
-        setOpen(false);
-    };
-
-    // Atualiza o estado quando digitar nos campos
+    // --------------------------------------------------------------------------------
+    // HANDLES DO FORMULÁRIO
+    // --------------------------------------------------------------------------------
     const handleChange = (e) => {
         const { name, value } = e.target;
         setNewRefueling((prev) => ({ ...prev, [name]: value }));
     };
 
-    // Salva (novo ou edição)
+    // --------------------------------------------------------------------------------
+    // SALVAR (NOVO OU EDIÇÃO)
+    // --------------------------------------------------------------------------------
     const handleSave = () => {
         // Validações básicas
         if (!newRefueling.vehicle.trim()) {
@@ -259,6 +304,25 @@ export default function Refueling() {
             return;
         }
 
+        // Validação: precisa ter ANEXOS
+        if (!attachments || attachments.length === 0) {
+            alert('É obrigatório adicionar pelo menos um anexo!');
+            return;
+        }
+
+        // Validação: precisa ter ASSINATURA
+        if (!newRefueling.signature) {
+            // Se não houver assinatura, abre modal para assinar
+            setOpenSignatureModal(true);
+            return;
+        }
+
+        // Se estiver tudo certo, salva
+        doFinalSave();
+    };
+
+    // Função que realmente salva (após validação e assinatura)
+    const doFinalSave = () => {
         if (isEditing && editId != null) {
             // Modo edição
             setRefuelings((prev) =>
@@ -271,6 +335,7 @@ export default function Refueling() {
                             mileage: Number(newRefueling.mileage),
                             tankMeasurement: Number(newRefueling.tankMeasurement),
                             unitPrice: Number(newRefueling.unitPrice),
+                            attachments: attachments, // Salva anexos
                         }
                         : r
                 )
@@ -285,14 +350,44 @@ export default function Refueling() {
                 mileage: Number(newRefueling.mileage),
                 tankMeasurement: Number(newRefueling.tankMeasurement),
                 unitPrice: Number(newRefueling.unitPrice),
+                attachments: attachments,
             };
             setRefuelings((prev) => [...prev, recordToAdd]);
         }
 
-        // Aqui você pode tratar os anexos (por exemplo, enviá-los para o servidor)
         console.log('Arquivos anexados:', attachments);
 
         setOpen(false);
+    };
+
+    // --------------------------------------------------------------------------------
+    // HANDLES DE ASSINATURA (CHAMADO AO TENTAR SALVAR)
+    // --------------------------------------------------------------------------------
+    const handleCloseSignature = () => {
+        setOpenSignatureModal(false);
+    };
+
+    const handleConfirmSignature = () => {
+        if (signatureRef.current && signatureRef.current.isEmpty()) {
+            alert('Por favor, faça a assinatura antes de confirmar.');
+            return;
+        }
+        const signatureDataUrl = signatureRef.current.toDataURL();
+
+        // Salva no estado do abastecimento atual
+        setNewRefueling((prev) => ({ ...prev, signature: signatureDataUrl }));
+
+        // Fecha modal
+        setOpenSignatureModal(false);
+
+        // Agora que temos a assinatura, finalizamos o save
+        doFinalSave();
+    };
+
+    const handleClearSignature = () => {
+        if (signatureRef.current) {
+            signatureRef.current.clear();
+        }
     };
 
     // Habilita/desabilita campos conforme o "post" (interno/externo)
@@ -440,6 +535,7 @@ export default function Refueling() {
                             onChange={handleChange}
                         />
                     </Box>
+
                     <TextField
                         margin="dense"
                         name="tankMeasurement"
@@ -465,7 +561,9 @@ export default function Refueling() {
 
                     {/* Seção de Anexos */}
                     <Box sx={{ mt: 2 }}>
-                        <Typography variant="subtitle1">Anexos</Typography>
+                        <Typography variant="subtitle1">
+                            Anexos (obrigatório pelo menos um)
+                        </Typography>
                         <input
                             accept="image/*,application/pdf"
                             style={{ display: 'none' }}
@@ -483,7 +581,7 @@ export default function Refueling() {
                             <Box sx={{ mt: 1 }}>
                                 {attachments.map((file, index) => (
                                     <Typography key={index} variant="body2">
-                                        {file.name}
+                                        {file.name || file}
                                     </Typography>
                                 ))}
                             </Box>
@@ -495,6 +593,38 @@ export default function Refueling() {
                     <Button onClick={handleCloseDialog}>Cancelar</Button>
                     <Button onClick={handleSave} variant="contained">
                         Salvar
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* MODAL DE ASSINATURA (chamado se não tiver assinatura no momento do Save) */}
+            <Dialog
+                open={openSignatureModal}
+                onClose={handleCloseSignature}
+                fullScreen={fullScreen}
+            >
+                <DialogTitle>Assinatura</DialogTitle>
+                <DialogContent dividers>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                        Por favor, assine abaixo:
+                    </Typography>
+                    <SignatureCanvas
+                        ref={signatureRef}
+                        penColor="black"
+                        canvasProps={{
+                            width: fullScreen ? window.innerWidth - 20 : 400,
+                            height: 200,
+                            className: 'sigCanvas',
+                        }}
+                    />
+                    <Button onClick={handleClearSignature} sx={{ mt: 1 }}>
+                        Limpar Assinatura
+                    </Button>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseSignature}>Cancelar</Button>
+                    <Button variant="contained" onClick={handleConfirmSignature}>
+                        Confirmar Assinatura
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -516,5 +646,7 @@ function initialRefueling() {
         mileage: '',
         tankMeasurement: '',
         observation: '',
+        signature: '',      // Campo para armazenar a assinatura
+        attachments: [],    // Campo para armazenar anexos
     };
 }

@@ -25,6 +25,7 @@ function PartsReplacement() {
         partCode: '',
         truck: '',
         truckPlate: '',
+        mileage: '', // Campo de quilometragem
         installationDate: '',
         quantity: 1,
         partValue: '',
@@ -48,8 +49,16 @@ function PartsReplacement() {
 
     // Função para registrar o novo dado
     const handleRegister = () => {
-        if (!newRecord.partCode || !newRecord.truck || !newRecord.installationDate || !newRecord.partValue) {
-            alert('Preencha os campos obrigatórios: Código da Peça, Caminhão, Data de Instalação e Valor da Peça.');
+        if (
+            !newRecord.partCode ||
+            !newRecord.truck ||
+            !newRecord.installationDate ||
+            !newRecord.partValue ||
+            !newRecord.mileage
+        ) {
+            alert(
+                'Preencha os campos obrigatórios: Código da Peça, Caminhão, Quilometragem, Data de Instalação e Valor da Peça.'
+            );
             return;
         }
         if (newRecord.includeLabor && !newRecord.laborValue) {
@@ -63,7 +72,9 @@ function PartsReplacement() {
 
         const id = records.length ? records[records.length - 1].id + 1 : 1;
         const partValue = parseFloat(newRecord.partValue) || 0;
-        const laborValue = newRecord.includeLabor ? parseFloat(newRecord.laborValue) || 0 : 0;
+        const laborValue = newRecord.includeLabor
+            ? parseFloat(newRecord.laborValue) || 0
+            : 0;
         const quantity = parseInt(newRecord.quantity, 10);
         const totalCost = partValue * quantity + laborValue;
 
@@ -72,6 +83,7 @@ function PartsReplacement() {
             partCode: newRecord.partCode,
             truck: newRecord.truck,
             truckPlate: newRecord.truckPlate,
+            mileage: newRecord.mileage, // Incluído
             installationDate: newRecord.installationDate,
             quantity,
             partValue,
@@ -87,6 +99,7 @@ function PartsReplacement() {
             partCode: '',
             truck: '',
             truckPlate: '',
+            mileage: '', // Reset do campo
             installationDate: '',
             quantity: 1,
             partValue: '',
@@ -96,72 +109,13 @@ function PartsReplacement() {
         });
     };
 
-    // Função para iniciar a edição de um registro
-    const handleEditClick = (params) => {
-        setEditRowId(params.row.id);
-        setEditValues({ ...params.row });
-    };
-
-    // Atualiza os valores em edição
-    const handleEditChange = (e) => {
-        const { name, value } = e.target;
-        setEditValues((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-    };
-
-    // Função para salvar as alterações
-    const handleSaveEdit = (id) => {
-        if (!editValues.partCode || !editValues.truck || !editValues.installationDate || !editValues.partValue) {
-            alert('Preencha os campos obrigatórios antes de salvar.');
-            return;
-        }
-        if (editValues.includeLabor && !editValues.laborValue) {
-            alert('Preencha o valor da mão de obra ou desmarque "Incluir Mão de Obra".');
-            return;
-        }
-        if (editValues.quantity <= 0) {
-            alert('A quantidade de peças deve ser pelo menos 1.');
-            return;
-        }
-
-        const partValue = parseFloat(editValues.partValue) || 0;
-        const laborValue = editValues.includeLabor ? parseFloat(editValues.laborValue) || 0 : 0;
-        const quantity = parseInt(editValues.quantity, 10);
-        const totalCost = partValue * quantity + laborValue;
-
-        setRecords((prev) =>
-            prev.map((record) =>
-                record.id === id
-                    ? { ...record, ...editValues, partValue, laborValue, quantity, totalCost }
-                    : record
-            )
-        );
-        setEditRowId(null);
-        setEditValues({});
-    };
-
-    // Função para cancelar a edição
-    const handleCancelEdit = () => {
-        setEditRowId(null);
-        setEditValues({});
-    };
-
-    // Função para remover um registro
-    const handleDelete = (id) => {
-        if (window.confirm('Tem certeza que deseja excluir este registro?')) {
-            setRecords((prev) => prev.filter((record) => record.id !== id));
-        }
-    };
-
-    // Função para exportar os registros para Excel (.xlsx) com cabeçalhos formatados
+    // Função para exportar os registros para Excel (.xlsx)
     const exportToExcel = () => {
-        // Definindo os títulos das colunas em português
         const headers = [
             "Código da Peça",
             "Caminhão",
             "Placa",
+            "Quilometragem",
             "Data de Instalação",
             "Qtd",
             "Valor da Peça (R$)",
@@ -170,13 +124,13 @@ function PartsReplacement() {
             "Observação",
         ];
 
-        // Monta os dados como array de arrays
         const data = [headers];
         records.forEach((r) => {
             data.push([
                 r.partCode,
                 r.truck,
                 r.truckPlate,
+                r.mileage, // Exporta a quilometragem
                 r.installationDate,
                 r.quantity,
                 r.partValue,
@@ -186,34 +140,7 @@ function PartsReplacement() {
             ]);
         });
 
-        // Cria a worksheet a partir do array de arrays
         const worksheet = XLSX.utils.aoa_to_sheet(data);
-
-        // Aplica formatação simples aos cabeçalhos (primeira linha)
-        // Observação: para que os estilos sejam aplicados, pode ser necessário utilizar uma versão que suporte estilos (como xlsx-style ou a versão Pro do SheetJS).
-        const range = XLSX.utils.decode_range(worksheet["!ref"]);
-        for (let C = range.s.c; C <= range.e.c; C++) {
-            const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
-            if (!worksheet[cellAddress]) continue;
-            worksheet[cellAddress].s = {
-                font: { bold: true, color: { rgb: "FFFFFF" } },
-                fill: { fgColor: { rgb: "4F81BD" } },
-            };
-        }
-
-        // Define larguras para as colunas (em pixels)
-        worksheet["!cols"] = [
-            { wpx: 100 }, // Código da Peça
-            { wpx: 100 }, // Caminhão
-            { wpx: 80 },  // Placa
-            { wpx: 120 }, // Data de Instalação
-            { wpx: 60 },  // Qtd
-            { wpx: 120 }, // Valor da Peça
-            { wpx: 120 }, // Mão de Obra
-            { wpx: 120 }, // Custo Total
-            { wpx: 150 }, // Observação
-        ];
-
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Registros');
         XLSX.writeFile(workbook, 'registros_troca_de_pecas.xlsx');
@@ -227,7 +154,11 @@ function PartsReplacement() {
             width: 150,
             renderCell: (params) =>
                 editRowId === params.row.id ? (
-                    <TextField name="partCode" value={editValues.partCode} onChange={handleEditChange} />
+                    <TextField
+                        name="partCode"
+                        value={editValues.partCode}
+                        onChange={handleEditChange}
+                    />
                 ) : (
                     params.value
                 ),
@@ -238,7 +169,11 @@ function PartsReplacement() {
             width: 150,
             renderCell: (params) =>
                 editRowId === params.row.id ? (
-                    <TextField name="truck" value={editValues.truck} onChange={handleEditChange} />
+                    <TextField
+                        name="truck"
+                        value={editValues.truck}
+                        onChange={handleEditChange}
+                    />
                 ) : (
                     params.value
                 ),
@@ -249,7 +184,26 @@ function PartsReplacement() {
             width: 130,
             renderCell: (params) =>
                 editRowId === params.row.id ? (
-                    <TextField name="truckPlate" value={editValues.truckPlate} onChange={handleEditChange} />
+                    <TextField
+                        name="truckPlate"
+                        value={editValues.truckPlate}
+                        onChange={handleEditChange}
+                    />
+                ) : (
+                    params.value
+                ),
+        },
+        {
+            field: 'mileage',
+            headerName: 'Quilometragem',
+            width: 130,
+            renderCell: (params) =>
+                editRowId === params.row.id ? (
+                    <TextField
+                        name="mileage"
+                        value={editValues.mileage}
+                        onChange={handleEditChange}
+                    />
                 ) : (
                     params.value
                 ),
@@ -384,6 +338,73 @@ function PartsReplacement() {
         },
     ];
 
+    // Função para iniciar a edição de um registro
+    const handleEditClick = (params) => {
+        setEditRowId(params.row.id);
+        setEditValues({ ...params.row });
+    };
+
+    // Atualiza os valores em edição
+    const handleEditChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setEditValues((prev) => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value,
+        }));
+    };
+
+    // Função para salvar as alterações
+    const handleSaveEdit = (id) => {
+        if (
+            !editValues.partCode ||
+            !editValues.truck ||
+            !editValues.installationDate ||
+            !editValues.partValue ||
+            !editValues.mileage
+        ) {
+            alert('Preencha os campos obrigatórios antes de salvar.');
+            return;
+        }
+        if (editValues.includeLabor && !editValues.laborValue) {
+            alert('Preencha o valor da mão de obra ou desmarque "Incluir Mão de Obra".');
+            return;
+        }
+        if (editValues.quantity <= 0) {
+            alert('A quantidade de peças deve ser pelo menos 1.');
+            return;
+        }
+
+        const partValue = parseFloat(editValues.partValue) || 0;
+        const laborValue = editValues.includeLabor
+            ? parseFloat(editValues.laborValue) || 0
+            : 0;
+        const quantity = parseInt(editValues.quantity, 10);
+        const totalCost = partValue * quantity + laborValue;
+
+        setRecords((prev) =>
+            prev.map((record) =>
+                record.id === id
+                    ? { ...record, ...editValues, partValue, laborValue, quantity, totalCost }
+                    : record
+            )
+        );
+        setEditRowId(null);
+        setEditValues({});
+    };
+
+    // Função para cancelar a edição
+    const handleCancelEdit = () => {
+        setEditRowId(null);
+        setEditValues({});
+    };
+
+    // Função para remover um registro
+    const handleDelete = (id) => {
+        if (window.confirm('Tem certeza que deseja excluir este registro?')) {
+            setRecords((prev) => prev.filter((record) => record.id !== id));
+        }
+    };
+
     return (
         <Box>
             <Typography variant="h4" sx={{ mb: 3 }}>
@@ -418,9 +439,18 @@ function PartsReplacement() {
                         <Grid item xs={12} sm={6} md={3}>
                             <TextField
                                 fullWidth
-                                label="Placa do Caminhão (opcional)"
+                                label="Placa do Caminhão"
                                 name="truckPlate"
                                 value={newRecord.truckPlate}
+                                onChange={handleChange}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <TextField
+                                fullWidth
+                                label="Quilometragem *"
+                                name="mileage"
+                                value={newRecord.mileage}
                                 onChange={handleChange}
                             />
                         </Grid>
