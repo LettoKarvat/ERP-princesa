@@ -20,6 +20,7 @@ import {
     Edit as EditIcon,
     Delete as DeleteIcon,
 } from '@mui/icons-material';
+import * as XLSX from 'xlsx';
 
 export default function Refueling() {
     // Lista de abastecimentos salvos
@@ -68,6 +69,75 @@ export default function Refueling() {
     // Handler para o input de arquivos
     const handleFileChange = (e) => {
         setAttachments(Array.from(e.target.files));
+    };
+
+    // Função para exportar os registros para Excel (.xlsx) com cabeçalhos em português e formatação simples
+    const exportToExcel = () => {
+        // Definindo os títulos das colunas em português
+        const headers = [
+            "Veículo",
+            "Combustível",
+            "Data",
+            "Posto",
+            "Bomba",
+            "Nota",
+            "Preço Unitário",
+            "Litros",
+            "KM",
+            "Medição Tanque",
+            "Observação",
+        ];
+        // Monta os dados (array de arrays)
+        const data = [headers];
+        refuelings.forEach((r) => {
+            data.push([
+                r.vehicle,
+                r.fuelType,
+                r.date,
+                r.post,
+                r.pump,
+                r.invoiceNumber,
+                r.unitPrice,
+                r.liters,
+                r.mileage,
+                r.tankMeasurement,
+                r.observation,
+            ]);
+        });
+
+        // Cria a worksheet a partir do array de arrays
+        const worksheet = XLSX.utils.aoa_to_sheet(data);
+
+        // Aplica formatação simples nos cabeçalhos (primeira linha)
+        // Pode ser necessário utilizar uma versão que suporte estilos, como o xlsx-style ou a versão Pro do SheetJS.
+        const range = XLSX.utils.decode_range(worksheet["!ref"]);
+        for (let C = range.s.c; C <= range.e.c; C++) {
+            const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+            if (!worksheet[cellAddress]) continue;
+            worksheet[cellAddress].s = {
+                font: { bold: true, color: { rgb: "FFFFFF" } },
+                fill: { fgColor: { rgb: "4F81BD" } },
+            };
+        }
+
+        // Define larguras para as colunas (em pixels)
+        worksheet["!cols"] = [
+            { wpx: 100 },
+            { wpx: 100 },
+            { wpx: 120 },
+            { wpx: 80 },
+            { wpx: 80 },
+            { wpx: 80 },
+            { wpx: 120 },
+            { wpx: 80 },
+            { wpx: 80 },
+            { wpx: 120 },
+            { wpx: 150 },
+        ];
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Abastecimentos");
+        XLSX.writeFile(workbook, "registros_abastecimentos.xlsx");
     };
 
     // Colunas do DataGrid
@@ -207,9 +277,7 @@ export default function Refueling() {
             );
         } else {
             // Novo abastecimento
-            const newId = refuelings.length
-                ? refuelings[refuelings.length - 1].id + 1
-                : 1;
+            const newId = refuelings.length ? refuelings[refuelings.length - 1].id + 1 : 1;
             const recordToAdd = {
                 id: newId,
                 ...newRefueling,
@@ -235,13 +303,14 @@ export default function Refueling() {
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
                 <Typography variant="h4">Abastecimentos</Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={handleOpenDialog}
-                >
-                    Novo Abastecimento
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button variant="outlined" onClick={exportToExcel}>
+                        Exportar para Excel (.xlsx)
+                    </Button>
+                    <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenDialog}>
+                        Novo Abastecimento
+                    </Button>
+                </Box>
             </Box>
 
             <DataGrid

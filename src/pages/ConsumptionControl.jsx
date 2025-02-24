@@ -5,20 +5,15 @@ import {
   Card,
   CardContent,
   Grid,
-  TextField,
   Button,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   IconButton,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import { BarChart } from '@mui/x-charts';
 import { Delete as DeleteIcon } from '@mui/icons-material';
+import * as XLSX from 'xlsx';
 
 // Função utilitária para extrair "mês/ano" de uma data "YYYY-MM-DD"
-// e retornar ex: "2025-02".
 function getMonthYear(dateStr) {
   if (!dateStr) return null;
   const date = new Date(dateStr);
@@ -29,22 +24,18 @@ function getMonthYear(dateStr) {
 }
 
 export default function ConsumptionControl() {
-  // Lista geral de gastos. Cada item pode ser de Combustível, Pneus ou Peças.
+  // Lista geral de consumos (registros)
   const [expenditures, setExpenditures] = useState([
     {
       id: 1,
       date: '2025-01-10',
       vehicle: 'ABC1234',
-      category: 'Combustível', // Combustível | Pneus | Peças
-      // Campos para combustível:
+      category: 'Combustível',
       liters: 50,
-      // Campos para pneus:
       tireQty: 0,
       tireBrand: '',
-      // Campos para peças:
       partName: '',
       partQty: 0,
-      // Comum a todas:
       cost: 250,
       observation: 'Posto Shell',
     },
@@ -89,98 +80,80 @@ export default function ConsumptionControl() {
     },
   ]);
 
-  // Estado do formulário para criar novo registro
-  const [newRecord, setNewRecord] = useState({
-    date: '',
-    vehicle: '',
-    category: 'Combustível',
-    // Combustível
-    liters: '',
-    // Pneus
-    tireQty: '',
-    tireBrand: '',
-    // Peças
-    partName: '',
-    partQty: '',
-    // Comum
-    cost: '',
-    observation: '',
-  });
-
-  // Ao digitar nos campos do formulário
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setNewRecord((prev) => ({ ...prev, [name]: value }));
-  };
-
-  // Quando mudamos a categoria, limpamos os campos específicos?
-  const handleCategoryChange = (e) => {
-    const selected = e.target.value;
-    setNewRecord((prev) => ({
-      ...prev,
-      category: selected,
-      liters: '',
-      tireQty: '',
-      tireBrand: '',
-      partName: '',
-      partQty: '',
-    }));
-  };
-
-  // Botão "Registrar"
-  const handleRegister = () => {
-    // Validação simples
-    if (!newRecord.date || !newRecord.vehicle || !newRecord.cost) {
-      alert('Preencha ao menos Data, Veículo e Custo!');
-      return;
-    }
-
-    // Gera ID
-    const newId = expenditures.length
-      ? expenditures[expenditures.length - 1].id + 1
-      : 1;
-
-    const recordToAdd = {
-      id: newId,
-      date: newRecord.date,
-      vehicle: newRecord.vehicle,
-      category: newRecord.category,
-      liters: Number(newRecord.liters) || 0,
-      tireQty: Number(newRecord.tireQty) || 0,
-      tireBrand: newRecord.tireBrand || '',
-      partName: newRecord.partName || '',
-      partQty: Number(newRecord.partQty) || 0,
-      cost: Number(newRecord.cost) || 0,
-      observation: newRecord.observation || '',
-    };
-
-    // Salva no array
-    setExpenditures((prev) => [...prev, recordToAdd]);
-
-    // Limpa formulário
-    setNewRecord({
-      date: '',
-      vehicle: '',
-      category: newRecord.category, // mantém a mesma categoria selecionada
-      liters: '',
-      tireQty: '',
-      tireBrand: '',
-      partName: '',
-      partQty: '',
-      cost: '',
-      observation: '',
-    });
-  };
-
-  // Excluir registro
+  // Função para excluir um registro
   const handleDelete = (id) => {
     if (!window.confirm('Deseja realmente excluir este registro?')) return;
     setExpenditures((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // ----- Montando colunas da tabela -----
-  // Exibimos colunas comuns: Data, Veículo, Categoria, Custo, Observação
-  // E colunas específicas se quiser (Litros, Qtd Pneus, Peça etc.).
+  // Função para exportar os registros para Excel (.xlsx) com cabeçalhos em português
+  const exportToExcel = () => {
+    const headers = [
+      "Data",
+      "Veículo",
+      "Categoria",
+      "Detalhes",
+      "Custo (R$)",
+      "Observação",
+    ];
+
+    // Prepara os dados para o Excel: transforma cada registro em um array
+    const data = [headers];
+    expenditures.forEach((r) => {
+      let details = '';
+      switch (r.category) {
+        case 'Combustível':
+          details = `Litros: ${r.liters}`;
+          break;
+        case 'Pneus':
+          details = `Qtd: ${r.tireQty} / Marca: ${r.tireBrand}`;
+          break;
+        case 'Peças':
+          details = `Peça: ${r.partName} (x${r.partQty})`;
+          break;
+        default:
+          break;
+      }
+      data.push([
+        r.date,
+        r.vehicle,
+        r.category,
+        details,
+        r.cost,
+        r.observation,
+      ]);
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+
+    // Aplica formatação simples aos cabeçalhos (primeira linha)
+    // Obs: Para que os estilos sejam aplicados, pode ser necessário utilizar uma versão que suporte estilos (como o xlsx-style ou a versão Pro do SheetJS)
+    const range = XLSX.utils.decode_range(worksheet["!ref"]);
+    for (let C = range.s.c; C <= range.e.c; C++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+      if (!worksheet[cellAddress]) continue;
+      worksheet[cellAddress].s = {
+        font: { bold: true, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: "4F81BD" } },
+      };
+    }
+
+    // Define larguras para as colunas (em pixels)
+    worksheet["!cols"] = [
+      { wpx: 100 }, // Data
+      { wpx: 100 }, // Veículo
+      { wpx: 120 }, // Categoria
+      { wpx: 180 }, // Detalhes
+      { wpx: 100 }, // Custo
+      { wpx: 150 }, // Observação
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Consumos');
+    XLSX.writeFile(workbook, 'registros_consumos.xlsx');
+  };
+
+  // Configuração das colunas da DataGrid
   const columns = [
     { field: 'date', headerName: 'Data', width: 110 },
     { field: 'vehicle', headerName: 'Veículo', width: 110 },
@@ -189,7 +162,6 @@ export default function ConsumptionControl() {
       field: 'specific',
       headerName: 'Detalhes',
       width: 180,
-      // Exibir algo de acordo com a categoria
       renderCell: (params) => {
         const row = params.row;
         switch (row.category) {
@@ -222,11 +194,8 @@ export default function ConsumptionControl() {
     },
   ];
 
-  // ----- Gráficos -----
-  // a) Gasto total mensal (somando todos).
-  // b) Gasto mensal por categoria (opcional).
-
-  // Montar um map { '2025-01': { totalCost: 0, fuelCost: 0, tireCost: 0, partsCost: 0 } }
+  // ----- Cálculo dos dados mensais para gráficos -----
+  // Monta um map { '2025-01': { total, fuel, tire, parts } }
   const monthlyMap = {};
   expenditures.forEach((item) => {
     const key = getMonthYear(item.date);
@@ -234,10 +203,7 @@ export default function ConsumptionControl() {
     if (!monthlyMap[key]) {
       monthlyMap[key] = { total: 0, fuel: 0, tire: 0, parts: 0 };
     }
-    // Soma no total
     monthlyMap[key].total += item.cost;
-
-    // Soma em cada categoria
     if (item.category === 'Combustível') {
       monthlyMap[key].fuel += item.cost;
     } else if (item.category === 'Pneus') {
@@ -246,8 +212,6 @@ export default function ConsumptionControl() {
       monthlyMap[key].parts += item.cost;
     }
   });
-
-  // Convertendo em array ordenada
   const monthlyData = Object.entries(monthlyMap)
     .map(([month, val]) => ({
       month,
@@ -257,13 +221,8 @@ export default function ConsumptionControl() {
       parts: val.parts,
     }))
     .sort((a, b) => a.month.localeCompare(b.month));
-
-  // Vamos criar um array para o BarChart do total
   const totalCosts = monthlyData.map((item) => item.total);
   const months = monthlyData.map((item) => item.month);
-
-  // Se quiser 3 gráficos (um para cada categoria) ou um stacked chart
-  //  *Exemplo rápido: 3 bar charts, um para cada*
   const fuelCosts = monthlyData.map((item) => item.fuel);
   const tireCosts = monthlyData.map((item) => item.tire);
   const partsCosts = monthlyData.map((item) => item.parts);
@@ -274,148 +233,12 @@ export default function ConsumptionControl() {
         Controle de Gastos (Combustível, Pneus, Peças)
       </Typography>
 
-      {/* Formulário de novo registro */}
-      <Card sx={{ mb: 4 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 3 }}>
-            Novo Registro de Consumo
-          </Typography>
-          <Grid container spacing={2}>
-            {/* Data */}
-            <Grid item xs={12} sm={6} md={2}>
-              <TextField
-                fullWidth
-                label="Data"
-                type="date"
-                name="date"
-                InputLabelProps={{ shrink: true }}
-                value={newRecord.date}
-                onChange={handleChange}
-              />
-            </Grid>
-            {/* Veículo */}
-            <Grid item xs={12} sm={6} md={2}>
-              <TextField
-                fullWidth
-                label="Veículo (Placa)"
-                name="vehicle"
-                value={newRecord.vehicle}
-                onChange={handleChange}
-              />
-            </Grid>
-            {/* Categoria */}
-            <Grid item xs={12} sm={6} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Categoria</InputLabel>
-                <Select
-                  name="category"
-                  label="Categoria"
-                  value={newRecord.category}
-                  onChange={handleCategoryChange}
-                >
-                  <MenuItem value="Combustível">Combustível</MenuItem>
-                  <MenuItem value="Pneus">Pneus</MenuItem>
-                  <MenuItem value="Peças">Peças</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-
-            {/* Se for Combustível, mostra Litros */}
-            {newRecord.category === 'Combustível' && (
-              <Grid item xs={12} sm={6} md={2}>
-                <TextField
-                  fullWidth
-                  label="Litros"
-                  type="number"
-                  name="liters"
-                  value={newRecord.liters}
-                  onChange={handleChange}
-                />
-              </Grid>
-            )}
-
-            {/* Se for Pneus, mostra Qtd e Marca */}
-            {newRecord.category === 'Pneus' && (
-              <>
-                <Grid item xs={12} sm={6} md={1.5}>
-                  <TextField
-                    fullWidth
-                    label="Qtd Pneus"
-                    type="number"
-                    name="tireQty"
-                    value={newRecord.tireQty}
-                    onChange={handleChange}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={2.5}>
-                  <TextField
-                    fullWidth
-                    label="Marca Pneus"
-                    name="tireBrand"
-                    value={newRecord.tireBrand}
-                    onChange={handleChange}
-                  />
-                </Grid>
-              </>
-            )}
-
-            {/* Se for Peças, mostra nome e qtd */}
-            {newRecord.category === 'Peças' && (
-              <>
-                <Grid item xs={12} sm={6} md={2}>
-                  <TextField
-                    fullWidth
-                    label="Peça"
-                    name="partName"
-                    value={newRecord.partName}
-                    onChange={handleChange}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={1.5}>
-                  <TextField
-                    fullWidth
-                    label="Qtd"
-                    type="number"
-                    name="partQty"
-                    value={newRecord.partQty}
-                    onChange={handleChange}
-                  />
-                </Grid>
-              </>
-            )}
-
-            {/* Custo */}
-            <Grid item xs={12} sm={6} md={2}>
-              <TextField
-                fullWidth
-                label="Custo (R$)"
-                type="number"
-                name="cost"
-                value={newRecord.cost}
-                onChange={handleChange}
-              />
-            </Grid>
-
-            {/* Observação */}
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                fullWidth
-                label="Observação"
-                name="observation"
-                value={newRecord.observation}
-                onChange={handleChange}
-              />
-            </Grid>
-
-            {/* Botão */}
-            <Grid item xs={12}>
-              <Button variant="contained" onClick={handleRegister}>
-                Registrar
-              </Button>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+      {/* Botão de exportação */}
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+        <Button variant="outlined" onClick={exportToExcel}>
+          Exportar para Excel (.xlsx)
+        </Button>
+      </Box>
 
       {/* Tabela de registros */}
       <Card sx={{ mb: 4 }}>
@@ -454,14 +277,13 @@ export default function ConsumptionControl() {
           </Card>
         </Grid>
 
-        {/* Gráficos de cada categoria separada (opcional) */}
+        {/* Gráficos por categoria */}
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Gasto por Categoria
               </Typography>
-              {/* Exemplo: 3 gráficos em colunas (poderia ser stacked etc.) */}
               <Typography variant="subtitle2">Combustível</Typography>
               <Box sx={{ width: '100%', height: 150, mb: 2 }}>
                 <BarChart

@@ -27,8 +27,11 @@ import {
   FaSignOutAlt,
   FaWhatsapp,
   FaCrown,
-  FaGasPump, // Importante para ícone de abastecimento
+  FaGasPump, // Ícone para abastecimento
 } from 'react-icons/fa';
+
+import { PiTireLight } from "react-icons/pi";
+
 import { useAuth } from '../contexts/AuthContext';
 
 // Define a largura fixa da sidebar
@@ -64,11 +67,11 @@ function Layout() {
         sx={{
           width: SIDEBAR_WIDTH,
           height: '100vh',
-          backgroundColor: '#1f2937', // fundo escuro (estilo Tailwind)
+          backgroundColor: '#1f2937',
           color: '#fff',
           display: 'flex',
           flexDirection: 'column',
-          position: 'fixed', // fica fixo na lateral
+          position: 'fixed',
           zIndex: 999,
         }}
       >
@@ -89,7 +92,6 @@ function Layout() {
               style={{ height: '100px', marginRight: '2px' }}
             />
           </Typography>
-
         </Box>
 
         {/* Menu principal */}
@@ -151,7 +153,7 @@ function Layout() {
               </ListItemButton>
             </ListItem>
 
-            {/* Abastecimento (NOVO ITEM) */}
+            {/* Abastecimento */}
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
@@ -164,6 +166,36 @@ function Layout() {
                 <ListItemText primary="Abastecimento" />
               </ListItemButton>
             </ListItem>
+
+            {/* Troca de Peças */}
+            <ListItem disablePadding>
+              <ListItemButton
+                component={NavLink}
+                to="/parts-replacement"
+                sx={listItemButtonStyle}
+              >
+                <ListItemIcon sx={{ color: 'inherit' }}>
+                  <FaTools />
+                </ListItemIcon>
+                <ListItemText primary="Troca de Peças" />
+              </ListItemButton>
+            </ListItem>
+
+            {/* Troca de Pneus */}
+            <ListItem disablePadding>
+              <ListItemButton
+                component={NavLink}
+                to="/tire-replacement"
+                sx={listItemButtonStyle}
+              >
+                <ListItemIcon sx={{ color: 'inherit' }}>
+                  {/* Aumentar o tamanho via prop size */}
+                  <PiTireLight size={24} />
+                </ListItemIcon>
+                <ListItemText primary="Pneus" />
+              </ListItemButton>
+            </ListItem>
+
 
             {/* Botão de sair */}
             <ListItem disablePadding>
@@ -214,11 +246,10 @@ function Layout() {
           flexGrow: 1,
           ml: `${SIDEBAR_WIDTH}px`, // empurra o conteúdo para a direita
           p: 3,
-          backgroundColor: '#f5f6fa', // cinza clarinho
+          backgroundColor: '#f5f6fa',
           minHeight: '100vh',
         }}
       >
-        {/* Espaço no topo (caso queira) */}
         <Toolbar />
         <Outlet />
       </Box>

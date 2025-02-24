@@ -5,10 +5,15 @@ import Dashboard from '../pages/Dashboard';
 import VehicleList from '../pages/VehicleList';
 import VehicleChecklist from '../pages/VehicleChecklist';
 import ConsumptionControl from '../pages/ConsumptionControl';
+import PartsReplacement from '../pages/PartsReplacement';
 
-// IMPORTANTE: importar o componente de abastecimento
+// 1) Comente ou remova o import antigo
+// import TireReplacement from '../pages/TireReplacement';
+
+// 2) Importe o novo componente
+import TireManagement from '../pages/TireManagement';
+
 import Refueling from '../pages/Refueling';
-
 import Layout from '../components/Layout';
 
 const PrivateRoute = ({ children }) => {
@@ -20,6 +25,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+
       <Route
         path="/"
         element={
@@ -36,7 +42,12 @@ function AppRoutes() {
         <Route path="checklist" element={<VehicleChecklist />} />
         <Route path="consumption" element={<ConsumptionControl />} />
 
-        {/* <-- AQUI adicionamos a rota de abastecimento */}
+        {/* 3) Substitua ou crie a rota que exibia o TireReplacement 
+            para exibir o novo TireManagement */}
+        {/* <Route path="tire-replacement" element={<TireReplacement />} /> */}
+        <Route path="tire-replacement" element={<TireManagement />} />
+
+        <Route path="parts-replacement" element={<PartsReplacement />} />
         <Route path="refueling" element={<Refueling />} />
       </Route>
     </Routes>
