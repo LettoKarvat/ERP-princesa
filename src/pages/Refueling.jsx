@@ -10,7 +10,10 @@ import {
     TextField,
     IconButton,
     FormControl,
-    InputLabel,
+    FormLabel,
+    RadioGroup,
+    FormControlLabel,
+    Radio,
     Select,
     MenuItem,
     useMediaQuery,
@@ -40,10 +43,9 @@ export default function Refueling() {
             unitPrice: 0,
             liters: 107,
             mileage: 376918,
-            tankMeasurement: 100,
             observation: 'Tanque cheio',
-            signature: '',        // Assinatura do motorista
-            attachments: [],      // Anexos
+            signature: '',  // Assinatura do motorista
+            attachments: [], // Anexos
         },
         {
             id: 2,
@@ -56,7 +58,6 @@ export default function Refueling() {
             unitPrice: 4.5,
             liters: 20,
             mileage: 42000,
-            tankMeasurement: 50,
             observation: '',
             signature: '',
             attachments: [],
@@ -95,19 +96,18 @@ export default function Refueling() {
     const exportToExcel = () => {
         // Definindo os títulos das colunas em português
         const headers = [
-            "Veículo",
-            "Combustível",
-            "Data",
-            "Posto",
-            "Bomba",
-            "Nota",
-            "Preço Unitário",
-            "Litros",
-            "KM",
-            "Medição Tanque",
-            "Observação",
-            "Assinatura",
-            "Anexos",
+            'Veículo',
+            'Combustível',
+            'Data',
+            'Posto',
+            'Bomba',
+            'Nota',
+            'Preço Unitário',
+            'Litros',
+            'KM',
+            'Observação',
+            'Assinatura',
+            'Anexos',
         ];
 
         // Monta os dados (array de arrays)
@@ -123,9 +123,8 @@ export default function Refueling() {
                 r.unitPrice,
                 r.liters,
                 r.mileage,
-                r.tankMeasurement,
                 r.observation,
-                r.signature ? "Sim" : "Não",
+                r.signature ? 'Sim' : 'Não',
                 r.attachments.map((f) => f.name || f).join(', '),
             ]);
         });
@@ -134,18 +133,18 @@ export default function Refueling() {
         const worksheet = XLSX.utils.aoa_to_sheet(data);
 
         // Aplica formatação simples nos cabeçalhos (primeira linha)
-        const range = XLSX.utils.decode_range(worksheet["!ref"]);
+        const range = XLSX.utils.decode_range(worksheet['!ref']);
         for (let C = range.s.c; C <= range.e.c; C++) {
             const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
             if (!worksheet[cellAddress]) continue;
             worksheet[cellAddress].s = {
-                font: { bold: true, color: { rgb: "FFFFFF" } },
-                fill: { fgColor: { rgb: "4F81BD" } },
+                font: { bold: true, color: { rgb: 'FFFFFF' } },
+                fill: { fgColor: { rgb: '4F81BD' } },
             };
         }
 
         // Define larguras para as colunas (em pixels)
-        worksheet["!cols"] = [
+        worksheet['!cols'] = [
             { wpx: 100 },
             { wpx: 100 },
             { wpx: 120 },
@@ -155,15 +154,14 @@ export default function Refueling() {
             { wpx: 120 },
             { wpx: 80 },
             { wpx: 80 },
-            { wpx: 120 },
             { wpx: 150 },
             { wpx: 90 },
             { wpx: 160 },
         ];
 
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Abastecimentos");
-        XLSX.writeFile(workbook, "registros_abastecimentos.xlsx");
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Abastecimentos');
+        XLSX.writeFile(workbook, 'registros_abastecimentos.xlsx');
     };
 
     // --------------------------------------------------------------------------------
@@ -184,11 +182,11 @@ export default function Refueling() {
             field: 'unitPrice',
             headerName: 'Preço Un.',
             width: 90,
-            valueFormatter: (params) => (params.value ? `R$ ${params.value}` : ''),
+            valueFormatter: (params) =>
+                params.value ? `R$ ${params.value}` : '',
         },
         { field: 'liters', headerName: 'Litros', width: 80 },
         { field: 'mileage', headerName: 'KM', width: 100 },
-        { field: 'tankMeasurement', headerName: 'Medição Tanque', width: 130 },
         {
             field: 'observation',
             headerName: 'Observação',
@@ -199,7 +197,7 @@ export default function Refueling() {
             field: 'signature',
             headerName: 'Assinatura',
             width: 100,
-            renderCell: (params) => params.value ? 'OK' : 'Falta'
+            renderCell: (params) => (params.value ? 'OK' : 'Falta'),
         },
         {
             field: 'actions',
@@ -264,9 +262,8 @@ export default function Refueling() {
             unitPrice: refuelToEdit.unitPrice,
             liters: refuelToEdit.liters,
             mileage: refuelToEdit.mileage,
-            tankMeasurement: refuelToEdit.tankMeasurement,
             observation: refuelToEdit.observation,
-            signature: refuelToEdit.signature,  // Carrega a assinatura já existente
+            signature: refuelToEdit.signature, // Carrega a assinatura já existente
         });
         setAttachments(refuelToEdit.attachments || []);
         setOpen(true);
@@ -333,7 +330,6 @@ export default function Refueling() {
                             ...newRefueling,
                             liters: Number(newRefueling.liters),
                             mileage: Number(newRefueling.mileage),
-                            tankMeasurement: Number(newRefueling.tankMeasurement),
                             unitPrice: Number(newRefueling.unitPrice),
                             attachments: attachments, // Salva anexos
                         }
@@ -342,13 +338,14 @@ export default function Refueling() {
             );
         } else {
             // Novo abastecimento
-            const newId = refuelings.length ? refuelings[refuelings.length - 1].id + 1 : 1;
+            const newId = refuelings.length
+                ? refuelings[refuelings.length - 1].id + 1
+                : 1;
             const recordToAdd = {
                 id: newId,
                 ...newRefueling,
                 liters: Number(newRefueling.liters),
                 mileage: Number(newRefueling.mileage),
-                tankMeasurement: Number(newRefueling.tankMeasurement),
                 unitPrice: Number(newRefueling.unitPrice),
                 attachments: attachments,
             };
@@ -390,7 +387,7 @@ export default function Refueling() {
         }
     };
 
-    // Habilita/desabilita campos conforme o "post" (interno/externo)
+    // Verifica se é posto interno ou externo para renderizar campos específicos
     const isInternal = newRefueling.post === 'interno';
     const isExternal = newRefueling.post === 'externo';
 
@@ -402,7 +399,11 @@ export default function Refueling() {
                     <Button variant="outlined" onClick={exportToExcel}>
                         Exportar para Excel (.xlsx)
                     </Button>
-                    <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenDialog}>
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={handleOpenDialog}
+                    >
                         Novo Abastecimento
                     </Button>
                 </Box>
@@ -433,20 +434,27 @@ export default function Refueling() {
                         sx={{ mb: 2 }}
                     />
 
-                    {/* Tipo Combustível & Data */}
-                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                        <FormControl fullWidth>
-                            <InputLabel id="fuel-label">Combustível</InputLabel>
-                            <Select
-                                labelId="fuel-label"
+                    {/* Combustível e Data */}
+                    <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
+                        <FormControl component="fieldset">
+                            <FormLabel component="legend">Combustível</FormLabel>
+                            <RadioGroup
+                                row
                                 name="fuelType"
-                                label="Combustível"
                                 value={newRefueling.fuelType}
                                 onChange={handleChange}
                             >
-                                <MenuItem value="DIESEL">DIESEL</MenuItem>
-                                <MenuItem value="ARLA">ARLA</MenuItem>
-                            </Select>
+                                <FormControlLabel
+                                    value="DIESEL"
+                                    control={<Radio />}
+                                    label="DIESEL"
+                                />
+                                <FormControlLabel
+                                    value="ARLA"
+                                    control={<Radio />}
+                                    label="ARLA"
+                                />
+                            </RadioGroup>
                         </FormControl>
 
                         <TextField
@@ -463,13 +471,11 @@ export default function Refueling() {
 
                     {/* Posto (interno/externo) */}
                     <FormControl fullWidth sx={{ mb: 2 }}>
-                        <InputLabel id="post-label">Posto</InputLabel>
                         <Select
-                            labelId="post-label"
                             name="post"
-                            label="Posto"
                             value={newRefueling.post}
                             onChange={handleChange}
+                            displayEmpty
                         >
                             <MenuItem value="interno">Interno</MenuItem>
                             <MenuItem value="externo">Externo</MenuItem>
@@ -535,17 +541,6 @@ export default function Refueling() {
                             onChange={handleChange}
                         />
                     </Box>
-
-                    <TextField
-                        margin="dense"
-                        name="tankMeasurement"
-                        label="Medição do Tanque (Total)"
-                        type="number"
-                        fullWidth
-                        value={newRefueling.tankMeasurement}
-                        onChange={handleChange}
-                        sx={{ mb: 2 }}
-                    />
 
                     {/* Observação */}
                     <TextField
@@ -644,9 +639,8 @@ function initialRefueling() {
         unitPrice: 0,
         liters: '',
         mileage: '',
-        tankMeasurement: '',
         observation: '',
-        signature: '',      // Campo para armazenar a assinatura
-        attachments: [],    // Campo para armazenar anexos
+        signature: '',   // Campo para armazenar a assinatura
+        attachments: [], // Campo para armazenar anexos
     };
 }
