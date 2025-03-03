@@ -13,26 +13,17 @@ import {
   Typography,
 } from '@mui/material';
 import {
-  FaBolt,
   FaHome,
-  FaUsers,
-  FaCog,
-  FaTools,
-  FaCalendarAlt,
-  FaChartBar,
-  FaUserCog,
-  FaBoxes,
   FaClipboardCheck,
-  FaHandshake,
+  FaChartBar,
+  FaGasPump,
+  FaTools,
   FaSignOutAlt,
   FaWhatsapp,
-  FaCrown,
-  FaGasPump, // Ícone para abastecimento
+  FaCog,
+  FaUsers, // <-- Novo ícone para gerenciamento de usuários
 } from 'react-icons/fa';
-
-import { PiTireLight } from "react-icons/pi";
-
-import { useAuth } from '../contexts/AuthContext';
+import { PiTireLight } from 'react-icons/pi';
 
 // Define a largura fixa da sidebar
 const SIDEBAR_WIDTH = 240;
@@ -50,11 +41,16 @@ const listItemButtonStyle = {
 };
 
 function Layout() {
-  const { logout } = useAuth();
   const navigate = useNavigate();
+  const role = localStorage.getItem('role') || '';
 
   const handleLogout = () => {
-    logout();
+    // Remove o token e demais dados do usuário do localStorage
+    localStorage.removeItem('sessionToken');
+    localStorage.removeItem('role');
+    localStorage.removeItem('fullname');
+
+    // Redireciona para a tela de login
     navigate('/login');
   };
 
@@ -97,7 +93,7 @@ function Layout() {
         {/* Menu principal */}
         <Box component="nav" sx={{ flex: 1 }}>
           <List>
-            {/* Dashboard */}
+            {/* Dashboard (todos veem) */}
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
@@ -111,91 +107,117 @@ function Layout() {
               </ListItemButton>
             </ListItem>
 
-            {/* Veículos */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={NavLink}
-                to="/vehicles"
-                sx={listItemButtonStyle}
-              >
-                <ListItemIcon sx={{ color: 'inherit' }}>
-                  <FaCog />
-                </ListItemIcon>
-                <ListItemText primary="Veículos" />
-              </ListItemButton>
-            </ListItem>
+            {/* Veículos: ex. admin e manutencao */}
+            {['admin', 'manutencao'].includes(role) && (
+              <ListItem disablePadding>
+                <ListItemButton
+                  component={NavLink}
+                  to="/vehicles"
+                  sx={listItemButtonStyle}
+                >
+                  <ListItemIcon sx={{ color: 'inherit' }}>
+                    <FaCog />
+                  </ListItemIcon>
+                  <ListItemText primary="Veículos" />
+                </ListItemButton>
+              </ListItem>
+            )}
 
-            {/* Checklist */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={NavLink}
-                to="/checklist"
-                sx={listItemButtonStyle}
-              >
-                <ListItemIcon sx={{ color: 'inherit' }}>
-                  <FaClipboardCheck />
-                </ListItemIcon>
-                <ListItemText primary="Checklist" />
-              </ListItemButton>
-            </ListItem>
+            {/* Checklist: ex. admin, motorista, portaria */}
+            {['admin', 'motorista', 'portaria'].includes(role) && (
+              <ListItem disablePadding>
+                <ListItemButton
+                  component={NavLink}
+                  to="/checklist"
+                  sx={listItemButtonStyle}
+                >
+                  <ListItemIcon sx={{ color: 'inherit' }}>
+                    <FaClipboardCheck />
+                  </ListItemIcon>
+                  <ListItemText primary="Checklist" />
+                </ListItemButton>
+              </ListItem>
+            )}
 
-            {/* Consumo */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={NavLink}
-                to="/consumption"
-                sx={listItemButtonStyle}
-              >
-                <ListItemIcon sx={{ color: 'inherit' }}>
-                  <FaChartBar />
-                </ListItemIcon>
-                <ListItemText primary="Consumo" />
-              </ListItemButton>
-            </ListItem>
+            {/* Consumo: ex. admin, fiscal */}
+            {['admin', 'fiscal'].includes(role) && (
+              <ListItem disablePadding>
+                <ListItemButton
+                  component={NavLink}
+                  to="/consumption"
+                  sx={listItemButtonStyle}
+                >
+                  <ListItemIcon sx={{ color: 'inherit' }}>
+                    <FaChartBar />
+                  </ListItemIcon>
+                  <ListItemText primary="Consumo" />
+                </ListItemButton>
+              </ListItem>
+            )}
 
-            {/* Abastecimento */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={NavLink}
-                to="/refueling"
-                sx={listItemButtonStyle}
-              >
-                <ListItemIcon sx={{ color: 'inherit' }}>
-                  <FaGasPump />
-                </ListItemIcon>
-                <ListItemText primary="Abastecimento" />
-              </ListItemButton>
-            </ListItem>
+            {/* Abastecimento: ex. admin, abastecimento */}
+            {['admin', 'abastecimento'].includes(role) && (
+              <ListItem disablePadding>
+                <ListItemButton
+                  component={NavLink}
+                  to="/refueling"
+                  sx={listItemButtonStyle}
+                >
+                  <ListItemIcon sx={{ color: 'inherit' }}>
+                    <FaGasPump />
+                  </ListItemIcon>
+                  <ListItemText primary="Abastecimento" />
+                </ListItemButton>
+              </ListItem>
+            )}
 
-            {/* Troca de Peças */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={NavLink}
-                to="/parts-replacement"
-                sx={listItemButtonStyle}
-              >
-                <ListItemIcon sx={{ color: 'inherit' }}>
-                  <FaTools />
-                </ListItemIcon>
-                <ListItemText primary="Troca de Peças" />
-              </ListItemButton>
-            </ListItem>
+            {/* Troca de Peças: admin e manutencao */}
+            {['admin', 'manutencao'].includes(role) && (
+              <ListItem disablePadding>
+                <ListItemButton
+                  component={NavLink}
+                  to="/parts-replacement"
+                  sx={listItemButtonStyle}
+                >
+                  <ListItemIcon sx={{ color: 'inherit' }}>
+                    <FaTools />
+                  </ListItemIcon>
+                  <ListItemText primary="Troca de Peças" />
+                </ListItemButton>
+              </ListItem>
+            )}
 
-            {/* Troca de Pneus */}
-            <ListItem disablePadding>
-              <ListItemButton
-                component={NavLink}
-                to="/tire-replacement"
-                sx={listItemButtonStyle}
-              >
-                <ListItemIcon sx={{ color: 'inherit' }}>
-                  {/* Aumentar o tamanho via prop size */}
-                  <PiTireLight size={24} />
-                </ListItemIcon>
-                <ListItemText primary="Pneus" />
-              </ListItemButton>
-            </ListItem>
+            {/* Troca de Pneus: admin e manutencao */}
+            {['admin', 'manutencao'].includes(role) && (
+              <ListItem disablePadding>
+                <ListItemButton
+                  component={NavLink}
+                  to="/tire-replacement"
+                  sx={listItemButtonStyle}
+                >
+                  <ListItemIcon sx={{ color: 'inherit' }}>
+                    <PiTireLight size={24} />
+                  </ListItemIcon>
+                  <ListItemText primary="Pneus" />
+                </ListItemButton>
+              </ListItem>
+            )}
 
+            {/* Gerenciar Usuários: somente admin */}
+            {role === 'admin' && (
+              <ListItem disablePadding>
+                <ListItemButton
+                  component={NavLink}
+                  to="/user-management"
+                  sx={listItemButtonStyle}
+                >
+                  <ListItemIcon sx={{ color: 'inherit' }}>
+                    <FaUsers />
+                  </ListItemIcon>
+                  <ListItemText primary="Usuários" />
+                </ListItemButton>
+              </ListItem>
+            )}
 
             {/* Botão de sair */}
             <ListItem disablePadding>
@@ -227,7 +249,6 @@ function Layout() {
             href="https://wa.me/5547996601626"
             target="_blank"
             rel="noopener noreferrer"
-            startIcon={<FaWhatsapp />}
             sx={{
               fontSize: '1rem',
               padding: '8px 16px',

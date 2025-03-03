@@ -1,3 +1,5 @@
+// src/pages/LoginPage.jsx
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -12,8 +14,9 @@ import {
   Alert,
   Paper,
 } from '@mui/material';
-import { useAuth } from '../contexts/AuthContext';
+import api from '../services/api'; // Axios config que chama o Back4App
 
+// Validação com Yup
 const schema = yup.object({
   email: yup.string().email('Email inválido').required('Email é obrigatório'),
   password: yup.string().required('Senha é obrigatória'),
@@ -21,19 +24,57 @@ const schema = yup.object({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
   const [error, setError] = useState('');
-  
-  const { register, handleSubmit, formState: { errors } } = useForm({
+
+  // react-hook-form com yup
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
     resolver: yupResolver(schema),
   });
 
+  // Mapeamento de roles -> rotas padrão
+  const roleToRoute = {
+    admin: '/dashboard',
+    abastecimento: '/refueling',
+    manutencao: '/parts-replacement',
+    motorista: '/checklist',
+    portaria: '/checklist', // Redireciona para checklist
+    // Adicione outras roles conforme precisar
+  };
+
   const onSubmit = async (data) => {
     try {
-      await login(data.email, data.password);
-      navigate('/dashboard');
+      // Faz a chamada à Cloud Function "login"
+      const response = await api.post('/functions/login', {
+        email: data.email.trim().toLowerCase(),
+        password: data.password,
+      });
+
+      // Se deu certo, retorna { result: { user: {...} } }
+      if (response.data.result && response.data.result.user) {
+        const { token, role, fullname } = response.data.result.user;
+
+        // Guarda no localStorage para identificar a sessão
+        localStorage.setItem('sessionToken', token);
+        localStorage.setItem('role', role);
+        localStorage.setItem('fullname', fullname);
+
+        // Verifica se a role está mapeada
+        const defaultRoute = roleToRoute[role];
+        if (defaultRoute) {
+          navigate(defaultRoute);
+        } else {
+          setError('Permissão inválida. Contate o suporte.');
+        }
+      } else {
+        throw new Error('Login falhou. Verifique suas credenciais.');
+      }
     } catch (err) {
-      setError('Credenciais inválidas');
+      console.error('Erro no login:', err);
+      setError('Credenciais inválidas. Tente novamente.');
     }
   };
 
@@ -60,12 +101,19 @@ function LoginPage() {
           <Typography component="h1" variant="h5">
             Login
           </Typography>
+
           {error && (
             <Alert severity="error" sx={{ width: '100%', mt: 2 }}>
               {error}
             </Alert>
           )}
-          <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 1 }}>
+
+          <Box
+            component="form"
+            onSubmit={handleSubmit(onSubmit)}
+            sx={{ mt: 1, width: '100%' }}
+          >
+            {/* Campo de Email */}
             <TextField
               margin="normal"
               required
@@ -78,6 +126,8 @@ function LoginPage() {
               error={!!errors.email}
               helperText={errors.email?.message}
             />
+
+            {/* Campo de Senha */}
             <TextField
               margin="normal"
               required
@@ -90,6 +140,7 @@ function LoginPage() {
               error={!!errors.password}
               helperText={errors.password?.message}
             />
+
             <Button
               type="submit"
               fullWidth

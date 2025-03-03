@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -15,74 +15,107 @@ import {
   IconButton,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+} from '@mui/icons-material';
+import api from '../services/api'; // Axios configurado
+import { useNavigate } from 'react-router-dom';
+
+// Mapeamento de tipos de veículo para quantidade de pneus
+const vehicleTypes = [
+  { label: 'Passeio', value: 'Passeio', tires: 5 },
+  { label: 'Delivery', value: 'Delivery', tires: 5 },
+  { label: '3/4', value: '3/4', tires: 7 },
+  { label: 'Toco', value: 'Toco', tires: 7 },
+  { label: 'Truck', value: 'Truck', tires: 11 },
+  { label: 'Bi-truck', value: 'Bi-truck', tires: 13 },
+  { label: 'Cavalo', value: 'Cavalo', tires: 10 },
+  { label: 'Semi-reboque Bi-trem', value: 'Semi-Reboque (Bi-Trem)', tires: 10 },
+  { label: 'Semi-reboque Rodo-trem', value: 'Semi-Reboque (Rodo-Trem)', tires: 14 },
+];
+
 
 function VehicleList() {
   const [open, setOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false); // controla se estamos editando ou criando
-  const [editId, setEditId] = useState(null);        // guarda o ID do veículo em edição
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState(null);
 
-  const [vehicles, setVehicles] = useState([
-    {
-      id: 1,
-      plate: 'ABC1234',
-      brand: 'Toyota',
-      model: 'Corolla',
-      year: 2020,
-      color: 'Prata',
-      mileage: 15000,
-      chassis: '9BWZZZ377VT004251',
-      status: 'Ativo',
-    },
-    {
-      id: 2,
-      plate: 'DEF5678',
-      brand: 'Honda',
-      model: 'Civic',
-      year: 2021,
-      color: 'Preto',
-      mileage: 10000,
-      chassis: '9BWZZZ377VT004252',
-      status: 'Ativo',
-    },
-    {
-      id: 3,
-      plate: 'GHI9012',
-      brand: 'Ford',
-      model: 'Ranger',
-      year: 2019,
-      color: 'Branco',
-      mileage: 5000,
-      chassis: '9BWZZZ377VT004253',
-      status: 'Manutenção',
-    },
-  ]);
+  // Lista de veículos (carregados do Parse)
+  const [vehicles, setVehicles] = useState([]);
 
-  // Estado para armazenar as informações do veículo em edição/criação
+  // Estado para o formulário
   const [newVehicle, setNewVehicle] = useState({
-    plate: '',
-    brand: '',
-    model: '',
-    year: '',
-    color: '',
-    mileage: '',
-    chassis: '',
+    placa: '',
+    marca: '',
+    modelo: '',
+    ano: '',
+    cor: '',
+    quilometragem: '',
+    chassi: '',
     status: 'Ativo',
+    tipo: '',
+    qtdPneus: 0,
   });
 
-  // Estado para guardar mensagens de erro simples
   const [errors, setErrors] = useState({});
 
-  // Colunas na DataGrid (incluindo colunas de ação: Editar/Excluir)
+  const navigate = useNavigate();
+
+  // Carregar veículos ao montar
+  useEffect(() => {
+    loadVehicles();
+  }, []);
+
+  // Função para carregar todos os veículos do Parse
+  const loadVehicles = async () => {
+    try {
+      const sessionToken = localStorage.getItem('sessionToken');
+      const response = await api.post(
+        '/functions/getAllVeiculos',
+        {},
+        {
+          headers: {
+            'X-Parse-Session-Token': sessionToken,
+          },
+        }
+      );
+      if (response.data.result) {
+        // Ajustamos para que a DataGrid use "id" = objectId
+        const fetched = response.data.result.map((v) => ({
+          id: v.objectId,
+          placa: v.placa || '',
+          marca: v.marca || '',
+          modelo: v.modelo || '',
+          ano: v.ano || '',
+          cor: v.cor || '',
+          quilometragem: v.quilometragem || 0,
+          chassi: v.chassi || '',
+          status: v.status || 'Ativo',
+          tipo: v.tipo || '',
+          qtdPneus: v.qtdPneus || 0,
+        }));
+        setVehicles(fetched);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar veículos:', err);
+      alert('Não foi possível carregar os veículos. Verifique se você tem permissão.');
+    }
+  };
+
+  // Colunas da DataGrid
   const columns = [
-    { field: 'plate', headerName: 'Placa', width: 120 },
-    { field: 'brand', headerName: 'Marca', width: 120 },
-    { field: 'model', headerName: 'Modelo', width: 150 },
-    { field: 'year', headerName: 'Ano', width: 90 },
-    { field: 'color', headerName: 'Cor', width: 100 },
-    { field: 'mileage', headerName: 'Quilometragem', width: 140 },
-    { field: 'chassis', headerName: 'Chassi', width: 180 },
-    { field: 'status', headerName: 'Status', width: 120 },
+    { field: 'placa', headerName: 'Placa', width: 100 },
+    { field: 'marca', headerName: 'Marca', width: 90 },
+    { field: 'modelo', headerName: 'Modelo', width: 100 },
+    { field: 'ano', headerName: 'Ano', width: 70 },
+    { field: 'cor', headerName: 'Cor', width: 70 },
+    { field: 'quilometragem', headerName: 'KM', width: 100 },
+    { field: 'chassi', headerName: 'Chassi', width: 150 },
+    { field: 'status', headerName: 'Status', width: 90 },
+    { field: 'tipo', headerName: 'Tipo', width: 100 },
+    { field: 'qtdPneus', headerName: 'Pneus', width: 80 },
     {
       field: 'actions',
       headerName: 'Ações',
@@ -108,148 +141,183 @@ function VehicleList() {
     },
   ];
 
-  /**
-   * Abre o diálogo para criar um veículo
-   */
+  // Abrir modal para criar
   const handleOpenDialog = () => {
     setIsEditing(false);
     setEditId(null);
-    // limpa estado de erros
     setErrors({});
-    // limpa formulário
     setNewVehicle({
-      plate: '',
-      brand: '',
-      model: '',
-      year: '',
-      color: '',
-      mileage: '',
-      chassis: '',
+      placa: '',
+      marca: '',
+      modelo: '',
+      ano: '',
+      cor: '',
+      quilometragem: '',
+      chassi: '',
       status: 'Ativo',
+      tipo: '',
+      qtdPneus: 0,
     });
     setOpen(true);
   };
 
-  /**
-   * Abre o diálogo para editar um veículo existente
-   */
-  const handleEdit = (id) => {
-    const vehicleToEdit = vehicles.find((v) => v.id === id);
+  // Editar existente
+  const handleEdit = (vehicleId) => {
+    const vehicleToEdit = vehicles.find((v) => v.id === vehicleId);
     if (!vehicleToEdit) return;
+
     setIsEditing(true);
-    setEditId(id);
-    setErrors({}); // limpa erros
+    setEditId(vehicleId);
+    setErrors({});
+
     setNewVehicle({
-      plate: vehicleToEdit.plate,
-      brand: vehicleToEdit.brand,
-      model: vehicleToEdit.model,
-      year: vehicleToEdit.year,
-      color: vehicleToEdit.color,
-      mileage: vehicleToEdit.mileage,
-      chassis: vehicleToEdit.chassis,
+      placa: vehicleToEdit.placa,
+      marca: vehicleToEdit.marca,
+      modelo: vehicleToEdit.modelo,
+      ano: vehicleToEdit.ano,
+      cor: vehicleToEdit.cor,
+      quilometragem: vehicleToEdit.quilometragem,
+      chassi: vehicleToEdit.chassi,
       status: vehicleToEdit.status,
+      tipo: vehicleToEdit.tipo,
+      qtdPneus: vehicleToEdit.qtdPneus,
     });
     setOpen(true);
   };
 
-  /**
-   * Exclui o veículo pelo ID
-   */
-  const handleDelete = (id) => {
-    const confirmed = window.confirm('Deseja realmente excluir este veículo?');
-    if (confirmed) {
-      setVehicles((prev) => prev.filter((v) => v.id !== id));
+  // Excluir (soft-delete)
+  const handleDelete = async (vehicleId) => {
+    if (!window.confirm('Deseja realmente excluir este veículo?')) return;
+    try {
+      const sessionToken = localStorage.getItem('sessionToken');
+      await api.post(
+        '/functions/softDeleteVeiculo',
+        { objectId: vehicleId },
+        {
+          headers: { 'X-Parse-Session-Token': sessionToken },
+        }
+      );
+      // Recarregar lista
+      loadVehicles();
+    } catch (err) {
+      console.error('Erro ao excluir veículo:', err);
+      alert('Falha ao excluir veículo.');
     }
   };
 
-  /**
-   * Fecha o diálogo sem salvar
-   */
+  // Fechar modal
   const handleCloseDialog = () => {
     setOpen(false);
   };
 
-  /**
-   * Atualiza os campos do formulário
-   */
-  const handleChange = (event) => {
-    const { name, value } = event.target;
+  // Ao digitar no form
+  const handleChange = (e) => {
+    const { name, value } = e.target;
     setNewVehicle((prev) => ({ ...prev, [name]: value }));
   };
 
-  /**
-   * Valida campos obrigatórios simples
-   */
+  // Ao escolher o tipo, atualiza qtdPneus automaticamente
+  const handleTipoChange = (e) => {
+    const selectedValue = e.target.value;
+    const found = vehicleTypes.find((t) => t.value === selectedValue);
+    setNewVehicle((prev) => ({
+      ...prev,
+      tipo: selectedValue,
+      qtdPneus: found ? found.tires : 0,
+    }));
+  };
+
+  // Validações simples
   const validateVehicle = () => {
     const newErrors = {};
-    if (!newVehicle.plate.trim()) {
-      newErrors.plate = 'Placa é obrigatória.';
+    if (!newVehicle.placa.trim()) {
+      newErrors.placa = 'Placa é obrigatória.';
     }
-    if (!newVehicle.model.trim()) {
-      newErrors.model = 'Modelo é obrigatório.';
+    if (!newVehicle.modelo.trim()) {
+      newErrors.modelo = 'Modelo é obrigatório.';
     }
-    if (!newVehicle.brand.trim()) {
-      newErrors.brand = 'Marca é obrigatória.';
+    if (!newVehicle.marca.trim()) {
+      newErrors.marca = 'Marca é obrigatória.';
     }
-    if (!newVehicle.year) {
-      newErrors.year = 'Ano é obrigatório.';
+    if (!newVehicle.ano) {
+      newErrors.ano = 'Ano é obrigatório.';
     } else {
-      const yearNum = parseInt(newVehicle.year, 10);
+      const yearNum = parseInt(newVehicle.ano, 10);
       if (yearNum < 1900 || yearNum > new Date().getFullYear() + 1) {
-        newErrors.year = 'Ano inválido.';
+        newErrors.ano = 'Ano inválido.';
       }
     }
-    if (!newVehicle.mileage.toString().trim()) {
-      newErrors.mileage = 'Quilometragem é obrigatória.';
+    if (!newVehicle.quilometragem.toString().trim()) {
+      newErrors.quilometragem = 'Quilometragem é obrigatória.';
     } else {
-      const mileageNum = parseInt(newVehicle.mileage, 10);
+      const mileageNum = parseInt(newVehicle.quilometragem, 10);
       if (mileageNum < 0) {
-        newErrors.mileage = 'Quilometragem inválida.';
+        newErrors.quilometragem = 'Quilometragem inválida.';
       }
     }
     return newErrors;
   };
 
-  /**
-   * Salva o novo veículo (ou atualiza, se for edição)
-   */
-  const handleSave = () => {
-    // Valida antes de salvar
+  // Criar ou Editar
+  const handleSave = async () => {
     const newErrors = validateVehicle();
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
-    // Se está editando...
-    if (isEditing && editId !== null) {
-      setVehicles((prev) =>
-        prev.map((v) => {
-          if (v.id === editId) {
-            return {
-              ...v,
-              ...newVehicle,
-              year: parseInt(newVehicle.year, 10),
-              mileage: parseInt(newVehicle.mileage, 10),
-            };
-          }
-          return v;
-        })
-      );
-    } else {
-      // Criação de um novo
-      const newId = vehicles.length ? vehicles[vehicles.length - 1].id + 1 : 1;
-      const vehicleToAdd = {
-        ...newVehicle,
-        id: newId,
-        year: parseInt(newVehicle.year, 10),
-        mileage: parseInt(newVehicle.mileage, 10),
-      };
-      setVehicles((prev) => [...prev, vehicleToAdd]);
-    }
+    // Montar objeto para enviar
+    const vehicleData = {
+      placa: newVehicle.placa,
+      marca: newVehicle.marca,
+      modelo: newVehicle.modelo,
+      ano: parseInt(newVehicle.ano, 10) || 0,
+      cor: newVehicle.cor,
+      quilometragem: parseInt(newVehicle.quilometragem, 10) || 0,
+      chassi: newVehicle.chassi,
+      status: newVehicle.status,
+      tipo: newVehicle.tipo,
+      qtdPneus: parseInt(newVehicle.qtdPneus, 10) || 0,
+    };
 
-    // Fecha o diálogo
-    setOpen(false);
+    try {
+      const sessionToken = localStorage.getItem('sessionToken');
+      if (isEditing && editId) {
+        // Editar
+        await api.post(
+          '/functions/editarVeiculo',
+          {
+            objectId: editId,
+            ...vehicleData,
+          },
+          {
+            headers: {
+              'X-Parse-Session-Token': sessionToken,
+            },
+          }
+        );
+      } else {
+        // Criar
+        await api.post(
+          '/functions/criarVeiculo',
+          {
+            ...vehicleData,
+          },
+          {
+            headers: {
+              'X-Parse-Session-Token': sessionToken,
+            },
+          }
+        );
+      }
+
+      // Fecha modal e recarrega
+      setOpen(false);
+      loadVehicles();
+    } catch (err) {
+      console.error('Erro ao salvar veículo:', err);
+      alert('Falha ao salvar veículo.');
+    }
   };
 
   return (
@@ -285,14 +353,14 @@ function VehicleList() {
           <TextField
             autoFocus
             margin="dense"
-            name="plate"
+            name="placa"
             label="Placa"
             fullWidth
             variant="outlined"
-            value={newVehicle.plate}
+            value={newVehicle.placa}
             onChange={handleChange}
-            error={!!errors.plate}
-            helperText={errors.plate}
+            error={!!errors.placa}
+            helperText={errors.placa}
             sx={{ mb: 2 }}
           />
 
@@ -300,25 +368,25 @@ function VehicleList() {
           <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
             <TextField
               margin="dense"
-              name="brand"
+              name="marca"
               label="Marca"
               fullWidth
               variant="outlined"
-              value={newVehicle.brand}
+              value={newVehicle.marca}
               onChange={handleChange}
-              error={!!errors.brand}
-              helperText={errors.brand}
+              error={!!errors.marca}
+              helperText={errors.marca}
             />
             <TextField
               margin="dense"
-              name="model"
+              name="modelo"
               label="Modelo"
               fullWidth
               variant="outlined"
-              value={newVehicle.model}
+              value={newVehicle.modelo}
               onChange={handleChange}
-              error={!!errors.model}
-              helperText={errors.model}
+              error={!!errors.modelo}
+              helperText={errors.modelo}
             />
           </Box>
 
@@ -326,23 +394,23 @@ function VehicleList() {
           <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
             <TextField
               margin="dense"
-              name="year"
+              name="ano"
               label="Ano"
               type="number"
               fullWidth
               variant="outlined"
-              value={newVehicle.year}
+              value={newVehicle.ano}
               onChange={handleChange}
-              error={!!errors.year}
-              helperText={errors.year}
+              error={!!errors.ano}
+              helperText={errors.ano}
             />
             <TextField
               margin="dense"
-              name="color"
+              name="cor"
               label="Cor"
               fullWidth
               variant="outlined"
-              value={newVehicle.color}
+              value={newVehicle.cor}
               onChange={handleChange}
             />
           </Box>
@@ -350,45 +418,83 @@ function VehicleList() {
           {/* Quilometragem */}
           <TextField
             margin="dense"
-            name="mileage"
+            name="quilometragem"
             label="Quilometragem"
             type="number"
             fullWidth
             variant="outlined"
-            value={newVehicle.mileage}
+            value={newVehicle.quilometragem}
             onChange={handleChange}
-            error={!!errors.mileage}
-            helperText={errors.mileage}
+            error={!!errors.quilometragem}
+            helperText={errors.quilometragem}
             sx={{ mb: 2 }}
           />
 
           {/* Chassi */}
           <TextField
             margin="dense"
-            name="chassis"
+            name="chassi"
             label="Chassi"
             fullWidth
             variant="outlined"
-            sx={{ mb: 2 }}
-            value={newVehicle.chassis}
+            value={newVehicle.chassi}
             onChange={handleChange}
+            sx={{ mb: 2 }}
           />
 
           {/* Status */}
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel id="status-label">Status</InputLabel>
+          <Box sx={{ mb: 2 }}>
+            <InputLabel>Status</InputLabel>
             <Select
-              labelId="status-label"
               name="status"
-              label="Status"
+              fullWidth
               value={newVehicle.status}
-              onChange={handleChange}
+              onChange={(e) =>
+                setNewVehicle((prev) => ({ ...prev, status: e.target.value }))
+              }
             >
               <MenuItem value="Ativo">Ativo</MenuItem>
               <MenuItem value="Manutenção">Manutenção</MenuItem>
               <MenuItem value="Inativo">Inativo</MenuItem>
             </Select>
+          </Box>
+
+          {/* Tipo e QtdPneus */}
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel id="tipo-label">Tipo do Veículo</InputLabel>
+            <Select
+              labelId="tipo-label"
+              name="tipo"
+              label="Tipo do Veículo"
+              value={newVehicle.tipo}
+              onChange={handleTipoChange}
+            >
+              <MenuItem value="">Selecione...</MenuItem>
+              {vehicleTypes.map((vt) => (
+                <MenuItem key={vt.value} value={vt.value}>
+                  {vt.label}
+                </MenuItem>
+              ))}
+            </Select>
           </FormControl>
+
+          <TextField
+            margin="dense"
+            name="qtdPneus"
+            label="Qtd. Pneus"
+            type="number"
+            fullWidth
+            variant="outlined"
+            value={newVehicle.qtdPneus}
+            onChange={(e) =>
+              setNewVehicle((prev) => ({
+                ...prev,
+                qtdPneus: e.target.value,
+              }))
+            }
+            helperText="Preenchido automaticamente pelo tipo escolhido."
+            sx={{ mb: 2 }}
+          />
         </DialogContent>
 
         <DialogActions>

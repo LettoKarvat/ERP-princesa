@@ -19,6 +19,8 @@ import {
   Tooltip,
   useTheme,
   useMediaQuery,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import {
@@ -105,8 +107,8 @@ export default function CheckList() {
     },
   ]);
   const [chegadas, setChegadas] = useState([]);
-  const [openSaidaDialog, setOpenSaidaDialog] = useState(false);
-  const [openChegadaDialog, setOpenChegadaDialog] = useState(false);
+  const [openOperationDialog, setOpenOperationDialog] = useState(false);
+  const [modalTab, setModalTab] = useState(0); // 0 = Saída, 1 = Chegada
   const [openCompareDialog, setOpenCompareDialog] = useState(false);
   const [openSignatureModal, setOpenSignatureModal] = useState(false);
   const [signatureContext, setSignatureContext] = useState(null); // 'saida' ou 'chegada'
@@ -172,27 +174,26 @@ export default function CheckList() {
     },
   ];
 
-  // --------------------- MANIPULAÇÃO DE DIÁLOGOS ---------------------
-  function handleOpenSaidaDialog() {
+  // --------------------- MANIPULAÇÃO DE MODAL UNIFICADO ---------------------
+  const handleOpenOperationDialog = () => {
+    // Reinicia os formulários ao abrir o modal
     setNewSaida(initialSaidaForm());
-    setOpenSaidaDialog(true);
-  }
-  function handleCloseSaidaDialog() {
-    setOpenSaidaDialog(false);
-  }
-
-  function handleOpenChegadaDialog() {
     setNewChegada(initialChegadaForm());
-    setOpenChegadaDialog(true);
-  }
-  function handleCloseChegadaDialog() {
-    setOpenChegadaDialog(false);
-  }
+    setModalTab(0); // Opcional: define como padrão a aba Saída
+    setOpenOperationDialog(true);
+  };
 
-  function handleCloseCompareDialog() {
-    setCompareData({ saida: null, chegada: null });
-    setOpenCompareDialog(false);
-  }
+  const handleCloseOperationDialog = () => {
+    setOpenOperationDialog(false);
+  };
+
+  const handleSaveOperation = () => {
+    if (modalTab === 0) {
+      handleSaveSaida();
+    } else {
+      handleSaveChegada();
+    }
+  };
 
   // --------------------- SALVAR SAÍDA ---------------------
   function handleSaveSaida() {
@@ -223,7 +224,7 @@ export default function CheckList() {
       closed: false,
     };
     setSaidas((prev) => [...prev, saidaToAdd]);
-    setOpenSaidaDialog(false);
+    setOpenOperationDialog(false);
   }
 
   // --------------------- SALVAR CHEGADA ---------------------
@@ -268,7 +269,7 @@ export default function CheckList() {
       prev.map((s) => (s.id === saidaId ? { ...s, closed: true } : s))
     );
     setChegadas((prev) => [...prev, chegadaToAdd]);
-    setOpenChegadaDialog(false);
+    setOpenOperationDialog(false);
   }
 
   // --------------------- COMPARAÇÃO ---------------------
@@ -457,19 +458,21 @@ export default function CheckList() {
         Saída/Chegada de Veículos
       </Typography>
 
+      {/* Botão único para nova operação */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenOperationDialog}>
+          Nova Operação
+        </Button>
+      </Box>
+
       {/* SEÇÃO DE SAÍDAS */}
       <Card sx={{ mb: 4 }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
             <Typography variant="h6">Saídas</Typography>
-            <Box>
-              <Button variant="outlined" onClick={exportSaidasToExcel} sx={{ mr: 1 }}>
-                Exportar Saídas para Excel
-              </Button>
-              <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenSaidaDialog}>
-                Nova Saída
-              </Button>
-            </Box>
+            <Button variant="outlined" onClick={exportSaidasToExcel}>
+              Exportar Saídas para Excel
+            </Button>
           </Box>
           <DataGrid
             rows={saidas}
@@ -486,14 +489,9 @@ export default function CheckList() {
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
             <Typography variant="h6">Chegadas</Typography>
-            <Box>
-              <Button variant="outlined" onClick={exportChegadasToExcel} sx={{ mr: 1 }}>
-                Exportar Chegadas para Excel
-              </Button>
-              <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenChegadaDialog}>
-                Nova Chegada
-              </Button>
-            </Box>
+            <Button variant="outlined" onClick={exportChegadasToExcel}>
+              Exportar Chegadas para Excel
+            </Button>
           </Box>
           <DataGrid
             rows={chegadas}
@@ -505,232 +503,234 @@ export default function CheckList() {
         </CardContent>
       </Card>
 
-      {/* DIALOG - NOVA SAÍDA */}
-      <Dialog open={openSaidaDialog} onClose={handleCloseSaidaDialog} maxWidth="md" fullWidth>
-        <DialogTitle>Saída do Veículo</DialogTitle>
+      {/* DIALOG UNIFICADO - NOVA OPERAÇÃO */}
+      <Dialog open={openOperationDialog} onClose={handleCloseOperationDialog} maxWidth="md" fullWidth>
+        <DialogTitle>Nova Operação</DialogTitle>
         <DialogContent dividers>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Empresa"
-                fullWidth
-                value={newSaida.empresa}
-                onChange={(e) => setNewSaida({ ...newSaida, empresa: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Departamento do veículo"
-                fullWidth
-                value={newSaida.departamento}
-                onChange={(e) => setNewSaida({ ...newSaida, departamento: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Veículo (Placa)"
-                fullWidth
-                value={newSaida.vehicle}
-                onChange={(e) => setNewSaida({ ...newSaida, vehicle: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Semi-reboque"
-                fullWidth
-                value={newSaida.semiReboque}
-                onChange={(e) => setNewSaida({ ...newSaida, semiReboque: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Placa do Semi-reboque"
-                fullWidth
-                value={newSaida.placaSemiReboque}
-                onChange={(e) => setNewSaida({ ...newSaida, placaSemiReboque: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="KM Rodado (Atual)"
-                type="number"
-                fullWidth
-                value={newSaida.kmRodado}
-                onChange={(e) => setNewSaida({ ...newSaida, kmRodado: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Data/Hora de Saída"
-                type="datetime-local"
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-                value={newSaida.dataSaida}
-                onChange={(e) => setNewSaida({ ...newSaida, dataSaida: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Horímetro (Saída)"
-                type="number"
-                fullWidth
-                value={newSaida.horimetroSaida}
-                onChange={(e) => setNewSaida({ ...newSaida, horimetroSaida: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="KM (Saída)"
-                type="number"
-                fullWidth
-                value={newSaida.kmSaida}
-                onChange={(e) => setNewSaida({ ...newSaida, kmSaida: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Inspecionado por"
-                fullWidth
-                value={newSaida.inspecionadoPor}
-                onChange={(e) => setNewSaida({ ...newSaida, inspecionadoPor: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="1° Motorista"
-                fullWidth
-                value={newSaida.motorista1}
-                onChange={(e) => setNewSaida({ ...newSaida, motorista1: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Motivo de Saída"
-                fullWidth
-                value={newSaida.motivoSaida}
-                onChange={(e) => setNewSaida({ ...newSaida, motivoSaida: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Destino"
-                fullWidth
-                value={newSaida.destino}
-                onChange={(e) => setNewSaida({ ...newSaida, destino: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Observações (Saída)"
-                multiline
-                minRows={2}
-                fullWidth
-                value={newSaida.observacoesSaida}
-                onChange={(e) => setNewSaida({ ...newSaida, observacoesSaida: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Typography variant="subtitle2">
-                Anexos (Saída) <span style={{ color: 'red' }}>*</span>
-              </Typography>
-              <TextField type="file" inputProps={{ multiple: true }} onChange={handleSaidaAttachments} />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseSaidaDialog}>Cancelar</Button>
-          <Button variant="contained" onClick={handleSaveSaida}>
-            Salvar
-          </Button>
-        </DialogActions>
-      </Dialog>
+          <Tabs
+            value={modalTab}
+            onChange={(e, newValue) => setModalTab(newValue)}
+            variant="fullWidth"
+            sx={{ mb: 2 }}
+          >
+            <Tab label="Saída" />
+            <Tab label="Chegada" />
+          </Tabs>
 
-      {/* DIALOG - NOVA CHEGADA */}
-      <Dialog open={openChegadaDialog} onClose={handleCloseChegadaDialog} maxWidth="md" fullWidth>
-        <DialogTitle>Chegada do Veículo</DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Saída (disponível)</InputLabel>
-                <Select
-                  value={newChegada.saidaId}
-                  label="Saída (disponível)"
-                  onChange={(e) => setNewChegada({ ...newChegada, saidaId: e.target.value })}
-                >
-                  {saidas.filter((s) => !s.closed).map((s) => (
-                    <MenuItem key={s.id} value={s.id}>{`ID ${s.id} - ${s.vehicle}`}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+          {modalTab === 0 && (
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Empresa"
+                  fullWidth
+                  value={newSaida.empresa}
+                  onChange={(e) => setNewSaida({ ...newSaida, empresa: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Departamento do veículo"
+                  fullWidth
+                  value={newSaida.departamento}
+                  onChange={(e) => setNewSaida({ ...newSaida, departamento: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Veículo (Placa)"
+                  fullWidth
+                  value={newSaida.vehicle}
+                  onChange={(e) => setNewSaida({ ...newSaida, vehicle: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Semi-reboque"
+                  fullWidth
+                  value={newSaida.semiReboque}
+                  onChange={(e) => setNewSaida({ ...newSaida, semiReboque: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Placa do Semi-reboque"
+                  fullWidth
+                  value={newSaida.placaSemiReboque}
+                  onChange={(e) => setNewSaida({ ...newSaida, placaSemiReboque: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="KM Rodado (Atual)"
+                  type="number"
+                  fullWidth
+                  value={newSaida.kmRodado}
+                  onChange={(e) => setNewSaida({ ...newSaida, kmRodado: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Data/Hora de Saída"
+                  type="datetime-local"
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
+                  value={newSaida.dataSaida}
+                  onChange={(e) => setNewSaida({ ...newSaida, dataSaida: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Horímetro (Saída)"
+                  type="number"
+                  fullWidth
+                  value={newSaida.horimetroSaida}
+                  onChange={(e) => setNewSaida({ ...newSaida, horimetroSaida: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="KM (Saída)"
+                  type="number"
+                  fullWidth
+                  value={newSaida.kmSaida}
+                  onChange={(e) => setNewSaida({ ...newSaida, kmSaida: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Inspecionado por"
+                  fullWidth
+                  value={newSaida.inspecionadoPor}
+                  onChange={(e) => setNewSaida({ ...newSaida, inspecionadoPor: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="1° Motorista"
+                  fullWidth
+                  value={newSaida.motorista1}
+                  onChange={(e) => setNewSaida({ ...newSaida, motorista1: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Motivo de Saída"
+                  fullWidth
+                  value={newSaida.motivoSaida}
+                  onChange={(e) => setNewSaida({ ...newSaida, motivoSaida: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Destino"
+                  fullWidth
+                  value={newSaida.destino}
+                  onChange={(e) => setNewSaida({ ...newSaida, destino: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Observações (Saída)"
+                  multiline
+                  minRows={2}
+                  fullWidth
+                  value={newSaida.observacoesSaida}
+                  onChange={(e) => setNewSaida({ ...newSaida, observacoesSaida: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2">
+                  Anexos (Saída) <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <TextField type="file" inputProps={{ multiple: true }} onChange={handleSaidaAttachments} />
+              </Grid>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Data/Hora de Chegada"
-                type="datetime-local"
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-                value={newChegada.dataChegada}
-                onChange={(e) => setNewChegada({ ...newChegada, dataChegada: e.target.value })}
-              />
+          )}
+
+          {modalTab === 1 && (
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Saída (disponível)</InputLabel>
+                  <Select
+                    value={newChegada.saidaId}
+                    label="Saída (disponível)"
+                    onChange={(e) => setNewChegada({ ...newChegada, saidaId: e.target.value })}
+                  >
+                    {saidas.filter((s) => !s.closed).map((s) => (
+                      <MenuItem key={s.id} value={s.id}>{`ID ${s.id} - ${s.vehicle}`}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Data/Hora de Chegada"
+                  type="datetime-local"
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
+                  value={newChegada.dataChegada}
+                  onChange={(e) => setNewChegada({ ...newChegada, dataChegada: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Horímetro (Chegada)"
+                  type="number"
+                  fullWidth
+                  value={newChegada.horimetroChegada}
+                  onChange={(e) => setNewChegada({ ...newChegada, horimetroChegada: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="KM (Chegada)"
+                  type="number"
+                  fullWidth
+                  value={newChegada.kmChegada}
+                  onChange={(e) => setNewChegada({ ...newChegada, kmChegada: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="1° Motorista (Chegada)"
+                  fullWidth
+                  value={newChegada.motorista1Cheg}
+                  onChange={(e) => setNewChegada({ ...newChegada, motorista1Cheg: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Observações (Chegada)"
+                  multiline
+                  minRows={2}
+                  fullWidth
+                  value={newChegada.observacoesChegada}
+                  onChange={(e) => setNewChegada({ ...newChegada, observacoesChegada: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2">
+                  Anexos (Chegada) <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <TextField type="file" inputProps={{ multiple: true }} onChange={handleChegadaAttachments} />
+              </Grid>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Horímetro (Chegada)"
-                type="number"
-                fullWidth
-                value={newChegada.horimetroChegada}
-                onChange={(e) => setNewChegada({ ...newChegada, horimetroChegada: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="KM (Chegada)"
-                type="number"
-                fullWidth
-                value={newChegada.kmChegada}
-                onChange={(e) => setNewChegada({ ...newChegada, kmChegada: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="1° Motorista (Chegada)"
-                fullWidth
-                value={newChegada.motorista1Cheg}
-                onChange={(e) => setNewChegada({ ...newChegada, motorista1Cheg: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Observações (Chegada)"
-                multiline
-                minRows={2}
-                fullWidth
-                value={newChegada.observacoesChegada}
-                onChange={(e) => setNewChegada({ ...newChegada, observacoesChegada: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Typography variant="subtitle2">
-                Anexos (Chegada) <span style={{ color: 'red' }}>*</span>
-              </Typography>
-              <TextField type="file" inputProps={{ multiple: true }} onChange={handleChegadaAttachments} />
-            </Grid>
-          </Grid>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseChegadaDialog}>Cancelar</Button>
-          <Button variant="contained" onClick={handleSaveChegada}>
+          <Button onClick={handleCloseOperationDialog}>Cancelar</Button>
+          <Button variant="contained" onClick={handleSaveOperation}>
             Salvar
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* DIALOG - COMPARAR SAÍDA x CHEGADA */}
-      <Dialog open={openCompareDialog} onClose={handleCloseCompareDialog} maxWidth="md" fullWidth>
+      <Dialog open={openCompareDialog} onClose={() => { setCompareData({ saida: null, chegada: null }); setOpenCompareDialog(false); }} maxWidth="md" fullWidth>
         <DialogTitle>
           Comparar Saída x Chegada
-          <IconButton onClick={handleCloseCompareDialog} sx={{ position: 'absolute', right: 8, top: 8 }}>
+          <IconButton onClick={() => { setCompareData({ saida: null, chegada: null }); setOpenCompareDialog(false); }} sx={{ position: 'absolute', right: 8, top: 8 }}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
