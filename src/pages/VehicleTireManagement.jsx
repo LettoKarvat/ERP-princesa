@@ -29,6 +29,12 @@ import api from '../services/api';
  *  - label: nome ou descrição (ex.: "1º Eixo Dianteiro")
  *  - positions: array com as posições (ex.: ["1E", "1D"])
  */
+/**
+ * Layout top-down dos pneus, por tipo de veículo.
+ * Cada tipo é um array de "eixos", e cada eixo tem:
+ *  - label: nome ou descrição (ex.: "1º Eixo Dianteiro")
+ *  - positions: array com as posições (ex.: ["1E", "1D"])
+ */
 const TIRE_LAYOUTS = {
     "Passeio": [
         {
@@ -65,7 +71,7 @@ const TIRE_LAYOUTS = {
         },
         {
             label: "2º Eixo (Traseiro)",
-            positions: ["2EI", "2EE", "2DE", "2DI"]
+            positions: ["2DI", "2DE", "2EI", "2EE"]
         },
         {
             label: "Estepe",
@@ -79,7 +85,7 @@ const TIRE_LAYOUTS = {
         },
         {
             label: "2º Eixo (Traseiro)",
-            positions: ["2EI", "2EE", "2DE", "2DI"]
+            positions: ["2DI", "2DE", "2EI", "2EE"]
         },
         {
             label: "Estepe",
@@ -93,11 +99,11 @@ const TIRE_LAYOUTS = {
         },
         {
             label: "2º Eixo (Traseiro)",
-            positions: ["2EI", "2EE", "2DE", "2DI"]
+            positions: ["2DI", "2DE", "2EI", "2EE"]
         },
         {
             label: "3º Eixo (Traseiro)",
-            positions: ["3EI", "3EE", "3DE", "3DI"]
+            positions: ["3DI", "3DE", "3EI", "3EE"]
         },
         {
             label: "Estepe",
@@ -115,11 +121,11 @@ const TIRE_LAYOUTS = {
         },
         {
             label: "3º Eixo",
-            positions: ["3EI", "3EE", "3DE", "3DI"]
+            positions: ["3DI", "3DE", "3EI", "3EE"]
         },
         {
             label: "4º Eixo",
-            positions: ["4EI", "4EE", "4DE", "4DI"]
+            positions: ["4DI", "4DE", "4EI", "4EE"]
         },
         {
             label: "Estepe",
@@ -138,6 +144,10 @@ const TIRE_LAYOUTS = {
         {
             label: "3º Eixo",
             positions: ["3I", "3E"]
+        },
+        {
+            label: "Estepe",
+            positions: ["E"] // Corrigido, adicionado estepe
         }
     ],
     "Semi-Reboque (Bi-Trem)": [
@@ -151,7 +161,7 @@ const TIRE_LAYOUTS = {
         },
         {
             label: "Estepe",
-            positions: ["E"]
+            positions: ["E", "E"] // Corrigido, adicionado segundo estepe
         }
     ],
     "Semi-Reboque (Rodo-Trem)": [
@@ -169,10 +179,11 @@ const TIRE_LAYOUTS = {
         },
         {
             label: "Estepe",
-            positions: ["E"]
+            positions: ["E", "E"] // Mantidos dois estepes conforme a imagem
         }
     ]
 };
+
 
 
 // Card para exibir cada posição de pneu
