@@ -99,7 +99,7 @@ function LoginPage() {
           }}
         >
           <Typography component="h1" variant="h5">
-            Login
+            Painel Princesa
           </Typography>
 
           {error && (
