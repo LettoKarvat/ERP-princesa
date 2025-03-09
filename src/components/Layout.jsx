@@ -125,7 +125,7 @@ function Layout() {
                 <ListItemIcon sx={{ color: 'inherit' }}>
                   <FaClipboardCheck />
                 </ListItemIcon>
-                <ListItemText primary="Checklist (Legacy)" />
+                <ListItemText primary="Checklist (Portaria)" />
               </ListItemButton>
             </ListItem>
           )}
@@ -226,7 +226,7 @@ function Layout() {
                   <ListItemIcon sx={{ color: 'inherit' }}>
                     <FaClipboardCheck />
                   </ListItemIcon>
-                  <ListItemText primary="Criar Checklist (Driver)" />
+                  <ListItemText primary="Criar Checklist (Caminhão/Motorista)" />
                 </ListItemButton>
               </ListItem>
               {/* Listar Checklists (Driver) */}
