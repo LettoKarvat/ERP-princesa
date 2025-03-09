@@ -11,6 +11,9 @@ import TireManagement from '../pages/TireManagement';
 import Refueling from '../pages/Refueling';
 import Layout from '../components/Layout';
 import UserManagement from '../pages/UserManagement';
+import DriverChecklist from '../pages/DriverChecklist';
+import DriverChecklistsList from '../pages/DriverChecklistsList';
+
 
 // Verifica se há sessionToken no localStorage
 const PrivateRoute = ({ children }) => {
@@ -44,6 +47,9 @@ function AppRoutes() {
         <Route path="parts-replacement" element={<PartsReplacement />} />
         <Route path="refueling" element={<Refueling />} />
         <Route path="user-management" element={<UserManagement />} />
+        <Route path="/driver-checklist" element={<DriverChecklist />} />
+        <Route path="/driver-checklists" element={<DriverChecklistsList />} />
+
       </Route>
     </Routes>
   );
