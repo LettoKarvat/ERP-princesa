@@ -43,34 +43,27 @@ const checklistItems = [
     { code: 18, description: "Tacógrafo: marcação, hora, agulha, está conforme." },
     { code: 19, description: "Carrinho de entrega está ok?" },
     { code: 20, description: "Itens de segurança: macaco, triângulo, chave de roda." },
-    { code: 21, description: "Possui EPI necessário?" }
+    { code: 21, description: "Possui EPI necessário?" },
 ];
 
 function DriverChecklist() {
-    // Respostas do checklist
+    // Cada item possui resposta, observação e, se não conforme, um array de anexos.
     const [answers, setAnswers] = useState(
         checklistItems.map((item) => ({
             code: item.code,
             answer: '', // 'sim' ou 'nao'
             obs: '',
+            attachments: [], // Agora é um array para armazenar múltiplos arquivos
         }))
     );
 
-    // Lista de veículos (para autocomplete)
     const [vehicles, setVehicles] = useState([]);
-    // Valor digitado no autocomplete
     const [plateInput, setPlateInput] = useState('');
-    // Veículo selecionado
     const [selectedVehicle, setSelectedVehicle] = useState(null);
 
-    // Modal de assinatura
     const [openSignModal, setOpenSignModal] = useState(false);
     const signatureRef = useRef(null);
 
-    // Anexos (arquivos) selecionados
-    const [attachments, setAttachments] = useState([]);
-
-    // Snackbar
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [snackbarSeverity, setSnackbarSeverity] = useState('info'); // success | error | warning | info
@@ -79,7 +72,6 @@ function DriverChecklist() {
         loadVehicles();
     }, []);
 
-    // Carrega veículos
     const loadVehicles = async () => {
         try {
             const sessionToken = localStorage.getItem('sessionToken');
@@ -97,56 +89,61 @@ function DriverChecklist() {
         }
     };
 
-    // Helper pra exibir snackbar
     const showSnackbar = (severity, message) => {
         setSnackbarSeverity(severity);
         setSnackbarMessage(message);
         setSnackbarOpen(true);
     };
 
-    // Ao mudar resposta do checklist
+    // Atualiza resposta ou observação de um item
     const handleAnswerChange = (code, field, value) => {
         setAnswers((prev) =>
             prev.map((ans) => (ans.code === code ? { ...ans, [field]: value } : ans))
         );
     };
 
-    // Handler do input de arquivo
-    const handleFileChange = (e) => {
-        if (!e.target.files) return;
-        setAttachments(Array.from(e.target.files));
+    // Atualiza o array de arquivos do item (substituindo os anexos atuais)
+    const handleItemFileChange = (code, files) => {
+        setAnswers((prev) =>
+            prev.map((ans) =>
+                ans.code === code ? { ...ans, attachments: files } : ans
+            )
+        );
     };
 
-    // Ao clicar em "Enviar Checklist"
     const handleSubmit = () => {
-        // Valida se todos estão respondidos
-        const anyEmpty = answers.some((ans) => ans.answer === '');
-        if (anyEmpty) {
+        // Verifica se todos os itens foram respondidos
+        const anyEmptyAnswer = answers.some((ans) => ans.answer === '');
+        if (anyEmptyAnswer) {
             showSnackbar('error', 'Responda todos os itens antes de enviar.');
             return;
         }
-
-        // Placa
+        // Verifica se os itens marcados como 'nao' possuem pelo menos um anexo
+        const nonCompliantWithoutAttachment = answers.some(
+            (ans) => ans.answer === 'nao' && (!ans.attachments || ans.attachments.length === 0)
+        );
+        if (nonCompliantWithoutAttachment) {
+            showSnackbar('error', 'Todos os itens marcados como "Não" devem ter pelo menos um anexo.');
+            return;
+        }
+        // Verifica se a placa foi informada
         if (!plateInput.trim()) {
             showSnackbar('error', 'Informe a placa do veículo.');
             return;
         }
 
-        // Abre modal de assinatura
+        // Abre o modal de assinatura
         setOpenSignModal(true);
     };
 
-    // Fechar modal de assinatura
     const handleCloseSignModal = () => {
         setOpenSignModal(false);
     };
 
-    // Limpar assinatura
     const handleClearSignature = () => {
         signatureRef.current.clear();
     };
 
-    // Confirmar assinatura e enviar
     const handleConfirmSignature = async () => {
         if (signatureRef.current && signatureRef.current.isEmpty()) {
             showSnackbar('error', 'Por favor, faça a assinatura antes de confirmar.');
@@ -156,43 +153,41 @@ function DriverChecklist() {
         const signatureData = signatureRef.current.toDataURL();
         const sessionToken = localStorage.getItem('sessionToken');
 
-        // Essas infos podem vir de localStorage ou do "currentUser" no Parse
         const fullname = localStorage.getItem('fullname') || '';
         const role = localStorage.getItem('role') || '';
         const userId = localStorage.getItem('userId') || '';
 
-        // Placa final
-        const finalPlate = selectedVehicle
-            ? selectedVehicle.placa
-            : plateInput.trim();
+        const finalPlate = selectedVehicle ? selectedVehicle.placa : plateInput.trim();
 
-        // Monta objeto para enviar ao Cloud Code
+        // Monta objeto a ser enviado (sem anexos)
         const dataToSend = {
             empresa: '298 - DISTRIBUIDORA PRINCESA',
-            items: answers,
+            items: answers.map((ans) => ({
+                code: ans.code,
+                answer: ans.answer,
+                obs: ans.obs,
+            })),
             placa: finalPlate,
-            user: {
-                fullname,
-                role,
-                userId
-            },
+            user: { fullname, role, userId },
             signature: signatureData,
         };
 
         try {
+            // Envia o checklist para salvar o registro
             const response = await api.post('/functions/submitChecklist', dataToSend, {
                 headers: { 'X-Parse-Session-Token': sessionToken },
             });
-            console.log('submitChecklist response:', response.data);
-
             if (response.data.result && response.data.result.status === 'success') {
-                // OK, pegamos o checklistId se quiser mandar anexos
                 const checklistId = response.data.result.objectId;
                 showSnackbar('success', 'Checklist enviado com sucesso!');
 
-                // Se houver anexos, enviamos
-                if (attachments.length > 0 && checklistId) {
-                    await uploadAttachments(checklistId, attachments, sessionToken);
+                // Envia os anexos de cada item marcado como "nao"
+                for (const ans of answers) {
+                    if (ans.answer === 'nao' && ans.attachments && ans.attachments.length > 0) {
+                        for (const file of ans.attachments) {
+                            await uploadSingleAttachment(checklistId, file, sessionToken, ans.code);
+                        }
+                    }
                 }
             } else {
                 throw new Error(
@@ -207,35 +202,33 @@ function DriverChecklist() {
         setOpenSignModal(false);
     };
 
-    // Função para converter arquivo em base64 e enviar
-    const uploadAttachments = async (checklistId, files, token) => {
-        for (const file of files) {
-            try {
-                const base64file = await convertFileToBase64(file);
-                // Chama a Cloud Function uploadChecklistAttachment
-                const attachResp = await api.post(
-                    '/functions/uploadChecklistAttachment',
-                    {
-                        checklistId,
-                        base64file,
-                        fileName: file.name,
-                    },
-                    { headers: { 'X-Parse-Session-Token': token } }
-                );
-                console.log('Anexo resp:', attachResp.data);
-                if (attachResp.data.result && attachResp.data.result.status === 'success') {
-                    showSnackbar('success', `Anexo ${file.name} enviado.`);
-                } else {
-                    throw new Error('Falha ao enviar anexo ' + file.name);
-                }
-            } catch (err) {
-                console.error('Erro ao enviar anexo:', err);
-                showSnackbar('error', `Erro ao enviar ${file.name}: ${err.message}`);
+    // Função para enviar cada anexo, incluindo o itemCode
+    const uploadSingleAttachment = async (checklistId, file, token, itemCode) => {
+        try {
+            const base64file = await convertFileToBase64(file);
+            const attachResp = await api.post(
+                '/functions/uploadChecklistAttachment',
+                {
+                    checklistId,
+                    base64file,
+                    fileName: file.name,
+                    itemCode, // Envia o código do item para vinculação
+                },
+                { headers: { 'X-Parse-Session-Token': token } }
+            );
+
+            if (attachResp.data.result && attachResp.data.result.status === 'success') {
+                console.log(`Anexo ${file.name} enviado com sucesso para o item ${itemCode}!`);
+            } else {
+                throw new Error(`Falha ao enviar anexo: ${file.name}`);
             }
+        } catch (err) {
+            console.error('Erro ao enviar anexo:', err);
+            showSnackbar('error', `Erro ao enviar ${file.name}: ${err.message}`);
         }
     };
 
-    // Converter arquivo em base64
+    // Converte um arquivo para base64
     const convertFileToBase64 = (file) => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -247,7 +240,6 @@ function DriverChecklist() {
         });
     };
 
-    // Fechar snackbar
     const handleCloseSnackbar = () => {
         setSnackbarOpen(false);
     };
@@ -304,17 +296,15 @@ function DriverChecklist() {
                 )}
             />
 
-            {/* Itens do checklist */}
+            {/* Lista de itens do checklist */}
             {checklistItems.map((item) => {
                 const ans = answers.find((a) => a.code === item.code);
-
-                // Se "sim", fundo verde claro. Se "nao", fundo vermelho claro.
-                // Caso contrário, fundo padrão (inherit).
-                const bgColor = ans.answer === 'sim'
-                    ? '#e0ffe0' // verde claro
-                    : ans.answer === 'nao'
-                        ? '#ffe0e0' // vermelho claro
-                        : 'inherit';
+                const bgColor =
+                    ans.answer === 'sim'
+                        ? '#e0ffe0'
+                        : ans.answer === 'nao'
+                            ? '#ffe0e0'
+                            : 'inherit';
 
                 return (
                     <Paper
@@ -345,7 +335,6 @@ function DriverChecklist() {
                                     control={
                                         <Radio
                                             sx={{
-                                                // Círculo do radio fica verde quando marcado
                                                 '&.Mui-checked': {
                                                     color: 'green',
                                                 },
@@ -359,7 +348,6 @@ function DriverChecklist() {
                                     control={
                                         <Radio
                                             sx={{
-                                                // Círculo do radio fica vermelho quando marcado
                                                 '&.Mui-checked': {
                                                     color: 'red',
                                                 },
@@ -382,26 +370,30 @@ function DriverChecklist() {
                                 handleAnswerChange(item.code, 'obs', e.target.value)
                             }
                         />
+
+                        {/* Exibe o input de arquivo apenas se a resposta for "nao" */}
+                        {ans.answer === 'nao' && (
+                            <Box sx={{ mt: 2 }}>
+                                <Typography variant="body2" sx={{ mb: 1 }}>
+                                    Anexos obrigatórios para item não conforme:
+                                </Typography>
+                                <input
+                                    type="file"
+                                    multiple
+                                    onChange={(e) =>
+                                        handleItemFileChange(item.code, Array.from(e.target.files))
+                                    }
+                                />
+                                {ans.attachments && ans.attachments.length > 0 && (
+                                    <Typography variant="body2" sx={{ mt: 1 }}>
+                                        Arquivos selecionados: {ans.attachments.map((f) => f.name).join(', ')}
+                                    </Typography>
+                                )}
+                            </Box>
+                        )}
                     </Paper>
                 );
             })}
-
-            {/* Input de anexos */}
-            <Paper sx={{ p: 2, mb: 2 }}>
-                <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                    Anexos (opcional)
-                </Typography>
-                <input
-                    type="file"
-                    multiple
-                    onChange={handleFileChange}
-                />
-                {attachments.length > 0 && (
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                        Arquivos selecionados: {attachments.map((f) => f.name).join(', ')}
-                    </Typography>
-                )}
-            </Paper>
 
             <Button
                 variant="contained"
@@ -413,7 +405,6 @@ function DriverChecklist() {
                 Enviar Checklist
             </Button>
 
-            {/* Modal de Assinatura */}
             <Dialog open={openSignModal} onClose={handleCloseSignModal} maxWidth="sm" fullWidth>
                 <DialogTitle>Assinatura</DialogTitle>
                 <DialogContent dividers>
@@ -450,7 +441,6 @@ function DriverChecklist() {
                 </DialogActions>
             </Dialog>
 
-            {/* Snackbar de notificação */}
             <Snackbar
                 open={snackbarOpen}
                 autoHideDuration={4000}

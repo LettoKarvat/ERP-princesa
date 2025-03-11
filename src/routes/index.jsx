@@ -1,5 +1,3 @@
-// src/routes/AppRoutes.jsx
-
 import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from '../pages/LoginPage';
 import Dashboard from '../pages/Dashboard';
@@ -14,11 +12,26 @@ import UserManagement from '../pages/UserManagement';
 import DriverChecklist from '../pages/DriverChecklist';
 import DriverChecklistsList from '../pages/DriverChecklistsList';
 
-
 // Verifica se há sessionToken no localStorage
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('sessionToken');
   return token ? children : <Navigate to="/login" />;
+};
+
+// Verifica se usuário é admin
+const AdminRoute = ({ children }) => {
+  const token = localStorage.getItem('sessionToken');
+  const role = localStorage.getItem('role');
+
+  if (!token) {
+    return <Navigate to="/login" />;
+  }
+
+  if (role !== 'admin') {
+    // se não for admin, manda pra "/" ou outra rota de “acesso negado”
+    return <Navigate to="/" />;
+  }
+  return children;
 };
 
 function AppRoutes() {
@@ -36,20 +49,38 @@ function AppRoutes() {
           </PrivateRoute>
         }
       >
-        {/* Redireciona / para /dashboard */}
+        {/* Redireciona / para /dashboard ou outra, se quiser */}
         <Route index element={<Navigate to="/dashboard" replace />} />
 
-        <Route path="dashboard" element={<Dashboard />} />
+        {/* Protegendo dashboard: só admin */}
+        <Route
+          path="dashboard"
+          element={
+            <AdminRoute>
+              <Dashboard />
+            </AdminRoute>
+          }
+        />
+
         <Route path="vehicles" element={<VehicleList />} />
         <Route path="checklist" element={<VehicleChecklist />} />
         <Route path="consumption" element={<ConsumptionControl />} />
         <Route path="tire-replacement" element={<TireManagement />} />
         <Route path="parts-replacement" element={<PartsReplacement />} />
         <Route path="refueling" element={<Refueling />} />
-        <Route path="user-management" element={<UserManagement />} />
+
+        {/* Também pode proteger user-management: só admin */}
+        <Route
+          path="user-management"
+          element={
+            <AdminRoute>
+              <UserManagement />
+            </AdminRoute>
+          }
+        />
+
         <Route path="/driver-checklist" element={<DriverChecklist />} />
         <Route path="/driver-checklists" element={<DriverChecklistsList />} />
-
       </Route>
     </Routes>
   );

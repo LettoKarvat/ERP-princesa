@@ -1,5 +1,3 @@
-// src/pages/LoginPage.jsx
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -17,8 +15,9 @@ import {
 import api from '../services/api'; // Axios config que chama o Back4App
 
 // Validação com Yup
+// Agora não validamos como "email" especificamente, pois pode ser matrícula ou email.
 const schema = yup.object({
-  email: yup.string().email('Email inválido').required('Email é obrigatório'),
+  username: yup.string().required('Informe seu usuário (E-mail ou Matrícula)'),
   password: yup.string().required('Senha é obrigatória'),
 });
 
@@ -40,16 +39,16 @@ function LoginPage() {
     admin: '/dashboard',
     abastecimento: '/refueling',
     manutencao: '/parts-replacement',
-    motorista: '/checklist',
-    portaria: '/checklist', // Redireciona para checklist
-    // Adicione outras roles conforme precisar
+    motorista: '/driver-checklists', // <-- Agora aponta para /driver-checklists
+    portaria: '/checklist',
   };
+
 
   const onSubmit = async (data) => {
     try {
-      // Faz a chamada à Cloud Function "login"
+      // Faz a chamada à Cloud Function "login", agora passando "username" em vez de "email"
       const response = await api.post('/functions/login', {
-        email: data.email.trim().toLowerCase(),
+        username: data.username.trim(), // Pode ser matricula ou email
         password: data.password,
       });
 
@@ -113,18 +112,18 @@ function LoginPage() {
             onSubmit={handleSubmit(onSubmit)}
             sx={{ mt: 1, width: '100%' }}
           >
-            {/* Campo de Email */}
+            {/* Campo de Usuário (pode ser E-mail ou Matrícula) */}
             <TextField
               margin="normal"
               required
               fullWidth
-              id="email"
-              label="Email"
-              autoComplete="email"
+              id="username"
+              label="Usuário (E-mail ou Matrícula)"
+              autoComplete="username"
               autoFocus
-              {...register('email')}
-              error={!!errors.email}
-              helperText={errors.email?.message}
+              {...register('username')}
+              error={!!errors.username}
+              helperText={errors.username?.message}
             />
 
             {/* Campo de Senha */}

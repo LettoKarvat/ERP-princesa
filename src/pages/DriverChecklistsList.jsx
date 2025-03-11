@@ -12,11 +12,13 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    Table,
-    TableBody,
-    TableRow,
-    TableCell
+    TextField,
+    InputAdornment
 } from '@mui/material';
+
+import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
+import PersonIcon from '@mui/icons-material/Person';
+import EventIcon from '@mui/icons-material/Event';
 
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -24,7 +26,7 @@ import autoTable from 'jspdf-autotable';
 import api from '../services/api';
 
 // -------------------------------------
-// Tabela de referência code -> description
+// Tabela de referência: código -> descrição dos itens
 // -------------------------------------
 const checklistItems = [
     { code: 1, description: "CRLV do veículo está ok?" },
@@ -47,7 +49,7 @@ const checklistItems = [
     { code: 18, description: "Tacógrafo: marcação, hora, agulha, está conforme." },
     { code: 19, description: "Carrinho de entrega está ok?" },
     { code: 20, description: "Itens de segurança: macaco, triângulo, chave de roda." },
-    { code: 21, description: "Possui EPI necessário?" }
+    { code: 21, description: "Possui EPI necessário?" },
 ];
 
 function getDescriptionByCode(code) {
@@ -55,7 +57,7 @@ function getDescriptionByCode(code) {
     return found ? found.description : `Item ${code}`;
 }
 
-// Funções para pegar dados do backend
+// Funções para buscar dados do backend
 async function fetchAllChecklists(sessionToken) {
     const resp = await api.post(
         '/functions/getAllChecklists',
@@ -77,6 +79,11 @@ async function fetchChecklistById(checklistId, sessionToken) {
 export default function DriverChecklistsList() {
     const [checklists, setChecklists] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    // Campos para busca
+    const [searchPlate, setSearchPlate] = useState('');       // placa
+    const [searchMotorista, setSearchMotorista] = useState(''); // motorista
+    const [searchDate, setSearchDate] = useState('');         // data (yyyy-mm-dd)
 
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [selectedChecklist, setSelectedChecklist] = useState(null);
@@ -129,10 +136,58 @@ export default function DriverChecklistsList() {
         setSnackbarMessage(message);
         setSnackbarOpen(true);
     };
+
     const handleCloseSnackbar = () => {
         setSnackbarOpen(false);
     };
 
+    // Filtramos os checklists localmente, com base em Placa, Motorista e Data
+    const filteredChecklists = checklists.filter((ch) => {
+        // Filtro por placa (se preenchido)
+        if (searchPlate) {
+            // se ch.placa não tiver a substring, descarta
+            if (!ch.placa?.toLowerCase().includes(searchPlate.toLowerCase())) {
+                return false;
+            }
+        }
+
+        // Filtro por motorista (se preenchido)
+        if (searchMotorista) {
+            // se ch.userFullname não tiver a substring, descarta
+            if (!ch.userFullname?.toLowerCase().includes(searchMotorista.toLowerCase())) {
+                return false;
+            }
+        }
+
+        // Filtro por data (se preenchido) - formato "yyyy-mm-dd" no input
+        if (searchDate) {
+            const cDateIso = ch.createdAt?.iso;
+            if (!cDateIso) return false;
+
+            // Criamos um Date a partir do ISO do checklist
+            const cDate = new Date(cDateIso);
+
+            // Data do checklist
+            const cDay = cDate.getDate();
+            const cMonth = cDate.getMonth();
+            const cYear = cDate.getFullYear();
+
+            // Converte a string "yyyy-mm-dd" em um Date
+            const sDate = new Date(searchDate);
+            const sDay = sDate.getDate();
+            const sMonth = sDate.getMonth();
+            const sYear = sDate.getFullYear();
+
+            // Comparando se são o mesmo dia/mês/ano
+            if (cDay !== sDay || cMonth !== sMonth || cYear !== sYear) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    // Geração do PDF (mantém a mesma lógica anterior)
     const handleGeneratePDF = () => {
         if (!selectedChecklist) return;
         try {
@@ -153,116 +208,114 @@ export default function DriverChecklistsList() {
                 : 'Data inválida';
             doc.text(`Data: ${createdStr}`, 40, 90);
 
-            let startTableY = 115;
-            // Tabela de itens
-            if (Array.isArray(selectedChecklist.items)) {
-                const rows = selectedChecklist.items.map((it) => {
-                    const desc = getDescriptionByCode(it.code);
-                    return [desc, it.answer, it.obs || ''];
-                });
-                autoTable(doc, {
-                    startY: startTableY,
-                    head: [['Item', 'Resposta', 'Observações']],
-                    body: rows,
-                    didParseCell: (data) => {
-                        if (data.section === 'body' && data.column.index === 1) {
-                            const ans = data.cell.raw;
-                            if (ans === 'sim') {
-                                data.cell.styles.fillColor = [204, 255, 204]; // verde
-                            } else if (ans === 'nao') {
-                                data.cell.styles.fillColor = [255, 204, 204]; // vermelho
-                            }
+            // 1) Tabela de Itens
+            let startY = 110;
+            const rows = selectedChecklist.items.map((it) => {
+                const desc = getDescriptionByCode(it.code);
+                return [desc, it.answer, it.obs || ''];
+            });
+
+            autoTable(doc, {
+                startY,
+                head: [['Item', 'Resposta', 'Observações']],
+                body: rows,
+                didParseCell: (data) => {
+                    // Se estivermos na coluna "Resposta" (índice 1), colorir a célula
+                    if (data.section === 'body' && data.column.index === 1) {
+                        const ans = data.cell.raw;
+                        if (ans === 'sim') {
+                            data.cell.styles.fillColor = [204, 255, 204]; // verde claro
+                        } else if (ans === 'nao') {
+                            data.cell.styles.fillColor = [255, 204, 204]; // vermelho claro
                         }
-                    },
-                });
-            }
+                    }
+                },
+            });
 
             const tableState = doc.lastAutoTable;
-            let finalY = tableState ? tableState.finalY : 115;
+            let currentY = tableState.finalY + 20;
 
-            // Assinatura
+            // 2) Assinatura (se existir)
             if (selectedChecklist.signature) {
-                doc.text('Assinatura:', 40, finalY + 30);
-                doc.addImage(
-                    selectedChecklist.signature,
-                    'PNG',
-                    40,
-                    finalY + 40,
-                    150,
-                    60
-                );
-                finalY += 110;
+                if (currentY + 80 > 720) {
+                    doc.addPage();
+                    currentY = 50;
+                }
+                doc.text('Assinatura:', 40, currentY);
+                doc.addImage(selectedChecklist.signature, 'PNG', 40, currentY + 10, 150, 60);
+                currentY += 80;
             }
 
-            // Verifica se haverá espaço para título "Anexos:"
-            // Se finalY + ~60 >= 720, pula para nova página
-            if (finalY + 60 > 720) {
-                doc.addPage();
-                finalY = 50;
-            }
+            // 3) Anexos
+            const allAttachments = selectedChecklist.attachments || [];
+            if (allAttachments.length > 0) {
+                const spaceNeeded = 50;
+                if (currentY + spaceNeeded > 720) {
+                    doc.addPage();
+                    currentY = 50;
+                }
 
-            // Anexos - 2 imagens por linha, sem nome do arquivo, só "Anexo #1"
-            if (
-                Array.isArray(selectedChecklist.attachments) &&
-                selectedChecklist.attachments.length > 0
-            ) {
                 doc.setFontSize(12);
                 doc.setFont('helvetica', 'bold');
-                doc.text('Anexos:', 40, finalY + 30);
+                doc.text('Anexos:', 40, currentY);
                 doc.setFontSize(10);
                 doc.setFont('helvetica', 'normal');
-                finalY += 45;
+                currentY += 20;
 
-                const attachments = selectedChecklist.attachments;
-
-                let xStart = 40;
-                let yPos = finalY;
-                const imageWidth = 150;
-                const imageHeight = 100;
-                const gapX = 40;
-                const gapY = 20;
-                const maxY = 720;
-                const columnsPerRow = 2;
-                let colIndex = 0;
-
-                attachments.forEach((attach, index) => {
-                    // Se não couber a imagem + algo de margem, pula pra outra página
-                    if (yPos > maxY) {
-                        doc.addPage();
-                        yPos = 50;
-                        xStart = 40;
-                        colIndex = 0;
-                    }
-
-                    // Mostra "Anexo #1", "Anexo #2"...
-                    doc.setTextColor(0, 0, 150);
-                    doc.text(`Anexo #${index + 1}`, xStart, yPos);
-                    doc.setTextColor(0, 0, 0);
-
-                    // Imagem
-                    const imageTop = yPos + 10;
-                    if (attach.fileBase64) {
-                        doc.addImage(
-                            attach.fileBase64,
-                            'JPEG',
-                            xStart,
-                            imageTop,
-                            imageWidth,
-                            imageHeight
-                        );
-                    }
-
-                    // Ajusta posição para próxima imagem
-                    colIndex++;
-                    if (colIndex < columnsPerRow) {
-                        xStart += imageWidth + gapX;
-                    } else {
-                        // Nova linha
-                        colIndex = 0;
-                        xStart = 40;
-                        yPos += imageHeight + gapY + 10;
-                    }
+                // Agrupa anexos por itemCode
+                const grouped = {};
+                allAttachments.forEach((att) => {
+                    const code = att.itemCode;
+                    if (!grouped[code]) grouped[code] = [];
+                    grouped[code].push(att);
                 });
+
+                for (const codeStr of Object.keys(grouped)) {
+                    const code = parseInt(codeStr, 10);
+                    const desc = getDescriptionByCode(code);
+                    const itemAtts = grouped[codeStr];
+
+                    if (currentY + 60 > 720) {
+                        doc.addPage();
+                        currentY = 50;
+                    }
+                    doc.setTextColor(0, 0, 150);
+                    doc.text(`Item ${code} - ${desc}`, 40, currentY);
+                    doc.setTextColor(0, 0, 0);
+                    currentY += 15;
+
+                    let xPos = 40;
+                    const imageWidth = 150;
+                    const imageHeight = 100;
+                    const gapX = 30;
+                    const gapY = 20;
+                    let colIndex = 0;
+
+                    itemAtts.forEach((att) => {
+                        if (currentY + imageHeight > 720) {
+                            doc.addPage();
+                            currentY = 50;
+                            xPos = 40;
+                            colIndex = 0;
+                        }
+                        doc.addImage(att.fileBase64, 'JPEG', xPos, currentY, imageWidth, imageHeight);
+                        colIndex++;
+                        if (colIndex === 2) {
+                            xPos = 40;
+                            currentY += imageHeight + gapY;
+                            colIndex = 0;
+                        } else {
+                            xPos += imageWidth + gapX;
+                        }
+                    });
+
+                    if (colIndex === 1) {
+                        colIndex = 0;
+                        xPos = 40;
+                        currentY += imageHeight + gapY;
+                    }
+                    currentY += 10;
+                }
             }
 
             doc.save('checklist.pdf');
@@ -281,67 +334,102 @@ export default function DriverChecklistsList() {
         );
     }
 
-    if (checklists.length === 0) {
-        return (
-            <Box sx={{ p: 2 }}>
-                <Typography variant="h6">Nenhum checklist encontrado.</Typography>
-            </Box>
-        );
-    }
-
     return (
         <Box sx={{ p: 2 }}>
             <Typography variant="h5" sx={{ mb: 2 }}>
                 Meus Checklists
             </Typography>
 
-            {checklists.map((ch) => {
-                const isoDate = ch.createdAt?.iso;
-                const createdStr = isoDate
-                    ? new Date(isoDate).toLocaleString('pt-BR')
-                    : 'Data inválida';
+            {/* Campos de busca com ícones */}
+            <Box sx={{ mb: 2, display: 'flex', gap: 2 }}>
+                <TextField
+                    variant="outlined"
+                    value={searchPlate}
+                    onChange={(e) => setSearchPlate(e.target.value)}
+                    // Removendo label, usando ícone
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <DirectionsCarIcon />
+                            </InputAdornment>
+                        ),
+                    }}
+                    placeholder="Placa"
+                />
+                <TextField
+                    variant="outlined"
+                    value={searchMotorista}
+                    onChange={(e) => setSearchMotorista(e.target.value)}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <PersonIcon />
+                            </InputAdornment>
+                        ),
+                    }}
+                    placeholder="Motorista"
+                />
+                <TextField
+                    type="date"
+                    variant="outlined"
+                    value={searchDate}
+                    onChange={(e) => setSearchDate(e.target.value)}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <EventIcon />
+                            </InputAdornment>
+                        ),
+                    }}
+                />
+            </Box>
 
-                return (
-                    <Paper
-                        key={ch.objectId}
-                        sx={{
-                            p: 2,
-                            mb: 2,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 1,
-                        }}
-                    >
-                        <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                            Placa: {ch.placa || 'N/A'}
-                        </Typography>
-                        <Typography variant="body2">
-                            Motorista: {ch.userFullname || 'N/A'}
-                        </Typography>
-                        <Typography variant="body2">Criado em: {createdStr}</Typography>
+            {/* Filtro local aplicado */}
+            {filteredChecklists.length === 0 ? (
+                <Typography variant="h6">Nenhum checklist encontrado.</Typography>
+            ) : (
+                filteredChecklists.map((ch) => {
+                    const isoDate = ch.createdAt?.iso;
+                    const createdStr = isoDate
+                        ? new Date(isoDate).toLocaleString('pt-BR')
+                        : 'Data inválida';
 
-                        <Button
-                            variant="contained"
-                            sx={{ mt: 1, alignSelf: 'flex-start' }}
-                            onClick={() => handleOpenDetails(ch.objectId)}
+                    return (
+                        <Paper
+                            key={ch.objectId}
+                            sx={{
+                                p: 2,
+                                mb: 2,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 1,
+                            }}
                         >
-                            Ver Detalhes
-                        </Button>
-                    </Paper>
-                );
-            })}
+                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                                Placa: {ch.placa || 'N/A'}
+                            </Typography>
+                            <Typography variant="body2">
+                                Motorista: {ch.userFullname || 'N/A'}
+                            </Typography>
+                            <Typography variant="body2">Criado em: {createdStr}</Typography>
+
+                            <Button
+                                variant="contained"
+                                sx={{ mt: 1, alignSelf: 'flex-start' }}
+                                onClick={() => handleOpenDetails(ch.objectId)}
+                            >
+                                Ver Detalhes
+                            </Button>
+                        </Paper>
+                    );
+                })
+            )}
 
             {/* Modal de Detalhes */}
-            <Dialog
-                open={detailsOpen}
-                onClose={handleCloseDetails}
-                fullWidth
-                maxWidth="md"
-            >
+            <Dialog open={detailsOpen} onClose={handleCloseDetails} fullWidth maxWidth="md">
                 <DialogTitle>Detalhes do Checklist</DialogTitle>
                 <DialogContent dividers>
                     {loadingDetails && <CircularProgress />}
-
                     {!loadingDetails && selectedChecklist && (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
@@ -352,43 +440,45 @@ export default function DriverChecklistsList() {
                             </Typography>
                             <Typography variant="body2">
                                 {selectedChecklist.createdAt?.iso
-                                    ? `Criado em: ${new Date(
-                                        selectedChecklist.createdAt.iso
-                                    ).toLocaleString('pt-BR')}`
+                                    ? `Criado em: ${new Date(selectedChecklist.createdAt.iso).toLocaleString('pt-BR')}`
                                     : 'Data inválida'}
                             </Typography>
 
-                            {Array.isArray(selectedChecklist.items) && (
-                                <Table size="small">
-                                    <TableBody>
-                                        {selectedChecklist.items.map((it, idx) => {
-                                            const desc = getDescriptionByCode(it.code);
-                                            return (
-                                                <TableRow key={idx}>
-                                                    <TableCell sx={{ fontWeight: 'bold' }}>
-                                                        {desc}
-                                                    </TableCell>
-                                                    <TableCell
-                                                        sx={{
-                                                            color:
-                                                                it.answer === 'sim'
-                                                                    ? 'green'
-                                                                    : it.answer === 'nao'
-                                                                        ? 'red'
-                                                                        : 'inherit',
-                                                        }}
-                                                    >
-                                                        {it.answer}
-                                                    </TableCell>
-                                                    <TableCell>{it.obs}</TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                    </TableBody>
-                                </Table>
-                            )}
+                            {/* Para cada item, exibe seus dados e os anexos logo abaixo */}
+                            {selectedChecklist.items.map((item, idx) => {
+                                const desc = getDescriptionByCode(item.code);
+                                const itemAttachments = selectedChecklist.attachments.filter(
+                                    (att) => att.itemCode === item.code
+                                );
+                                return (
+                                    <Box key={idx} sx={{ mb: 2, borderBottom: '1px solid #ccc', pb: 1 }}>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                                            {desc}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: item.answer === 'sim' ? 'green' : 'red' }}>
+                                            Resposta: {item.answer}
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            Observações: {item.obs || '-'}
+                                        </Typography>
+                                        {itemAttachments.length > 0 && (
+                                            <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                                {itemAttachments.map((att) => (
+                                                    <Box key={att.objectId} sx={{ textAlign: 'center' }}>
+                                                        <img
+                                                            src={att.fileBase64}
+                                                            alt="Anexo"
+                                                            style={{ border: '1px solid #ccc', maxWidth: '200px' }}
+                                                        />
+                                                    </Box>
+                                                ))}
+                                            </Box>
+                                        )}
+                                    </Box>
+                                );
+                            })}
 
-                            {/* Assinatura */}
+                            {/* Exibe a assinatura, se existir */}
                             {selectedChecklist.signature && (
                                 <Box>
                                     <Typography variant="subtitle2" sx={{ mt: 2 }}>
@@ -401,42 +491,6 @@ export default function DriverChecklistsList() {
                                     />
                                 </Box>
                             )}
-
-                            {/* Anexos */}
-                            {Array.isArray(selectedChecklist.attachments) &&
-                                selectedChecklist.attachments.length > 0 && (
-                                    <Box>
-                                        <Typography variant="subtitle2" sx={{ mt: 2 }}>
-                                            Anexos:
-                                        </Typography>
-                                        {selectedChecklist.attachments.map((att, i) => (
-                                            <Box key={att.objectId} sx={{ mb: 1 }}>
-                                                {/* Exemplo: só "Anexo #1" no modal (ou nada) */}
-                                                <Typography variant="body2">
-                                                    Anexo #{i + 1}
-                                                </Typography>
-                                                {att.fileBase64 ? (
-                                                    <img
-                                                        src={att.fileBase64}
-                                                        alt="Anexo"
-                                                        style={{
-                                                            border: '1px solid #ccc',
-                                                            maxWidth: '300px',
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <a
-                                                        href={att.fileUrl}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                    >
-                                                        Abrir
-                                                    </a>
-                                                )}
-                                            </Box>
-                                        ))}
-                                    </Box>
-                                )}
                         </Box>
                     )}
                 </DialogContent>
@@ -458,11 +512,7 @@ export default function DriverChecklistsList() {
                 onClose={handleCloseSnackbar}
                 anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
             >
-                <Alert
-                    onClose={handleCloseSnackbar}
-                    severity={snackbarSeverity}
-                    sx={{ width: '100%' }}
-                >
+                <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
                     {snackbarMessage}
                 </Alert>
             </Snackbar>

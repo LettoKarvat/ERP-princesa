@@ -85,19 +85,20 @@ function Layout() {
       <Box component="nav" sx={{ flex: 1 }}>
         <List>
           {/* Dashboard */}
-          <ListItem disablePadding>
-            <ListItemButton
-              component={NavLink}
-              to="/dashboard"
-              sx={listItemButtonStyle}
-            >
-              <ListItemIcon sx={{ color: 'inherit' }}>
-                <FaHome />
-              </ListItemIcon>
-              <ListItemText primary="Dashboard" />
-            </ListItemButton>
-          </ListItem>
-
+          {['admin', 'manutencao'].includes(role) && (
+            <ListItem disablePadding>
+              <ListItemButton
+                component={NavLink}
+                to="/dashboard"
+                sx={listItemButtonStyle}
+              >
+                <ListItemIcon sx={{ color: 'inherit' }}>
+                  <FaHome />
+                </ListItemIcon>
+                <ListItemText primary="Dashboard" />
+              </ListItemButton>
+            </ListItem>
+          )}
           {/* Veículos */}
           {['admin', 'manutencao'].includes(role) && (
             <ListItem disablePadding>

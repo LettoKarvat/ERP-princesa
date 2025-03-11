@@ -27,29 +27,41 @@ const roleOptions = [
 ];
 
 function UserManagement() {
-    // ----- ESTADOS PARA CRIAR USUÁRIO -----
+    // ---------------------------
+    // ESTADOS PARA CRIAR USUÁRIO
+    // ---------------------------
     const [fullname, setFullname] = useState('');
-    const [email, setEmail] = useState('');
+    const [email, setEmail] = useState('');       // usado quando role = admin
+    const [matricula, setMatricula] = useState(''); // usado quando role != admin
     const [password, setPassword] = useState('');
     const [role, setRole] = useState('');
     const [error, setError] = useState('');
 
-    // ----- LISTA DE USUÁRIOS -----
+    // ---------------------------
+    // LISTA DE USUÁRIOS
+    // ---------------------------
     const [users, setUsers] = useState([]);
 
-    // ----- MODAL DE CREDENCIAIS (APÓS CRIAR) -----
+    // ---------------------------
+    // MODAL DE CREDENCIAIS (PÓS-CRIAÇÃO)
+    // ---------------------------
     const [modalCredOpen, setModalCredOpen] = useState(false);
     const [createdUser, setCreatedUser] = useState(null);
 
-    // ----- MODAL DE EDIÇÃO -----
+    // ---------------------------
+    // MODAL DE EDIÇÃO
+    // ---------------------------
     const [modalEditOpen, setModalEditOpen] = useState(false);
     const [editUserId, setEditUserId] = useState('');
     const [editFullname, setEditFullname] = useState('');
     const [editEmail, setEditEmail] = useState('');
+    const [editMatricula, setEditMatricula] = useState('');
     const [editPassword, setEditPassword] = useState('');
     const [editRole, setEditRole] = useState('');
 
-    // ----- MODAL DE EXCLUSÃO -----
+    // ---------------------------
+    // MODAL DE EXCLUSÃO
+    // ---------------------------
     const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
     const [deleteUserId, setDeleteUserId] = useState('');
 
@@ -58,6 +70,9 @@ function UserManagement() {
         loadUsers();
     }, []);
 
+    // ---------------------------
+    // CARREGAR LISTA DE USUÁRIOS
+    // ---------------------------
     const loadUsers = async () => {
         try {
             const response = await api.post(
@@ -78,33 +93,61 @@ function UserManagement() {
         }
     };
 
-    // Criar novo usuário
+    // ---------------------------
+    // CRIAR NOVO USUÁRIO
+    // ---------------------------
     const handleCreateUser = async (e) => {
         e.preventDefault();
         setError('');
 
-        if (!fullname || !email || !password || !role) {
-            setError('Preencha todos os campos!');
+        // Verificação básica
+        if (!fullname || !password || !role) {
+            setError('Preencha nome completo, senha e tipo de usuário.');
+            return;
+        }
+
+        // Se for admin, exigimos email. Se não for, exigimos matrícula
+        if (role === 'admin' && !email) {
+            setError('Para criar um Admin, informe o email.');
+            return;
+        } else if (role !== 'admin' && !matricula) {
+            setError('Para criar usuários não-admin, informe a matrícula.');
             return;
         }
 
         try {
-            // Chama a Cloud Function "signup"
-            const response = await api.post('/functions/signup', {
+            // Monta o payload conforme a role
+            const payload = {
                 fullname,
-                email,
                 password,
                 role,
-            });
+            };
+
+            if (role === 'admin') {
+                payload.email = email;
+            } else {
+                payload.matricula = matricula;
+            }
+
+            // Chama a Cloud Function "signup"
+            const response = await api.post('/functions/signup', payload);
 
             if (response.data.result && response.data.result.user) {
                 // Salva as credenciais e exibe no modal
-                setCreatedUser({
+                const created = {
                     fullname,
-                    email,
                     role,
                     password,
-                });
+                };
+
+                // username = email (admin) ou matricula (não-admin)
+                if (role === 'admin') {
+                    created.username = email;
+                } else {
+                    created.username = matricula;
+                }
+
+                setCreatedUser(created);
                 setModalCredOpen(true);
 
                 // Recarrega a lista de usuários
@@ -113,6 +156,7 @@ function UserManagement() {
                 // Limpa os campos
                 setFullname('');
                 setEmail('');
+                setMatricula('');
                 setPassword('');
                 setRole('');
             } else {
@@ -124,60 +168,99 @@ function UserManagement() {
         }
     };
 
-    // Copiar credenciais
+    // ---------------------------
+    // COPIAR CREDENCIAIS
+    // ---------------------------
     const handleCopy = () => {
         if (createdUser) {
-            const creds = `Nome: ${createdUser.fullname}\nEmail: ${createdUser.email}\nTipo: ${createdUser.role}\nSenha: ${createdUser.password}`;
+            const creds = `Nome: ${createdUser.fullname}\n` +
+                `Usuário (Email/Matrícula): ${createdUser.username}\n` +
+                `Tipo: ${createdUser.role}\n` +
+                `Senha: ${createdUser.password}`;
             navigator.clipboard.writeText(creds).then(() => {
                 alert('Credenciais copiadas para a área de transferência!');
             });
         }
     };
 
+    // ---------------------------
+    // FECHAR MODAL DE CREDENCIAIS
+    // ---------------------------
     const handleCloseCredModal = () => {
         setModalCredOpen(false);
         setCreatedUser(null);
     };
 
-    // ----- ABRIR MODAL DE EDIÇÃO -----
+    // ---------------------------
+    // ABRIR MODAL DE EDIÇÃO
+    // ---------------------------
     const openEditModal = (user) => {
         setEditUserId(user.objectId);
         setEditFullname(user.fullname);
-        setEditEmail(user.email);
-        setEditPassword(''); // começa vazio, se o admin não quiser mudar a senha
+        setEditPassword(''); // começa vazio, se não quiser alterar
         setEditRole(user.role);
+
+        // Se for admin, usamos .email; se não for, usamos .matricula
+        if (user.role === 'admin') {
+            setEditEmail(user.email || '');
+            setEditMatricula('');
+        } else {
+            setEditEmail('');
+            setEditMatricula(user.matricula || '');
+        }
+
         setModalEditOpen(true);
     };
 
+    // ---------------------------
+    // FECHAR MODAL DE EDIÇÃO
+    // ---------------------------
     const closeEditModal = () => {
         setModalEditOpen(false);
         setEditUserId('');
         setEditFullname('');
         setEditEmail('');
+        setEditMatricula('');
         setEditPassword('');
         setEditRole('');
     };
 
-    // ----- SALVAR EDIÇÃO -----
+    // ---------------------------
+    // SALVAR EDIÇÃO
+    // ---------------------------
     const handleSaveEdit = async () => {
         if (!editUserId) return;
+
+        // Se for admin, precisamos de email; se não for admin, precisamos de matrícula
+        if (editRole === 'admin' && !editEmail) {
+            alert('Admin precisa de email');
+            return;
+        }
+        if (editRole !== 'admin' && !editMatricula) {
+            alert('Usuário não-admin precisa de matrícula');
+            return;
+        }
+
         try {
-            // Chamamos updateUser, podendo passar email e password também
-            await api.post(
-                '/functions/updateUser',
-                {
-                    userId: editUserId,
-                    fullname: editFullname,
-                    email: editEmail,       // <-- Novo
-                    password: editPassword, // <-- Novo
-                    role: editRole,
+            // Monta o payload
+            const payload = {
+                userId: editUserId,
+                fullname: editFullname,
+                role: editRole,
+                password: editPassword, // Se vazio, o back-end ignora
+            };
+
+            if (editRole === 'admin') {
+                payload.email = editEmail;
+            } else {
+                payload.matricula = editMatricula;
+            }
+
+            await api.post('/functions/updateUser', payload, {
+                headers: {
+                    'X-Parse-Session-Token': localStorage.getItem('sessionToken'),
                 },
-                {
-                    headers: {
-                        'X-Parse-Session-Token': localStorage.getItem('sessionToken'),
-                    },
-                }
-            );
+            });
             closeEditModal();
             loadUsers();
         } catch (err) {
@@ -186,18 +269,25 @@ function UserManagement() {
         }
     };
 
-    // ----- ABRIR MODAL DE EXCLUSÃO -----
+    // ---------------------------
+    // ABRIR MODAL DE EXCLUSÃO
+    // ---------------------------
     const openDeleteModal = (userId) => {
         setDeleteUserId(userId);
         setModalDeleteOpen(true);
     };
 
+    // ---------------------------
+    // FECHAR MODAL DE EXCLUSÃO
+    // ---------------------------
     const closeDeleteModal = () => {
         setDeleteUserId('');
         setModalDeleteOpen(false);
     };
 
-    // ----- CONFIRMAR EXCLUSÃO -----
+    // ---------------------------
+    // CONFIRMAR EXCLUSÃO (SOFT DELETE)
+    // ---------------------------
     const handleConfirmDelete = async () => {
         if (!deleteUserId) return;
         try {
@@ -218,6 +308,9 @@ function UserManagement() {
         }
     };
 
+    // ======================
+    // RENDER
+    // ======================
     return (
         <Box sx={{ maxWidth: 900, margin: '0 auto', mt: 4 }}>
             <Typography variant="h5" sx={{ mb: 2 }}>
@@ -230,7 +323,7 @@ function UserManagement() {
                 </Alert>
             )}
 
-            {/* Formulário de criar novo usuário */}
+            {/* FORM DE CRIAR NOVO USUÁRIO */}
             <Box
                 component="form"
                 onSubmit={handleCreateUser}
@@ -253,15 +346,29 @@ function UserManagement() {
                     value={fullname}
                     onChange={(e) => setFullname(e.target.value)}
                 />
-                <TextField
-                    label="Email"
-                    type="email"
-                    variant="outlined"
-                    fullWidth
-                    sx={{ mb: 2 }}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                />
+
+                {/* Se role=admin => pede email; senão => pede matrícula */}
+                {role === 'admin' ? (
+                    <TextField
+                        label="Email"
+                        type="email"
+                        variant="outlined"
+                        fullWidth
+                        sx={{ mb: 2 }}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                    />
+                ) : (
+                    <TextField
+                        label="Matrícula"
+                        variant="outlined"
+                        fullWidth
+                        sx={{ mb: 2 }}
+                        value={matricula}
+                        onChange={(e) => setMatricula(e.target.value)}
+                    />
+                )}
+
                 <TextField
                     label="Senha"
                     type="password"
@@ -271,6 +378,7 @@ function UserManagement() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                 />
+
                 <FormControl fullWidth sx={{ mb: 2 }}>
                     <InputLabel id="role-label">Tipo de Usuário</InputLabel>
                     <Select
@@ -293,52 +401,59 @@ function UserManagement() {
                 </Button>
             </Box>
 
-            {/* Lista de usuários existentes */}
+            {/* LISTA DE USUÁRIOS */}
             <Typography variant="h6" sx={{ mb: 2 }}>
                 Usuários Cadastrados
             </Typography>
 
-            {users.map((u) => (
-                <Paper
-                    key={u.objectId}
-                    sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        p: 2,
-                        mb: 1,
-                    }}
-                >
-                    <Box>
-                        <Typography>
-                            <strong>Nome:</strong> {u.fullname}
-                        </Typography>
-                        <Typography>
-                            <strong>Email:</strong> {u.email}
-                        </Typography>
-                        <Typography>
-                            <strong>Tipo:</strong> {u.role}
-                        </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Button
-                            variant="outlined"
-                            onClick={() => openEditModal(u)}
-                        >
-                            Editar
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            color="error"
-                            onClick={() => openDeleteModal(u.objectId)}
-                        >
-                            Excluir
-                        </Button>
-                    </Box>
-                </Paper>
-            ))}
+            {users.map((u) => {
+                // Se for admin => 'Email', senão => 'Matrícula'
+                const isAdmin = u.role === 'admin';
+                const identifierLabel = isAdmin ? 'Email' : 'Matrícula';
+                const identifierValue = isAdmin ? u.email : u.matricula;
 
-            {/* MODAL DE CREDENCIAIS (com mais cor e destaque) */}
+                return (
+                    <Paper
+                        key={u.objectId}
+                        sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            p: 2,
+                            mb: 1,
+                        }}
+                    >
+                        <Box>
+                            <Typography>
+                                <strong>Nome:</strong> {u.fullname}
+                            </Typography>
+                            <Typography>
+                                <strong>{identifierLabel}:</strong> {identifierValue || '—'}
+                            </Typography>
+                            <Typography>
+                                <strong>Tipo:</strong> {u.role}
+                            </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button
+                                variant="outlined"
+                                onClick={() => openEditModal(u)}
+                            >
+                                Editar
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                color="error"
+                                onClick={() => openDeleteModal(u.objectId)}
+                            >
+                                Excluir
+                            </Button>
+                        </Box>
+                    </Paper>
+                );
+            })}
+
+            {/* MODAL DE CREDENCIAIS (criação) */}
             <Dialog open={modalCredOpen} onClose={handleCloseCredModal}>
                 <DialogTitle sx={{ bgcolor: '#1976d2', color: '#fff' }}>
                     Credenciais do Usuário
@@ -350,7 +465,7 @@ function UserManagement() {
                                 <strong>Nome:</strong> {createdUser.fullname}
                             </Typography>
                             <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                                <strong>Email:</strong> {createdUser.email}
+                                <strong>Usuário (Email/Matrícula):</strong> {createdUser.username}
                             </Typography>
                             <Typography variant="subtitle1" sx={{ mb: 1 }}>
                                 <strong>Tipo de Usuário:</strong> {createdUser.role}
@@ -388,15 +503,29 @@ function UserManagement() {
                         value={editFullname}
                         onChange={(e) => setEditFullname(e.target.value)}
                     />
-                    <TextField
-                        label="Email"
-                        type="email"
-                        variant="outlined"
-                        fullWidth
-                        sx={{ mb: 2 }}
-                        value={editEmail}
-                        onChange={(e) => setEditEmail(e.target.value)}
-                    />
+
+                    {/* Se editRole=admin => Email, senão => Matrícula */}
+                    {editRole === 'admin' ? (
+                        <TextField
+                            label="Email"
+                            type="email"
+                            variant="outlined"
+                            fullWidth
+                            sx={{ mb: 2 }}
+                            value={editEmail}
+                            onChange={(e) => setEditEmail(e.target.value)}
+                        />
+                    ) : (
+                        <TextField
+                            label="Matrícula"
+                            variant="outlined"
+                            fullWidth
+                            sx={{ mb: 2 }}
+                            value={editMatricula}
+                            onChange={(e) => setEditMatricula(e.target.value)}
+                        />
+                    )}
+
                     <TextField
                         label="Nova Senha"
                         type="password"
@@ -407,6 +536,7 @@ function UserManagement() {
                         onChange={(e) => setEditPassword(e.target.value)}
                         helperText="Deixe em branco se não quiser alterar a senha."
                     />
+
                     <FormControl fullWidth>
                         <InputLabel id="edit-role-label">Tipo de Usuário</InputLabel>
                         <Select
