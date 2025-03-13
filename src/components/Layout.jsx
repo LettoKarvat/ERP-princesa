@@ -25,7 +25,6 @@ import {
   FaGasPump,
   FaTools,
   FaSignOutAlt,
-  FaWhatsapp,
   FaCog,
   FaUsers,
 } from 'react-icons/fa';
@@ -33,6 +32,18 @@ import { PiTireLight } from 'react-icons/pi';
 import MenuIcon from '@mui/icons-material/Menu';
 
 const DRAWER_WIDTH = 240;
+
+// Estilos do item de lista
+const listItemButtonStyle = {
+  color: '#fff',
+  textTransform: 'none',
+  '&.active': {
+    backgroundColor: '#333',
+  },
+  '&:hover': {
+    backgroundColor: '#374151',
+  },
+};
 
 function Layout() {
   const navigate = useNavigate();
@@ -56,6 +67,7 @@ function Layout() {
   const drawerContent = (
     <Box
       sx={{
+        // Fundo do Drawer (apenas para o conteúdo)
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -82,6 +94,7 @@ function Layout() {
         </Typography>
       </Box>
 
+      {/* Menu de navegação */}
       <Box component="nav" sx={{ flex: 1 }}>
         <List>
           {/* Dashboard */}
@@ -99,6 +112,7 @@ function Layout() {
               </ListItemButton>
             </ListItem>
           )}
+
           {/* Veículos */}
           {['admin', 'manutencao'].includes(role) && (
             <ListItem disablePadding>
@@ -212,8 +226,7 @@ function Layout() {
           )}
 
           {/* ------------------------------
-              NOVOS ITENS PARA O DRIVER
-              (motorista e admin)
+              NOVOS ITENS PARA O DRIVER (motorista e admin)
           ------------------------------ */}
           {['admin', 'motorista'].includes(role) && (
             <>
@@ -284,7 +297,7 @@ function Layout() {
   );
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#1f2937' }}>
       <CssBaseline />
 
       {/* AppBar no mobile */}
@@ -314,16 +327,20 @@ function Layout() {
         </AppBar>
       )}
 
-      {/* Drawer (sidebar) */}
+      {/* Drawer (sidebar) em telas grandes */}
       {isDesktop ? (
         <Drawer
           variant="permanent"
           sx={{
             width: DRAWER_WIDTH,
             flexShrink: 0,
-            [`& .MuiDrawer-paper`]: {
+            '& .MuiDrawer-paper': {
               width: DRAWER_WIDTH,
               boxSizing: 'border-box',
+              // Novo: fundo escuro, cor de texto e rolagem
+              backgroundColor: '#1f2937',
+              color: '#fff',
+              overflowY: 'auto',
             },
           }}
           open
@@ -331,18 +348,23 @@ function Layout() {
           {drawerContent}
         </Drawer>
       ) : (
+        // Drawer em telas menores (mobile)
         <Drawer
           variant="temporary"
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{
-            keepMounted: true,
+            keepMounted: true, // Mantém no DOM para suavizar transições
           }}
           sx={{
             display: { xs: 'block', md: 'none' },
-            [`& .MuiDrawer-paper`]: {
+            '& .MuiDrawer-paper': {
               width: DRAWER_WIDTH,
               boxSizing: 'border-box',
+              // Mesmo estilo de fundo e rolagem
+              backgroundColor: '#1f2937',
+              color: '#fff',
+              overflowY: 'auto',
             },
           }}
         >
@@ -355,10 +377,12 @@ function Layout() {
         component="main"
         sx={{
           flexGrow: 1,
-          ml: { md: `${DRAWER_WIDTH}px` },
+          // Sem margin-left, pois o Drawer fica sobreposto em telas grandes
+          ml: { md: 0 },
+          // Espaçamento no topo quando a AppBar está fixa no mobile
           mt: { xs: isDesktop ? 0 : 8, md: 0 },
           p: 2,
-          minHeight: '100vh',
+          // Fundo claro só na área de conteúdo
           backgroundColor: '#f5f6fa',
         }}
       >
@@ -370,15 +394,3 @@ function Layout() {
 }
 
 export default Layout;
-
-// Estilos do item de lista
-const listItemButtonStyle = {
-  color: '#fff',
-  textTransform: 'none',
-  '&.active': {
-    backgroundColor: '#333',
-  },
-  '&:hover': {
-    backgroundColor: '#374151',
-  },
-};
