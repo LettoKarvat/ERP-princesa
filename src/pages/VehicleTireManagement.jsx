@@ -20,171 +20,158 @@ import {
     Select,
     MenuItem,
 } from '@mui/material';
-import { MdOutlineTireRepair } from 'react-icons/md'; // Ícone de pneu (pode usar outro)
+import { MdOutlineTireRepair } from 'react-icons/md';
 import api from '../services/api';
 
-/**
- * Layout top-down dos pneus, por tipo de veículo.
- * Cada tipo é um array de "eixos", e cada eixo tem:
- *  - label: nome ou descrição (ex.: "1º Eixo Dianteiro")
- *  - positions: array com as posições (ex.: ["1E", "1D"])
- */
-/**
- * Layout top-down dos pneus, por tipo de veículo.
- * Cada tipo é um array de "eixos", e cada eixo tem:
- *  - label: nome ou descrição (ex.: "1º Eixo Dianteiro")
- *  - positions: array com as posições (ex.: ["1E", "1D"])
- */
+// Layouts por tipo de veículo
 const TIRE_LAYOUTS = {
-    "Passeio": [
+    'Passeio': [
         {
-            label: "Eixo Dianteiro",
-            positions: ["1E", "1D"]
+            label: 'Eixo Dianteiro',
+            positions: ['1E', '1D']
         },
         {
-            label: "Eixo Traseiro",
-            positions: ["2E", "2D"]
+            label: 'Eixo Traseiro',
+            positions: ['2E', '2D']
         },
         {
-            label: "Estepe",
-            positions: ["E"]
+            label: 'Estepe',
+            positions: ['E']
         }
     ],
-    "Delivery": [
+    'Delivery': [
         {
-            label: "1º Eixo (Dianteiro)",
-            positions: ["1E", "1D"]
+            label: '1º Eixo (Dianteiro)',
+            positions: ['1E', '1D']
         },
         {
-            label: "2º Eixo (Traseiro)",
-            positions: ["2E", "2D"]
+            label: '2º Eixo (Traseiro)',
+            positions: ['2E', '2D']
         },
         {
-            label: "Estepe",
-            positions: ["E"]
+            label: 'Estepe',
+            positions: ['E']
         }
     ],
-    "3/4": [
+    '3/4': [
         {
-            label: "1º Eixo (Dianteiro)",
-            positions: ["1E", "1D"]
+            label: '1º Eixo (Dianteiro)',
+            positions: ['1E', '1D']
         },
         {
-            label: "2º Eixo (Traseiro)",
-            positions: ["2DI", "2DE", "2EI", "2EE"]
+            label: '2º Eixo (Traseiro)',
+            positions: ['2DI', '2DE', '2EI', '2EE']
         },
         {
-            label: "Estepe",
-            positions: ["E"]
+            label: 'Estepe',
+            positions: ['E']
         }
     ],
-    "Toco": [
+    'Toco': [
         {
-            label: "1º Eixo (Dianteiro)",
-            positions: ["1E", "1D"]
+            label: '1º Eixo (Dianteiro)',
+            positions: ['1E', '1D']
         },
         {
-            label: "2º Eixo (Traseiro)",
-            positions: ["2DI", "2DE", "2EI", "2EE"]
+            label: '2º Eixo (Traseiro)',
+            positions: ['2DI', '2DE', '2EI', '2EE']
         },
         {
-            label: "Estepe",
-            positions: ["E"]
+            label: 'Estepe',
+            positions: ['E']
         }
     ],
-    "Truck": [
+    'Truck': [
         {
-            label: "1º Eixo (Dianteiro)",
-            positions: ["1E", "1D"]
+            label: '1º Eixo (Dianteiro)',
+            positions: ['1E', '1D']
         },
         {
-            label: "2º Eixo (Traseiro)",
-            positions: ["2DI", "2DE", "2EI", "2EE"]
+            label: '2º Eixo (Traseiro)',
+            positions: ['2DI', '2DE', '2EI', '2EE']
         },
         {
-            label: "3º Eixo (Traseiro)",
-            positions: ["3DI", "3DE", "3EI", "3EE"]
+            label: '3º Eixo (Traseiro)',
+            positions: ['3DI', '3DE', '3EI', '3EE']
         },
         {
-            label: "Estepe",
-            positions: ["E"]
+            label: 'Estepe',
+            positions: ['E']
         }
     ],
-    "Bi-Truck": [
+    'Bi-Truck': [
         {
-            label: "1º Eixo (Dianteiro)",
-            positions: ["1E", "1D"]
+            label: '1º Eixo (Dianteiro)',
+            positions: ['1E', '1D']
         },
         {
-            label: "2º Eixo",
-            positions: ["2E", "2D"]
+            label: '2º Eixo',
+            positions: ['2E', '2D']
         },
         {
-            label: "3º Eixo",
-            positions: ["3DI", "3DE", "3EI", "3EE"]
+            label: '3º Eixo',
+            positions: ['3DI', '3DE', '3EI', '3EE']
         },
         {
-            label: "4º Eixo",
-            positions: ["4DI", "4DE", "4EI", "4EE"]
+            label: '4º Eixo',
+            positions: ['4DI', '4DE', '4EI', '4EE']
         },
         {
-            label: "Estepe",
-            positions: ["E"]
+            label: 'Estepe',
+            positions: ['E']
         }
     ],
-    "Cavalo": [
+    'Cavalo': [
         {
-            label: "1º Eixo (Dianteiro)",
-            positions: ["1E", "1D"]
+            label: '1º Eixo (Dianteiro)',
+            positions: ['1E', '1D']
         },
         {
-            label: "2º Eixo",
-            positions: ["2DI", "2DE", "2EI", "2EE"]
+            label: '2º Eixo',
+            positions: ['2DI', '2DE', '2EI', '2EE']
         },
         {
-            label: "3º Eixo",
-            positions: ["3I", "3E"]
+            label: '3º Eixo',
+            positions: ['3I', '3E']
         },
         {
-            label: "Estepe",
-            positions: ["E"] // Corrigido, adicionado estepe
+            label: 'Estepe',
+            positions: ['E']
         }
     ],
-    "Semi-Reboque (Bi-Trem)": [
+    'Semi-Reboque (Bi-Trem)': [
         {
-            label: "1º Eixo",
-            positions: ["1DE", "1E"]
+            label: '1º Eixo',
+            positions: ['1DE', '1E']
         },
         {
-            label: "2º Eixo",
-            positions: ["2DI", "2DE", "2EI", "2EE"]
+            label: '2º Eixo',
+            positions: ['2DI', '2DE', '2EI', '2EE']
         },
         {
-            label: "Estepe",
-            positions: ["E", "E"] // Corrigido, adicionado segundo estepe
+            label: 'Estepe',
+            positions: ['E', 'E']
         }
     ],
-    "Semi-Reboque (Rodo-Trem)": [
+    'Semi-Reboque (Rodo-Trem)': [
         {
-            label: "1º Eixo",
-            positions: ["1D", "1E"]
+            label: '1º Eixo',
+            positions: ['1D', '1E']
         },
         {
-            label: "2º Eixo",
-            positions: ["2DI", "2DE", "2EI", "2EE"]
+            label: '2º Eixo',
+            positions: ['2DI', '2DE', '2EI', '2EE']
         },
         {
-            label: "3º Eixo",
-            positions: ["3DI", "3DE", "3EI", "3EE"]
+            label: '3º Eixo',
+            positions: ['3DI', '3DE', '3EI', '3EE']
         },
         {
-            label: "Estepe",
-            positions: ["E", "E"] // Mantidos dois estepes conforme a imagem
+            label: 'Estepe',
+            positions: ['E', 'E']
         }
     ]
 };
-
-
 
 // Card para exibir cada posição de pneu
 const TirePositionCard = styled(Paper)(({ theme }) => ({
@@ -211,12 +198,18 @@ function VehicleTireManagement() {
     // Pneus em estoque (para troca)
     const [stockTires, setStockTires] = useState([]);
 
-    // Modal
-    const [openModal, setOpenModal] = useState(false);
+    // Modal do veículo (layout)
+    const [openVehicleModal, setOpenVehicleModal] = useState(false);
+
+    // Modal de troca de pneu (posição)
+    const [openPositionModal, setOpenPositionModal] = useState(false);
     const [modalError, setModalError] = useState('');
     const [positionToEdit, setPositionToEdit] = useState('');
     const [assignedTire, setAssignedTire] = useState(null); // pneu que está no slot
     const [selectedStockTire, setSelectedStockTire] = useState(null);
+
+    // Destino do pneu antigo (quando houver)
+    const [oldTireDestination, setOldTireDestination] = useState('Em recapagem');
 
     useEffect(() => {
         loadVehicles();
@@ -239,13 +232,20 @@ function VehicleTireManagement() {
         }
     };
 
-    // Ao selecionar um veículo, carrega os pneus dele
-    const handleSelectVehicle = (vehicle) => {
+    // Ao selecionar um veículo, carrega pneus e abre modal
+    const handleSelectVehicle = async (vehicle) => {
         setSelectedVehicle(vehicle);
-        loadVehicleTires(vehicle.objectId);
+        await loadVehicleTires(vehicle.objectId);
+        setOpenVehicleModal(true);
     };
 
-    // Carrega todos os pneus e filtra por veiculoId
+    const handleCloseVehicleModal = () => {
+        setOpenVehicleModal(false);
+        setSelectedVehicle(null);
+        setVehicleTires([]);
+    };
+
+    // Carrega pneus do veículo
     const loadVehicleTires = async (vehicleId) => {
         try {
             const sessionToken = localStorage.getItem('sessionToken');
@@ -288,23 +288,25 @@ function VehicleTireManagement() {
         v.placa.toLowerCase().includes(vehicleSearch.toLowerCase())
     );
 
-    // Ao clicar em um slot, abrimos o modal
-    const handleOpenModal = (position, currentTire) => {
+    // Ao clicar em um slot, abrimos o modal de posição
+    const openPositionDetails = (position, currentTire) => {
         setPositionToEdit(position);
         setAssignedTire(currentTire || null);
         setModalError('');
         setSelectedStockTire(null);
+        setOldTireDestination('Em recapagem'); // define default
         // Carrega pneus em estoque
         loadStockTires();
-        setOpenModal(true);
+        setOpenPositionModal(true);
     };
 
-    const handleCloseModal = () => {
-        setOpenModal(false);
+    const handleClosePositionModal = () => {
+        setOpenPositionModal(false);
         setPositionToEdit('');
         setAssignedTire(null);
         setSelectedStockTire(null);
         setModalError('');
+        setOldTireDestination('Em recapagem');
     };
 
     // Trocar/Atribuir pneu
@@ -316,16 +318,15 @@ function VehicleTireManagement() {
         try {
             const sessionToken = localStorage.getItem('sessionToken');
 
-            // Se já existe um pneu nessa posição, removemos ele do veículo
+            // Se já existe um pneu nessa posição, atualizamos o status/destino dele
             if (assignedTire) {
-                // Ajuste se quiser mandar de volta para "Em estoque" ou "Trocado"
                 await api.post(
                     '/functions/editarPneu',
                     {
                         objectId: assignedTire.objectId,
                         veiculoId: '',
                         posicaoVeiculo: '',
-                        status: 'Trocado',
+                        status: oldTireDestination, // "Em recapagem", "Sucata" ou "Em estoque"
                     },
                     { headers: { 'X-Parse-Session-Token': sessionToken } }
                 );
@@ -344,7 +345,8 @@ function VehicleTireManagement() {
             );
 
             alert('Pneu atribuído/trocado com sucesso!');
-            handleCloseModal();
+            handleClosePositionModal();
+            // Recarrega pneus do veículo
             loadVehicleTires(selectedVehicle.objectId);
         } catch (err) {
             console.error('Erro ao trocar pneu:', err);
@@ -392,84 +394,129 @@ function VehicleTireManagement() {
                             selected={selectedVehicle && selectedVehicle.objectId === vehicle.objectId}
                         >
                             <ListItemText
-                                primary={`${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo}   (${vehicle.tipo})`}
+                                primary={`${vehicle.placa} - ${vehicle.marca} ${vehicle.modelo} (${vehicle.tipo})`}
                             />
                         </ListItem>
                     ))}
                 </List>
             )}
 
-            {/* Se um veículo foi selecionado, desenhar o layout */}
-            {selectedVehicle && (
-                <Box sx={{ mt: 4 }}>
-                    <Typography variant="h5">
-                        Veículo: {selectedVehicle.placa} - {selectedVehicle.tipo}
-                    </Typography>
-
-                    {/* Layout top-down, por eixos */}
-                    {getVehicleLayout().length === 0 ? (
-                        <Typography sx={{ mt: 2 }}>
-                            Não há layout definido para o tipo "{selectedVehicle.tipo}".
-                        </Typography>
-                    ) : (
-                        getVehicleLayout().map((axle, index) => (
-                            <Box key={index} sx={{ mt: 3 }}>
-                                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                    {axle.label}
+            {/* MODAL: Layout de Pneus do Veículo */}
+            <Dialog
+                open={openVehicleModal}
+                onClose={handleCloseVehicleModal}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>
+                    {selectedVehicle
+                        ? `Veículo: ${selectedVehicle.placa} - ${selectedVehicle.tipo}`
+                        : 'Veículo não selecionado'}
+                </DialogTitle>
+                <DialogContent dividers>
+                    {selectedVehicle && (
+                        <>
+                            {getVehicleLayout().length === 0 ? (
+                                <Typography sx={{ mt: 2 }}>
+                                    Não há layout definido para o tipo "{selectedVehicle.tipo}".
                                 </Typography>
-                                <Grid container justifyContent="center">
-                                    {axle.positions.map((pos) => {
-                                        // Achar se existe um pneu nessa posição
-                                        const currentTire = vehicleTires.find(
-                                            (t) => t.posicaoVeiculo === pos
-                                        );
-                                        return (
-                                            <Grid item key={pos}>
-                                                <TirePositionCard
-                                                    onClick={() => handleOpenModal(pos, currentTire)}
-                                                >
-                                                    <MdOutlineTireRepair size={24} />
-                                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                                        {pos}
-                                                    </Typography>
-                                                    {currentTire ? (
-                                                        <>
-                                                            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                                                                {currentTire.numeroSerie}
+                            ) : (
+                                getVehicleLayout().map((axle, index) => (
+                                    <Box key={index} sx={{ mt: 3 }}>
+                                        <Typography
+                                            variant="subtitle1"
+                                            sx={{ mb: 1, fontWeight: 'bold' }}
+                                        >
+                                            {axle.label}
+                                        </Typography>
+                                        <Grid container justifyContent="center">
+                                            {axle.positions.map((pos) => {
+                                                // Achar se existe um pneu nessa posição
+                                                const currentTire = vehicleTires.find(
+                                                    (t) => t.posicaoVeiculo === pos
+                                                );
+                                                return (
+                                                    <Grid item key={pos}>
+                                                        <TirePositionCard
+                                                            onClick={() =>
+                                                                openPositionDetails(pos, currentTire)
+                                                            }
+                                                        >
+                                                            <MdOutlineTireRepair size={24} />
+                                                            <Typography
+                                                                variant="body2"
+                                                                sx={{ fontWeight: 'bold' }}
+                                                            >
+                                                                {pos}
                                                             </Typography>
-                                                            <Typography variant="body2" sx={{ fontSize: '0.7rem' }}>
-                                                                {currentTire.fabricante} - {currentTire.modelo}
-                                                            </Typography>
-                                                            <Typography variant="body2" sx={{ fontSize: '0.7rem' }}>
-                                                                {getKmsRodados(currentTire)} km rodados
-                                                            </Typography>
-                                                        </>
-                                                    ) : (
-                                                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                                                            [Vazio]
-                                                        </Typography>
-                                                    )}
-                                                </TirePositionCard>
-                                            </Grid>
-                                        );
-                                    })}
-                                </Grid>
-                            </Box>
-                        ))
+                                                            {currentTire ? (
+                                                                <>
+                                                                    <Typography
+                                                                        variant="body2"
+                                                                        sx={{ fontSize: '0.8rem' }}
+                                                                    >
+                                                                        {currentTire.numeroSerie}
+                                                                    </Typography>
+                                                                    <Typography
+                                                                        variant="body2"
+                                                                        sx={{ fontSize: '0.7rem' }}
+                                                                    >
+                                                                        {currentTire.fabricante} -{' '}
+                                                                        {currentTire.modelo}
+                                                                    </Typography>
+                                                                    <Typography
+                                                                        variant="body2"
+                                                                        sx={{ fontSize: '0.7rem' }}
+                                                                    >
+                                                                        {getKmsRodados(currentTire)} km rodados
+                                                                    </Typography>
+                                                                    {/* Exibe quantas recapagens esse pneu tem, se quiser */}
+                                                                    <Typography
+                                                                        variant="body2"
+                                                                        sx={{ fontSize: '0.7rem' }}
+                                                                    >
+                                                                        Recap: {currentTire.recapCount || 0}
+                                                                    </Typography>
+                                                                </>
+                                                            ) : (
+                                                                <Typography
+                                                                    variant="body2"
+                                                                    sx={{ fontSize: '0.8rem' }}
+                                                                >
+                                                                    [Vazio]
+                                                                </Typography>
+                                                            )}
+                                                        </TirePositionCard>
+                                                    </Grid>
+                                                );
+                                            })}
+                                        </Grid>
+                                    </Box>
+                                ))
+                            )}
+                        </>
                     )}
-                </Box>
-            )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseVehicleModal}>Fechar</Button>
+                </DialogActions>
+            </Dialog>
 
-            {/* Modal de detalhes e troca de pneu */}
-            <Dialog open={openModal} onClose={handleCloseModal} maxWidth="sm" fullWidth>
+            {/* MODAL: Detalhes da Posição (troca/atribuição de pneu) */}
+            <Dialog
+                open={openPositionModal}
+                onClose={handleClosePositionModal}
+                maxWidth="sm"
+                fullWidth
+            >
                 <DialogTitle>Detalhes da Posição: {positionToEdit}</DialogTitle>
                 <DialogContent dividers>
-                    {/* Se existe pneu na posição, exibe as infos */}
                     {assignedTire && (
                         <Box sx={{ mb: 2 }}>
                             <Alert severity="info" sx={{ mb: 2 }}>
                                 Pneu atual: {assignedTire.numeroSerie} (
-                                {assignedTire.fabricante} {assignedTire.modelo})
+                                {assignedTire.fabricante} {assignedTire.modelo})<br />
+                                <strong>Status:</strong> {assignedTire.status}
                             </Alert>
                             <Typography variant="body2">
                                 <strong>KM Inicial:</strong> {assignedTire.kmInicial}
@@ -487,20 +534,36 @@ function VehicleTireManagement() {
                                 <strong>Vida:</strong> {assignedTire.vida}
                             </Typography>
                             <Typography variant="body2">
-                                <strong>Status:</strong> {assignedTire.status}
+                                <strong>Recapagens:</strong> {assignedTire.recapCount || 0}
                             </Typography>
                         </Box>
                     )}
 
-                    {/* Exibe erros no modal, se houver */}
                     {modalError && (
                         <Alert severity="error" sx={{ mb: 2 }}>
                             {modalError}
                         </Alert>
                     )}
 
+                    {/* Se houver pneu antigo, escolher destino */}
+                    {assignedTire && (
+                        <FormControl fullWidth sx={{ mb: 3 }}>
+                            <InputLabel id="destino-label">Destino do Pneu Antigo</InputLabel>
+                            <Select
+                                labelId="destino-label"
+                                value={oldTireDestination}
+                                label="Destino do Pneu Antigo"
+                                onChange={(e) => setOldTireDestination(e.target.value)}
+                            >
+                                <MenuItem value="Em recapagem">Em recapagem</MenuItem>
+                                <MenuItem value="Sucata">Sucata</MenuItem>
+                                <MenuItem value="Em estoque">Em estoque</MenuItem>
+                            </Select>
+                        </FormControl>
+                    )}
+
                     {/* Lista de pneus em estoque para trocar/atribuir */}
-                    <FormControl fullWidth sx={{ mt: 2 }}>
+                    <FormControl fullWidth>
                         <InputLabel id="stock-tire-label">Selecionar Pneu do Estoque</InputLabel>
                         <Select
                             labelId="stock-tire-label"
@@ -524,7 +587,7 @@ function VehicleTireManagement() {
                     </FormControl>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleCloseModal}>Fechar</Button>
+                    <Button onClick={handleClosePositionModal}>Fechar</Button>
                     <Button variant="contained" onClick={handleSwapTire}>
                         Confirmar Troca/Atribuição
                     </Button>

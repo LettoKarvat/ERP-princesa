@@ -1,4 +1,5 @@
 // src/pages/DriverChecklistsList.jsx
+
 import React, { useState, useEffect } from 'react';
 import {
     Box,
@@ -52,12 +53,13 @@ const checklistItems = [
     { code: 21, description: "Possui EPI necessário?" },
 ];
 
+// Mapeia code -> descrição
 function getDescriptionByCode(code) {
     const found = checklistItems.find((item) => item.code === code);
     return found ? found.description : `Item ${code}`;
 }
 
-// Funções para buscar dados do backend
+// ----------- Funções de acesso ao backend -----------
 async function fetchAllChecklists(sessionToken) {
     const resp = await api.post(
         '/functions/getAllChecklists',
@@ -76,14 +78,15 @@ async function fetchChecklistById(checklistId, sessionToken) {
     return resp.data.result;
 }
 
+// ----------------------------------------------------
 export default function DriverChecklistsList() {
     const [checklists, setChecklists] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Campos para busca
-    const [searchPlate, setSearchPlate] = useState('');       // placa
+    // Campos de busca
+    const [searchPlate, setSearchPlate] = useState('');        // placa
     const [searchMotorista, setSearchMotorista] = useState(''); // motorista
-    const [searchDate, setSearchDate] = useState('');         // data (yyyy-mm-dd)
+    const [searchDate, setSearchDate] = useState('');          // data (yyyy-mm-dd)
 
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [selectedChecklist, setSelectedChecklist] = useState(null);
@@ -93,7 +96,16 @@ export default function DriverChecklistsList() {
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [snackbarSeverity, setSnackbarSeverity] = useState('info');
 
+    // ADIÇÃO: role do usuário (salvo em localStorage no momento do login)
+    const [userRole, setUserRole] = useState('');
+
     useEffect(() => {
+        // Resgata o role do localStorage
+        const storedRole = localStorage.getItem('role');
+        if (storedRole) {
+            setUserRole(storedRole);
+        }
+
         loadChecklists();
     }, []);
 
@@ -106,6 +118,31 @@ export default function DriverChecklistsList() {
         } catch (error) {
             console.error('Erro ao buscar checklists:', error);
             showSnackbar('error', 'Falha ao carregar checklists.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ADIÇÃO: Deletar (soft-delete) checklist
+    const handleDeleteChecklist = async (objectId) => {
+        const confirmDelete = window.confirm('Tem certeza que deseja deletar este checklist?');
+        if (!confirmDelete) return;
+
+        setLoading(true);
+        try {
+            const sessionToken = localStorage.getItem('sessionToken');
+            // Chama a Cloud Function de soft-delete
+            await api.post(
+                '/functions/softDeleteChecklist',
+                { checklistId: objectId },  // a CF espera "checklistId"
+                { headers: { 'X-Parse-Session-Token': sessionToken } }
+            );
+            showSnackbar('success', 'Checklist deletado com sucesso.');
+            // Recarrega a lista
+            loadChecklists();
+        } catch (error) {
+            console.error('Erro ao deletar checklist:', error);
+            showSnackbar('error', 'Falha ao deletar checklist.');
         } finally {
             setLoading(false);
         }
@@ -141,45 +178,31 @@ export default function DriverChecklistsList() {
         setSnackbarOpen(false);
     };
 
-    // Filtramos os checklists localmente, com base em Placa, Motorista e Data
+    // Filtra os checklists localmente
     const filteredChecklists = checklists.filter((ch) => {
-        // Filtro por placa (se preenchido)
+        // Filtro por placa
         if (searchPlate) {
-            // se ch.placa não tiver a substring, descarta
             if (!ch.placa?.toLowerCase().includes(searchPlate.toLowerCase())) {
                 return false;
             }
         }
-
-        // Filtro por motorista (se preenchido)
+        // Filtro por motorista
         if (searchMotorista) {
-            // se ch.userFullname não tiver a substring, descarta
             if (!ch.userFullname?.toLowerCase().includes(searchMotorista.toLowerCase())) {
                 return false;
             }
         }
-
-        // Filtro por data (se preenchido) - formato "yyyy-mm-dd" no input
+        // Filtro por data
         if (searchDate) {
             const cDateIso = ch.createdAt?.iso;
             if (!cDateIso) return false;
-
-            // Criamos um Date a partir do ISO do checklist
             const cDate = new Date(cDateIso);
-
-            // Data do checklist
-            const cDay = cDate.getDate();
-            const cMonth = cDate.getMonth();
-            const cYear = cDate.getFullYear();
-
-            // Converte a string "yyyy-mm-dd" em um Date
             const sDate = new Date(searchDate);
-            const sDay = sDate.getDate();
-            const sMonth = sDate.getMonth();
-            const sYear = sDate.getFullYear();
-
-            // Comparando se são o mesmo dia/mês/ano
-            if (cDay !== sDay || cMonth !== sMonth || cYear !== sYear) {
+            if (
+                cDate.getDate() !== sDate.getDate() ||
+                cDate.getMonth() !== sDate.getMonth() ||
+                cDate.getFullYear() !== sDate.getFullYear()
+            ) {
                 return false;
             }
         }
@@ -187,7 +210,7 @@ export default function DriverChecklistsList() {
         return true;
     });
 
-    // Geração do PDF (mantém a mesma lógica anterior)
+    // Geração do PDF
     const handleGeneratePDF = () => {
         if (!selectedChecklist) return;
         try {
@@ -208,7 +231,7 @@ export default function DriverChecklistsList() {
                 : 'Data inválida';
             doc.text(`Data: ${createdStr}`, 40, 90);
 
-            // 1) Tabela de Itens
+            // Tabela de itens
             let startY = 110;
             const rows = selectedChecklist.items.map((it) => {
                 const desc = getDescriptionByCode(it.code);
@@ -220,7 +243,6 @@ export default function DriverChecklistsList() {
                 head: [['Item', 'Resposta', 'Observações']],
                 body: rows,
                 didParseCell: (data) => {
-                    // Se estivermos na coluna "Resposta" (índice 1), colorir a célula
                     if (data.section === 'body' && data.column.index === 1) {
                         const ans = data.cell.raw;
                         if (ans === 'sim') {
@@ -235,7 +257,7 @@ export default function DriverChecklistsList() {
             const tableState = doc.lastAutoTable;
             let currentY = tableState.finalY + 20;
 
-            // 2) Assinatura (se existir)
+            // Assinatura
             if (selectedChecklist.signature) {
                 if (currentY + 80 > 720) {
                     doc.addPage();
@@ -246,7 +268,7 @@ export default function DriverChecklistsList() {
                 currentY += 80;
             }
 
-            // 3) Anexos
+            // Anexos
             const allAttachments = selectedChecklist.attachments || [];
             if (allAttachments.length > 0) {
                 const spaceNeeded = 50;
@@ -262,7 +284,7 @@ export default function DriverChecklistsList() {
                 doc.setFont('helvetica', 'normal');
                 currentY += 20;
 
-                // Agrupa anexos por itemCode
+                // Agrupa por itemCode
                 const grouped = {};
                 allAttachments.forEach((att) => {
                     const code = att.itemCode;
@@ -340,13 +362,12 @@ export default function DriverChecklistsList() {
                 Meus Checklists
             </Typography>
 
-            {/* Campos de busca com ícones */}
+            {/* Campos de busca */}
             <Box sx={{ mb: 2, display: 'flex', gap: 2 }}>
                 <TextField
                     variant="outlined"
                     value={searchPlate}
                     onChange={(e) => setSearchPlate(e.target.value)}
-                    // Removendo label, usando ícone
                     InputProps={{
                         startAdornment: (
                             <InputAdornment position="start">
@@ -384,7 +405,7 @@ export default function DriverChecklistsList() {
                 />
             </Box>
 
-            {/* Filtro local aplicado */}
+            {/* Lista Filtrada */}
             {filteredChecklists.length === 0 ? (
                 <Typography variant="h6">Nenhum checklist encontrado.</Typography>
             ) : (
@@ -411,22 +432,41 @@ export default function DriverChecklistsList() {
                             <Typography variant="body2">
                                 Motorista: {ch.userFullname || 'N/A'}
                             </Typography>
-                            <Typography variant="body2">Criado em: {createdStr}</Typography>
+                            <Typography variant="body2">
+                                Criado em: {createdStr}
+                            </Typography>
 
-                            <Button
-                                variant="contained"
-                                sx={{ mt: 1, alignSelf: 'flex-start' }}
-                                onClick={() => handleOpenDetails(ch.objectId)}
-                            >
-                                Ver Detalhes
-                            </Button>
+                            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                                <Button
+                                    variant="contained"
+                                    onClick={() => handleOpenDetails(ch.objectId)}
+                                >
+                                    Ver Detalhes
+                                </Button>
+
+                                {/* Botão de Deletar (somente para admin) */}
+                                {userRole === 'admin' && (
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        onClick={() => handleDeleteChecklist(ch.objectId)}
+                                    >
+                                        Deletar
+                                    </Button>
+                                )}
+                            </Box>
                         </Paper>
                     );
                 })
             )}
 
             {/* Modal de Detalhes */}
-            <Dialog open={detailsOpen} onClose={handleCloseDetails} fullWidth maxWidth="md">
+            <Dialog
+                open={detailsOpen}
+                onClose={handleCloseDetails}
+                fullWidth
+                maxWidth="md"
+            >
                 <DialogTitle>Detalhes do Checklist</DialogTitle>
                 <DialogContent dividers>
                     {loadingDetails && <CircularProgress />}
@@ -444,31 +484,56 @@ export default function DriverChecklistsList() {
                                     : 'Data inválida'}
                             </Typography>
 
-                            {/* Para cada item, exibe seus dados e os anexos logo abaixo */}
-                            {selectedChecklist.items.map((item, idx) => {
+                            {/* Exemplo de exibir os itens */}
+                            {selectedChecklist.items?.map((item, idx) => {
                                 const desc = getDescriptionByCode(item.code);
-                                const itemAttachments = selectedChecklist.attachments.filter(
+                                const itemAttachments = selectedChecklist.attachments?.filter(
                                     (att) => att.itemCode === item.code
-                                );
+                                ) || [];
                                 return (
-                                    <Box key={idx} sx={{ mb: 2, borderBottom: '1px solid #ccc', pb: 1 }}>
+                                    <Box
+                                        key={idx}
+                                        sx={{
+                                            mb: 2,
+                                            borderBottom: '1px solid #ccc',
+                                            pb: 1,
+                                        }}
+                                    >
                                         <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
                                             {desc}
                                         </Typography>
-                                        <Typography variant="body2" sx={{ color: item.answer === 'sim' ? 'green' : 'red' }}>
+                                        <Typography
+                                            variant="body2"
+                                            sx={{
+                                                color: item.answer === 'sim' ? 'green' : 'red',
+                                            }}
+                                        >
                                             Resposta: {item.answer}
                                         </Typography>
                                         <Typography variant="body2">
                                             Observações: {item.obs || '-'}
                                         </Typography>
                                         {itemAttachments.length > 0 && (
-                                            <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                            <Box
+                                                sx={{
+                                                    mt: 1,
+                                                    display: 'flex',
+                                                    flexWrap: 'wrap',
+                                                    gap: 1,
+                                                }}
+                                            >
                                                 {itemAttachments.map((att) => (
-                                                    <Box key={att.objectId} sx={{ textAlign: 'center' }}>
+                                                    <Box
+                                                        key={att.objectId}
+                                                        sx={{ textAlign: 'center' }}
+                                                    >
                                                         <img
                                                             src={att.fileBase64}
                                                             alt="Anexo"
-                                                            style={{ border: '1px solid #ccc', maxWidth: '200px' }}
+                                                            style={{
+                                                                border: '1px solid #ccc',
+                                                                maxWidth: '200px',
+                                                            }}
                                                         />
                                                     </Box>
                                                 ))}
@@ -478,7 +543,7 @@ export default function DriverChecklistsList() {
                                 );
                             })}
 
-                            {/* Exibe a assinatura, se existir */}
+                            {/* Assinatura, se existir */}
                             {selectedChecklist.signature && (
                                 <Box>
                                     <Typography variant="subtitle2" sx={{ mt: 2 }}>
@@ -512,7 +577,11 @@ export default function DriverChecklistsList() {
                 onClose={handleCloseSnackbar}
                 anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
             >
-                <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbarSeverity}
+                    sx={{ width: '100%' }}
+                >
                     {snackbarMessage}
                 </Alert>
             </Snackbar>

@@ -31,14 +31,18 @@ const TireCard = styled(Paper)(({ theme }) => ({
 function TireManagement() {
   // Abas
   const [viewMode, setViewMode] = useState('stock');
+
   // Listagem de pneus em estoque
   const [stockTires, setStockTires] = useState([]);
   const [stockSearch, setStockSearch] = useState('');
 
+  // Listagem de pneus em recapagem
+  const [recapTires, setRecapTires] = useState([]);
+  const [recapSearch, setRecapSearch] = useState('');
+
   // Modal de criar pneu
   const [openAddModal, setOpenAddModal] = useState(false);
   const [newTire, setNewTire] = useState({
-    // Removido "status: 'Em estoque'"
     kmInicial: 0,
     kmFinal: 0,
     numeroSerie: '',
@@ -68,7 +72,9 @@ function TireManagement() {
   });
   const [editError, setEditError] = useState('');
 
-  // Carrega pneus em estoque
+  // --------------------------------------------------------------------------
+  //  1) Carregar Pneus em ESTOQUE
+  // --------------------------------------------------------------------------
   const loadStockTires = async () => {
     try {
       const sessionToken = localStorage.getItem('sessionToken');
@@ -79,7 +85,7 @@ function TireManagement() {
       );
       if (response.data) {
         const result = response.data.result || [];
-        // Filtra apenas status "Em estoque" se você quiser
+        // Filtra apenas status "Em estoque"
         const stock = result.filter(
           (p) => (p.status || '').toLowerCase() === 'em estoque'
         );
@@ -90,14 +96,44 @@ function TireManagement() {
     }
   };
 
-  // Efeito para carregar lista de pneus ao entrar na aba "stock"
+  // --------------------------------------------------------------------------
+  //  2) Carregar Pneus em RECAPAGEM
+  // --------------------------------------------------------------------------
+  const loadRecapTires = async () => {
+    try {
+      const sessionToken = localStorage.getItem('sessionToken');
+      const response = await api.post(
+        '/functions/getAllPneus',
+        {},
+        { headers: { 'X-Parse-Session-Token': sessionToken } }
+      );
+      if (response.data) {
+        const result = response.data.result || [];
+        // Filtra apenas status "Em recapagem"
+        const recaps = result.filter(
+          (p) => (p.status || '').toLowerCase() === 'em recapagem'
+        );
+        setRecapTires(recaps);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar pneus em recapagem:', err);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // Ao mudar de aba, carregamos os pneus correspondentes
+  // --------------------------------------------------------------------------
   useEffect(() => {
     if (viewMode === 'stock') {
       loadStockTires();
+    } else if (viewMode === 'recapadora') {
+      loadRecapTires();
     }
   }, [viewMode]);
 
-  // Filtra pneus pelo termo de busca
+  // --------------------------------------------------------------------------
+  // Filtros para Exibição
+  // --------------------------------------------------------------------------
   const filteredStockTires = stockTires.filter((tire) => {
     const searchTerm = stockSearch.toLowerCase();
     return (
@@ -108,10 +144,22 @@ function TireManagement() {
     );
   });
 
-  // --- Modal Criar Pneu ------------------------------------------------------
+  const filteredRecapTires = recapTires.filter((tire) => {
+    const searchTerm = recapSearch.toLowerCase();
+    return (
+      tire.numeroSerie?.toLowerCase().includes(searchTerm) ||
+      tire.fabricante?.toLowerCase().includes(searchTerm) ||
+      tire.modelo?.toLowerCase().includes(searchTerm) ||
+      tire.dimensao?.toLowerCase().includes(searchTerm)
+    );
+  });
+
+  // --------------------------------------------------------------------------
+  // Criação de Pneu (Modal)
+  // --------------------------------------------------------------------------
   const handleOpenAddModal = () => {
     setAddError('');
-    // Reseta o objeto local sem status
+    // Reseta o objeto local
     setNewTire({
       kmInicial: 0,
       kmFinal: 0,
@@ -148,7 +196,7 @@ function TireManagement() {
       return;
     }
 
-    // Chama a API sem aguardar a resposta
+    // Chama a API
     const sessionToken = localStorage.getItem('sessionToken');
     api
       .post(
@@ -167,22 +215,25 @@ function TireManagement() {
         { headers: { 'X-Parse-Session-Token': sessionToken } }
       )
       .then(() => {
-        loadStockTires(); // recarrega a lista
+        loadStockTires(); // recarrega a lista de estoque
       })
       .catch((err) => {
         console.error('Erro ao criar pneu:', err);
       });
 
-    // Fecha modal imediatamente
+    // Fecha modal
     handleCloseAddModal();
   };
 
-  // --- Modal Detalhes / Edição / Exclusão -------------------------------------
+  // --------------------------------------------------------------------------
+  // Detalhes / Edição / Exclusão de Pneu
+  // --------------------------------------------------------------------------
   const handleTireClick = (tire) => {
     setSelectedTire(tire);
     // Carrega no estado local para edição (se o usuário clicar em "Editar")
     setEditTireData({
       objectId: tire.objectId,
+      status: tire.status || '',
       kmInicial: tire.kmInicial || 0,
       kmFinal: tire.kmFinal || 0,
       numeroSerie: tire.numeroSerie || '',
@@ -203,19 +254,16 @@ function TireManagement() {
     setEditError('');
   };
 
-  // Entrar em modo de edição
   const handleStartEdit = () => {
     setIsEditing(true);
     setEditError('');
   };
 
-  // Lida com mudanças nos campos de edição
   const handleEditChange = (e) => {
     const { name, value } = e.target;
     setEditTireData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Salvar alterações (chama "editarPneu")
   const handleSaveEdit = async () => {
     try {
       setEditError('');
@@ -235,19 +283,29 @@ function TireManagement() {
         },
         { headers: { 'X-Parse-Session-Token': sessionToken } }
       );
-      // Recarrega lista e sai do modo de edição
-      await loadStockTires();
+
+      // Se estamos alterando algo no pneu da aba estoque, atualiza
+      if (viewMode === 'stock') {
+        await loadStockTires();
+      }
+      // Se for da aba recapadora e editamos, atualiza também
+      else if (viewMode === 'recapadora') {
+        await loadRecapTires();
+      }
+
+      // Sai do modo de edição
       setIsEditing(false);
+
+      // Atualizar 'selectedTire' local
+      setSelectedTire((prev) => ({ ...prev, ...editTireData }));
     } catch (err) {
       console.error('Erro ao editar pneu:', err);
       setEditError('Erro ao editar pneu. Verifique o console.');
     }
   };
 
-  // Excluir (soft-delete) o pneu
   const handleDeleteTire = async () => {
     if (!selectedTire) return;
-
     try {
       const sessionToken = localStorage.getItem('sessionToken');
       await api.post(
@@ -255,8 +313,14 @@ function TireManagement() {
         { objectId: selectedTire.objectId },
         { headers: { 'X-Parse-Session-Token': sessionToken } }
       );
-      // Atualiza lista e fecha modal
-      await loadStockTires();
+
+      // Atualiza a lista correspondente e fecha modal
+      if (viewMode === 'stock') {
+        await loadStockTires();
+      } else if (viewMode === 'recapadora') {
+        await loadRecapTires();
+      }
+
       handleCloseDetailsModal();
     } catch (err) {
       console.error('Erro ao deletar pneu:', err);
@@ -264,6 +328,57 @@ function TireManagement() {
     }
   };
 
+  // --------------------------------------------------------------------------
+  // Ações para a aba RECAPADORA
+  //  - "Voltar ao estoque"
+  //  - "Enviar para sucata"
+  // --------------------------------------------------------------------------
+  const handleReturnToStock = async (tire) => {
+    if (!tire) return;
+    try {
+      const sessionToken = localStorage.getItem('sessionToken');
+      await api.post(
+        '/functions/editarPneu',
+        {
+          objectId: tire.objectId,
+          status: 'Em estoque',
+          // limpar veiculoId e posicaoVeiculo
+          veiculoId: '',
+          posicaoVeiculo: '',
+        },
+        { headers: { 'X-Parse-Session-Token': sessionToken } }
+      );
+      loadRecapTires();
+    } catch (err) {
+      console.error('Erro ao retornar pneu ao estoque:', err);
+      alert('Não foi possível retornar o pneu ao estoque. Verifique o console.');
+    }
+  };
+
+  const handleSendToScrap = async (tire) => {
+    if (!tire) return;
+    try {
+      const sessionToken = localStorage.getItem('sessionToken');
+      await api.post(
+        '/functions/editarPneu',
+        {
+          objectId: tire.objectId,
+          status: 'Sucata',
+          veiculoId: '',
+          posicaoVeiculo: '',
+        },
+        { headers: { 'X-Parse-Session-Token': sessionToken } }
+      );
+      loadRecapTires();
+    } catch (err) {
+      console.error('Erro ao enviar pneu para sucata:', err);
+      alert('Não foi possível enviar o pneu para sucata. Verifique o console.');
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // Render
+  // --------------------------------------------------------------------------
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h4" sx={{ mb: 2 }}>
@@ -280,6 +395,9 @@ function TireManagement() {
         <Tab label="Gerenciar Veículos" value="vehicle" />
       </Tabs>
 
+      {/* -------------------------------------------------------------
+          ABA: Estoque de Pneus 
+      ------------------------------------------------------------- */}
       {viewMode === 'stock' && (
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
@@ -303,10 +421,22 @@ function TireManagement() {
               {filteredStockTires.map((tire) => (
                 <Grid item xs={6} sm={4} md={3} key={tire.objectId}>
                   <TireCard onClick={() => handleTireClick(tire)}>
-                    <MdOutlineTireRepair size={50} style={{ marginBottom: '8px' }} />
-                    <Typography variant="body2">N°: {tire.numeroSerie}</Typography>
+                    <MdOutlineTireRepair
+                      size={50}
+                      style={{ marginBottom: '8px' }}
+                    />
+                    <Typography variant="body2">
+                      N°: {tire.numeroSerie}
+                    </Typography>
                     <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
                       {tire.fabricante} - {tire.modelo} - {tire.dimensao}
+                    </Typography>
+                    {/* Exemplo: mostrar recapCount */}
+                    <Typography
+                      variant="body2"
+                      sx={{ fontSize: '0.8rem', color: 'gray' }}
+                    >
+                      Recap: {tire.recapCount || 0}
                     </Typography>
                   </TireCard>
                 </Grid>
@@ -316,24 +446,100 @@ function TireManagement() {
         </Box>
       )}
 
+      {/* -------------------------------------------------------------
+          ABA: Recapadora (Pneus em Recapagem)
+      ------------------------------------------------------------- */}
       {viewMode === 'recapadora' && (
         <Box>
-          <Typography variant="h6">
-            Funcionalidade para recapadora em desenvolvimento.
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Pneus em Recapagem
           </Typography>
+          <TextField
+            label="Buscar Pneus"
+            variant="outlined"
+            size="small"
+            sx={{ width: '300px', mb: 2 }}
+            value={recapSearch}
+            onChange={(e) => setRecapSearch(e.target.value)}
+          />
+
+          {filteredRecapTires.length === 0 ? (
+            <Typography>Nenhum pneu em recapagem.</Typography>
+          ) : (
+            <Grid container spacing={2}>
+              {filteredRecapTires.map((tire) => (
+                <Grid item xs={6} sm={4} md={3} key={tire.objectId}>
+                  <TireCard>
+                    <MdOutlineTireRepair
+                      size={50}
+                      style={{ marginBottom: '8px' }}
+                    />
+                    <Typography variant="body2">
+                      N°: {tire.numeroSerie}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                      {tire.fabricante} - {tire.modelo} - {tire.dimensao}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                      Vida: {tire.vida}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontSize: '0.8rem', color: 'gray' }}
+                    >
+                      Recapagens: {tire.recapCount || 0}
+                    </Typography>
+
+                    {/* Botões de ação */}
+                    <Box sx={{ mt: 1 }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        sx={{ mr: 1 }}
+                        onClick={() => handleReturnToStock(tire)}
+                      >
+                        Voltar ao Estoque
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        onClick={() => handleSendToScrap(tire)}
+                      >
+                        Sucata
+                      </Button>
+                    </Box>
+
+                    {/* Exemplo: se quiser editar detalhes, clique no card */}
+                    <Box sx={{ mt: 1 }}>
+                      <Button
+                        variant="text"
+                        size="small"
+                        onClick={() => handleTireClick(tire)}
+                      >
+                        Editar Detalhes
+                      </Button>
+                    </Box>
+                  </TireCard>
+                </Grid>
+              ))}
+            </Grid>
+          )}
         </Box>
       )}
 
+      {/* -------------------------------------------------------------
+          ABA: Veículos e Pneus
+      ------------------------------------------------------------- */}
       {viewMode === 'vehicle' && (
         <Box>
-          <Typography variant="h4" sx={{ mb: 2 }}>
-            Gerenciamento de Veículos e Pneus
-          </Typography>
           <VehicleTireManagement />
         </Box>
       )}
 
-      {/* MODAL: Adicionar Novo Pneu */}
+      {/* -------------------------------------------------------------
+          MODAL: Adicionar Novo Pneu
+      ------------------------------------------------------------- */}
       <Dialog
         open={openAddModal}
         onClose={handleCloseAddModal}
@@ -430,7 +636,9 @@ function TireManagement() {
         </DialogActions>
       </Dialog>
 
-      {/* MODAL: Detalhes do Pneu + Edição + Exclusão */}
+      {/* -------------------------------------------------------------
+          MODAL: Detalhes do Pneu + Edição + Exclusão
+      ------------------------------------------------------------- */}
       <Dialog
         open={openDetailsModal}
         onClose={handleCloseDetailsModal}
@@ -471,7 +679,13 @@ function TireManagement() {
                 <Typography variant="subtitle1">
                   <strong>KM Final:</strong> {selectedTire.kmFinal}
                 </Typography>
-
+                {/* Exibir recapCount, caso já exista no pneu */}
+                <Typography variant="subtitle1">
+                  <strong>Recapagens:</strong> {selectedTire.recapCount || 0}
+                </Typography>
+                <Typography variant="subtitle1">
+                  <strong>Status:</strong> {selectedTire.status}
+                </Typography>
               </Box>
             </>
           )}
@@ -552,7 +766,16 @@ function TireManagement() {
                 onChange={handleEditChange}
                 sx={{ mb: 2 }}
               />
-
+              <TextField
+                margin="dense"
+                name="status"
+                label="Status"
+                fullWidth
+                variant="outlined"
+                value={editTireData.status}
+                onChange={handleEditChange}
+                sx={{ mb: 2 }}
+              />
             </>
           )}
         </DialogContent>
@@ -583,9 +806,7 @@ function TireManagement() {
             </>
           )}
 
-          <Button onClick={handleCloseDetailsModal}>
-            {isEditing ? 'Fechar' : 'Fechar'}
-          </Button>
+          <Button onClick={handleCloseDetailsModal}>Fechar</Button>
         </DialogActions>
       </Dialog>
     </Box>
