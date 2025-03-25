@@ -275,7 +275,7 @@ function DriverChecklist() {
     return (
         <Box sx={{ p: 2 }}>
             <Typography variant="h5" sx={{ mb: 2 }}>
-                Checklist de Inspeção (Motorista)
+                Checklist de Inspeção
             </Typography>
 
             <Paper sx={{ p: 2, mb: 2 }}>
