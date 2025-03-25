@@ -65,6 +65,7 @@ function DriverChecklist() {
 
     const [openSignModal, setOpenSignModal] = useState(false);
     const signatureRef = useRef(null);
+    const [savedSignature, setSavedSignature] = useState(null);
 
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -153,12 +154,28 @@ function DriverChecklist() {
     };
 
     const handleCloseSignModal = () => {
-        setOpenSignModal(false);
+        // Permite fechar o modal somente se não estiver carregando
+        if (!loading) {
+            setOpenSignModal(false);
+            setSavedSignature(null); // Opcional: limpa a assinatura salva ao fechar o modal
+        }
     };
 
     const handleClearSignature = () => {
         if (signatureRef.current) {
             signatureRef.current.clear();
+            setSavedSignature(null);
+        }
+    };
+
+    // Função para salvar a assinatura (no mobile, por exemplo)
+    const handleSaveSignature = () => {
+        if (signatureRef.current && !signatureRef.current.isEmpty()) {
+            const data = signatureRef.current.getTrimmedCanvas().toDataURL('image/png');
+            setSavedSignature(data);
+            showSnackbar('success', 'Assinatura salva.');
+        } else {
+            showSnackbar('error', 'Por favor, faça a assinatura antes de salvar.');
         }
     };
 
@@ -216,8 +233,8 @@ function DriverChecklist() {
     };
 
     const handleConfirmSignature = async () => {
-        if (signatureRef.current && signatureRef.current.isEmpty()) {
-            showSnackbar('error', 'Por favor, faça a assinatura antes de confirmar.');
+        if (!savedSignature) {
+            showSnackbar('error', 'Por favor, salve a assinatura antes de confirmar.');
             return;
         }
 
@@ -229,7 +246,7 @@ function DriverChecklist() {
             const attachmentsResults = await uploadAttachments(answers, sessionToken);
 
             const finalPlate = selectedVehicle ? selectedVehicle.placa : plateInput.trim();
-            const signatureData = signatureRef.current.toDataURL();
+            const signatureData = savedSignature;
             const fullname = localStorage.getItem('fullname') || '';
             const role = localStorage.getItem('role') || '';
             const userId = localStorage.getItem('userId') || '';
@@ -265,6 +282,7 @@ function DriverChecklist() {
         } finally {
             setLoading(false);
             setOpenSignModal(false);
+            setSavedSignature(null);
         }
     };
 
@@ -425,7 +443,17 @@ function DriverChecklist() {
             </Button>
 
             {/* Modal de assinatura */}
-            <Dialog open={openSignModal} onClose={handleCloseSignModal} maxWidth="sm" fullWidth>
+            <Dialog
+                open={openSignModal}
+                onClose={(event, reason) => {
+                    // Bloqueia o fechamento se estiver carregando ou se for clique no backdrop
+                    if (loading || (reason && reason === 'backdropClick')) return;
+                    handleCloseSignModal();
+                }}
+                disableEscapeKeyDown={loading}
+                maxWidth="sm"
+                fullWidth
+            >
                 <DialogTitle>Assinatura</DialogTitle>
                 <DialogContent dividers>
                     <Typography sx={{ mb: 1 }}>Por favor, assine no quadro abaixo:</Typography>
@@ -440,13 +468,20 @@ function DriverChecklist() {
                             }}
                         />
                     </Box>
-                    <Button onClick={handleClearSignature} variant="outlined">
-                        Limpar Assinatura
-                    </Button>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Button onClick={handleClearSignature} variant="outlined" disabled={loading}>
+                            Limpar Assinatura
+                        </Button>
+                        <Button onClick={handleSaveSignature} variant="outlined" disabled={loading}>
+                            Salvar Assinatura
+                        </Button>
+                    </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={handleCloseSignModal}>Cancelar</Button>
-                    <Button variant="contained" onClick={handleConfirmSignature}>
+                    <Button onClick={handleCloseSignModal} disabled={loading}>
+                        Cancelar
+                    </Button>
+                    <Button variant="contained" onClick={handleConfirmSignature} disabled={loading}>
                         Confirmar
                     </Button>
                 </DialogActions>
