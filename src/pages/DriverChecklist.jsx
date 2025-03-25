@@ -17,6 +17,8 @@ import {
     DialogActions,
     Snackbar,
     Alert,
+    Backdrop,
+    CircularProgress,
 } from '@mui/material';
 import { Autocomplete } from '@mui/material';
 import SignatureCanvas from 'react-signature-canvas';
@@ -47,13 +49,13 @@ const checklistItems = [
 ];
 
 function DriverChecklist() {
-    // Cada item possui resposta, observação e, se não conforme, um array de anexos.
+    // Cada item possui resposta, observação e um array de anexos
     const [answers, setAnswers] = useState(
         checklistItems.map((item) => ({
             code: item.code,
             answer: '', // 'sim' ou 'nao'
             obs: '',
-            attachments: [], // Agora é um array para armazenar múltiplos arquivos
+            attachments: [],
         }))
     );
 
@@ -68,9 +70,25 @@ function DriverChecklist() {
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [snackbarSeverity, setSnackbarSeverity] = useState('info'); // success | error | warning | info
 
+    const [loading, setLoading] = useState(false); // Estado de loading
+
     useEffect(() => {
         loadVehicles();
     }, []);
+
+    // Adiciona listener para evitar saída da página enquanto loading estiver ativo
+    useEffect(() => {
+        const handleBeforeUnload = (event) => {
+            if (loading) {
+                event.preventDefault();
+                event.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [loading]);
 
     const loadVehicles = async () => {
         try {
@@ -102,12 +120,10 @@ function DriverChecklist() {
         );
     };
 
-    // Atualiza o array de arquivos do item (substituindo os anexos atuais)
+    // Atualiza o array de arquivos do item
     const handleItemFileChange = (code, files) => {
         setAnswers((prev) =>
-            prev.map((ans) =>
-                ans.code === code ? { ...ans, attachments: files } : ans
-            )
+            prev.map((ans) => (ans.code === code ? { ...ans, attachments: files } : ans))
         );
     };
 
@@ -118,7 +134,7 @@ function DriverChecklist() {
             showSnackbar('error', 'Responda todos os itens antes de enviar.');
             return;
         }
-        // Verifica se os itens marcados como 'nao' possuem pelo menos um anexo
+        // Verifica se os itens marcados como "nao" possuem pelo menos um anexo
         const nonCompliantWithoutAttachment = answers.some(
             (ans) => ans.answer === 'nao' && (!ans.attachments || ans.attachments.length === 0)
         );
@@ -173,7 +189,7 @@ function DriverChecklist() {
         };
 
         try {
-            // Envia o checklist para salvar o registro
+            setLoading(true); // Inicia o loading
             const response = await api.post('/functions/submitChecklist', dataToSend, {
                 headers: { 'X-Parse-Session-Token': sessionToken },
             });
@@ -198,8 +214,10 @@ function DriverChecklist() {
         } catch (err) {
             console.error('Erro ao enviar checklist:', err);
             showSnackbar('error', err.message || 'Erro ao enviar checklist.');
+        } finally {
+            setLoading(false); // Finaliza o loading
+            setOpenSignModal(false);
         }
-        setOpenSignModal(false);
     };
 
     // Função para enviar cada anexo, incluindo o itemCode
@@ -287,12 +305,7 @@ function DriverChecklist() {
                         : '';
                 }}
                 renderInput={(params) => (
-                    <TextField
-                        {...params}
-                        label="Placa do Veículo"
-                        variant="outlined"
-                        sx={{ mb: 2 }}
-                    />
+                    <TextField {...params} label="Placa do Veículo" variant="outlined" sx={{ mb: 2 }} />
                 )}
             />
 
@@ -325,9 +338,7 @@ function DriverChecklist() {
                             <RadioGroup
                                 row
                                 value={ans?.answer || ''}
-                                onChange={(e) =>
-                                    handleAnswerChange(item.code, 'answer', e.target.value)
-                                }
+                                onChange={(e) => handleAnswerChange(item.code, 'answer', e.target.value)}
                             >
                                 <FormControlLabel
                                     value="sim"
@@ -366,12 +377,10 @@ function DriverChecklist() {
                             minRows={2}
                             sx={{ mt: 2 }}
                             value={ans?.obs || ''}
-                            onChange={(e) =>
-                                handleAnswerChange(item.code, 'obs', e.target.value)
-                            }
+                            onChange={(e) => handleAnswerChange(item.code, 'obs', e.target.value)}
                         />
 
-                        {/* Exibe o input de arquivo apenas se a resposta for "nao" */}
+                        {/* Exibe input de arquivo se resposta for "nao" */}
                         {ans.answer === 'nao' && (
                             <Box sx={{ mt: 2 }}>
                                 <Typography variant="body2" sx={{ mb: 1 }}>
@@ -405,20 +414,12 @@ function DriverChecklist() {
                 Enviar Checklist
             </Button>
 
+            {/* Modal de assinatura */}
             <Dialog open={openSignModal} onClose={handleCloseSignModal} maxWidth="sm" fullWidth>
                 <DialogTitle>Assinatura</DialogTitle>
                 <DialogContent dividers>
-                    <Typography sx={{ mb: 1 }}>
-                        Por favor, assine no quadro abaixo:
-                    </Typography>
-                    <Box
-                        sx={{
-                            border: '1px solid #ccc',
-                            width: '100%',
-                            height: 200,
-                            marginBottom: 2,
-                        }}
-                    >
+                    <Typography sx={{ mb: 1 }}>Por favor, assine no quadro abaixo:</Typography>
+                    <Box sx={{ border: '1px solid #ccc', width: '100%', height: 200, marginBottom: 2 }}>
                         <SignatureCanvas
                             ref={signatureRef}
                             penColor="black"
@@ -447,14 +448,15 @@ function DriverChecklist() {
                 onClose={handleCloseSnackbar}
                 anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
             >
-                <Alert
-                    onClose={handleCloseSnackbar}
-                    severity={snackbarSeverity}
-                    sx={{ width: '100%' }}
-                >
+                <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
                     {snackbarMessage}
                 </Alert>
             </Snackbar>
+
+            {/* Indicador de loading */}
+            <Backdrop sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }} open={loading}>
+                <CircularProgress color="inherit" />
+            </Backdrop>
         </Box>
     );
 }
