@@ -70,7 +70,7 @@ function DriverChecklist() {
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [snackbarSeverity, setSnackbarSeverity] = useState('info');
 
-    const [loading, setLoading] = useState(false); // Estado de loading
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         loadVehicles();
@@ -81,7 +81,7 @@ function DriverChecklist() {
         const handleBeforeUnload = (event) => {
             if (loading) {
                 event.preventDefault();
-                event.returnValue = ''; // Necessário para alguns navegadores
+                event.returnValue = '';
             }
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
@@ -157,92 +157,8 @@ function DriverChecklist() {
     };
 
     const handleClearSignature = () => {
-        signatureRef.current.clear();
-    };
-
-    const handleConfirmSignature = async () => {
-        if (signatureRef.current && signatureRef.current.isEmpty()) {
-            showSnackbar('error', 'Por favor, faça a assinatura antes de confirmar.');
-            return;
-        }
-
-        const signatureData = signatureRef.current.toDataURL();
-        const sessionToken = localStorage.getItem('sessionToken');
-
-        const fullname = localStorage.getItem('fullname') || '';
-        const role = localStorage.getItem('role') || '';
-        const userId = localStorage.getItem('userId') || '';
-
-        const finalPlate = selectedVehicle ? selectedVehicle.placa : plateInput.trim();
-
-        // Monta objeto a ser enviado (sem anexos)
-        const dataToSend = {
-            empresa: '298 - DISTRIBUIDORA PRINCESA',
-            items: answers.map((ans) => ({
-                code: ans.code,
-                answer: ans.answer,
-                obs: ans.obs,
-            })),
-            placa: finalPlate,
-            user: { fullname, role, userId },
-            signature: signatureData,
-        };
-
-        try {
-            setLoading(true); // Inicia o loading
-            const response = await api.post('/functions/submitChecklist', dataToSend, {
-                headers: { 'X-Parse-Session-Token': sessionToken },
-            });
-            if (response.data.result && response.data.result.status === 'success') {
-                const checklistId = response.data.result.objectId;
-                showSnackbar('success', 'Checklist enviado com sucesso!');
-
-                // Envia os anexos de cada item marcado como "nao"
-                for (const ans of answers) {
-                    if (ans.answer === 'nao' && ans.attachments && ans.attachments.length > 0) {
-                        for (const file of ans.attachments) {
-                            await uploadSingleAttachment(checklistId, file, sessionToken, ans.code);
-                        }
-                    }
-                }
-            } else {
-                throw new Error(
-                    (response.data.result && response.data.result.message) ||
-                    'Falha ao enviar checklist.'
-                );
-            }
-        } catch (err) {
-            console.error('Erro ao enviar checklist:', err);
-            showSnackbar('error', err.message || 'Erro ao enviar checklist.');
-        } finally {
-            setLoading(false); // Finaliza o loading
-            setOpenSignModal(false);
-        }
-    };
-
-    // Função para enviar cada anexo, incluindo o itemCode
-    const uploadSingleAttachment = async (checklistId, file, token, itemCode) => {
-        try {
-            const base64file = await convertFileToBase64(file);
-            const attachResp = await api.post(
-                '/functions/uploadChecklistAttachment',
-                {
-                    checklistId,
-                    base64file,
-                    fileName: file.name,
-                    itemCode,
-                },
-                { headers: { 'X-Parse-Session-Token': token } }
-            );
-
-            if (attachResp.data.result && attachResp.data.result.status === 'success') {
-                console.log(`Anexo ${file.name} enviado com sucesso para o item ${itemCode}!`);
-            } else {
-                throw new Error(`Falha ao enviar anexo: ${file.name}`);
-            }
-        } catch (err) {
-            console.error('Erro ao enviar anexo:', err);
-            showSnackbar('error', `Erro ao enviar ${file.name}: ${err.message}`);
+        if (signatureRef.current) {
+            signatureRef.current.clear();
         }
     };
 
@@ -256,6 +172,100 @@ function DriverChecklist() {
             reader.onerror = reject;
             reader.readAsDataURL(file);
         });
+    };
+
+    // Função para enviar anexos antes do checklist
+    const uploadAttachments = async (answers, sessionToken) => {
+        const attachmentsResults = {};
+
+        for (const ans of answers) {
+            if (ans.answer === 'nao' && ans.attachments?.length > 0) {
+                attachmentsResults[ans.code] = [];
+
+                for (const file of ans.attachments) {
+                    try {
+                        const base64file = await convertFileToBase64(file);
+                        // Sanitiza o nome do arquivo removendo espaços e parênteses
+                        const sanitizedFileName = file.name.replace(/\s/g, '_').replace(/[()]/g, '');
+                        const attachResp = await api.post(
+                            '/functions/uploadChecklistAttachmentTemp',
+                            {
+                                base64file,
+                                fileName: sanitizedFileName,
+                                itemCode: ans.code,
+                            },
+                            { headers: { 'X-Parse-Session-Token': sessionToken } }
+                        );
+
+                        if (attachResp.data.result && attachResp.data.result.status === 'success') {
+                            attachmentsResults[ans.code].push({
+                                attachmentId: attachResp.data.result.attachmentId,
+                                fileName: sanitizedFileName,
+                            });
+                        } else {
+                            throw new Error(`Falha ao enviar anexo: ${file.name}`);
+                        }
+                    } catch (error) {
+                        throw new Error(`Erro ao enviar anexo ${file.name}: ${error.message}`);
+                    }
+                }
+            }
+        }
+
+        return attachmentsResults;
+    };
+
+    const handleConfirmSignature = async () => {
+        if (signatureRef.current && signatureRef.current.isEmpty()) {
+            showSnackbar('error', 'Por favor, faça a assinatura antes de confirmar.');
+            return;
+        }
+
+        setLoading(true);
+        const sessionToken = localStorage.getItem('sessionToken');
+
+        try {
+            // Envia os anexos e aguarda a resposta com os IDs
+            const attachmentsResults = await uploadAttachments(answers, sessionToken);
+
+            const finalPlate = selectedVehicle ? selectedVehicle.placa : plateInput.trim();
+            const signatureData = signatureRef.current.toDataURL();
+            const fullname = localStorage.getItem('fullname') || '';
+            const role = localStorage.getItem('role') || '';
+            const userId = localStorage.getItem('userId') || '';
+
+            const dataToSend = {
+                empresa: '298 - DISTRIBUIDORA PRINCESA',
+                items: answers.map((ans) => ({
+                    code: ans.code,
+                    answer: ans.answer,
+                    obs: ans.obs,
+                    attachments: attachmentsResults[ans.code] || [],
+                })),
+                placa: finalPlate,
+                user: { fullname, role, userId },
+                signature: signatureData,
+            };
+
+            const response = await api.post('/functions/submitChecklist', dataToSend, {
+                headers: { 'X-Parse-Session-Token': sessionToken },
+            });
+
+            if (response.data.result && response.data.result.status === 'success') {
+                showSnackbar('success', 'Checklist e anexos enviados com sucesso!');
+            } else {
+                throw new Error(
+                    (response.data.result && response.data.result.message) ||
+                    'Falha ao enviar checklist.'
+                );
+            }
+        } catch (err) {
+            console.error('Erro ao enviar checklist:', err);
+            showSnackbar('error', err.message || 'Erro ao enviar checklist.');
+        } finally {
+            setLoading(false);
+            setOpenSignModal(false);
+        }
     };
 
     const handleCloseSnackbar = () => {
