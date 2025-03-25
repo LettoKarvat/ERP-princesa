@@ -68,7 +68,7 @@ function DriverChecklist() {
 
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
-    const [snackbarSeverity, setSnackbarSeverity] = useState('info'); // success | error | warning | info
+    const [snackbarSeverity, setSnackbarSeverity] = useState('info');
 
     const [loading, setLoading] = useState(false); // Estado de loading
 
@@ -76,12 +76,12 @@ function DriverChecklist() {
         loadVehicles();
     }, []);
 
-    // Adiciona listener para evitar saída da página enquanto loading estiver ativo
+    // Bloqueia a saída da página enquanto o loading estiver ativo
     useEffect(() => {
         const handleBeforeUnload = (event) => {
             if (loading) {
                 event.preventDefault();
-                event.returnValue = '';
+                event.returnValue = ''; // Necessário para alguns navegadores
             }
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
@@ -230,7 +230,7 @@ function DriverChecklist() {
                     checklistId,
                     base64file,
                     fileName: file.name,
-                    itemCode, // Envia o código do item para vinculação
+                    itemCode,
                 },
                 { headers: { 'X-Parse-Session-Token': token } }
             );
@@ -453,7 +453,7 @@ function DriverChecklist() {
                 </Alert>
             </Snackbar>
 
-            {/* Indicador de loading */}
+            {/* Loading visual */}
             <Backdrop sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }} open={loading}>
                 <CircularProgress color="inherit" />
             </Backdrop>
