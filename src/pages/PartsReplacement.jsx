@@ -11,11 +11,12 @@ import {
   Checkbox,
   CardHeader,
 } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import IconButton from "@mui/material/IconButton";
 import * as XLSX from "xlsx";
+import { DataGrid } from "@mui/x-data-grid";
+import Paper from "@mui/material/Paper";
 
 function PartsReplacement() {
   // Lista de registros cadastrados
@@ -437,6 +438,8 @@ function PartsReplacement() {
     { label: "Valor da Peça (R$) *", name: "partValue", type: "number" },
   ];
 
+  const paginationModel = { page: 0, pageSize: 5 };
+
   return (
     <Box>
       <Typography variant="h4" sx={{ mb: 3 }}>
@@ -445,10 +448,8 @@ function PartsReplacement() {
 
       {/* Formulário para novo registro */}
       <Card>
-        <CardHeader>
-          <Typography className="MuiCardHeader-title">Novo Registro</Typography>
-        </CardHeader>
         <CardContent>
+          <h3 className="text-xl mb-4">Novo registro</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {fields.map((field, index) => (
               <TextField
@@ -503,146 +504,22 @@ function PartsReplacement() {
         </CardContent>
       </Card>
 
-      {/* <CardContent>
-                    <Typography variant="h6" sx={{ mb: 3 }}>
-                        Novo Registro
-                    </Typography>
-                    <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6} md={3}>
-                            <TextField
-                                fullWidth
-                                label="Código da Peça *"
-                                name="partCode"
-                                value={newRecord.partCode}
-                                onChange={handleChange}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
-                            <TextField
-                                fullWidth
-                                label="Caminhão *"
-                                name="truck"
-                                value={newRecord.truck}
-                                onChange={handleChange}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
-                            <TextField
-                                fullWidth
-                                label="Placa do Caminhão"
-                                name="truckPlate"
-                                value={newRecord.truckPlate}
-                                onChange={handleChange}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
-                            <TextField
-                                fullWidth
-                                label="Quilometragem *"
-                                name="mileage"
-                                value={newRecord.mileage}
-                                onChange={handleChange}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
-                            <TextField
-                                fullWidth
-                                label="Data de Instalação *"
-                                type="date"
-                                name="installationDate"
-                                InputLabelProps={{ shrink: true }}
-                                value={newRecord.installationDate}
-                                onChange={handleChange}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
-                            <TextField
-                                fullWidth
-                                label="Quantidade"
-                                type="number"
-                                name="quantity"
-                                value={newRecord.quantity}
-                                onChange={handleChange}
-                                InputProps={{ inputProps: { min: 1 } }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
-                            <TextField
-                                fullWidth
-                                label="Valor da Peça (R$) *"
-                                type="number"
-                                name="partValue"
-                                value={newRecord.partValue}
-                                onChange={handleChange}
-                            />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <FormControlLabel
-                                control={
-                                    <Checkbox
-                                        name="includeLabor"
-                                        checked={newRecord.includeLabor}
-                                        onChange={handleChange}
-                                    />
-                                }
-                                label="Incluir Mão de Obra"
-                            />
-                        </Grid>
-                        {newRecord.includeLabor && (
-                            <Grid item xs={12} sm={6} md={3}>
-                                <TextField
-                                    fullWidth
-                                    label="Valor da Mão de Obra (R$)"
-                                    type="number"
-                                    name="laborValue"
-                                    value={newRecord.laborValue}
-                                    onChange={handleChange}
-                                />
-                            </Grid>
-                        )}
-                        <Grid item xs={12}>
-                            <TextField
-                                fullWidth
-                                label="Observação"
-                                name="observation"
-                                value={newRecord.observation}
-                                onChange={handleChange}
-                                multiline
-                                minRows={2}
-                            />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <Button variant="contained" onClick={handleRegister}>
-                                Registrar
-                            </Button>
-                        </Grid>
-                    </Grid>
-                </CardContent>
-      </Card>  */}
-
       {/* Botão para exportar os registros para Excel */}
-      <Box sx={{ mb: 2, display: "flex", justifyContent: "flex-end" }}>
+      <Box sx={{ my: 2, display: "flex", justifyContent: "flex-end" }}>
         <Button variant="outlined" onClick={exportToExcel}>
           Exportar para Excel (.xlsx)
         </Button>
       </Box>
 
-      {/* Tabela para exibição dos registros */}
-      {/* <Card>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Registros de Troca de Peças
-          </Typography>
-          <Box sx={{ height: 500 }}>
-            <DataGrid
-              rows={records}
-              columns={columns}
-              pageSize={5}
-              disableSelectionOnClick
-            />
-          </Box>
-        </CardContent>
-      </Card> */}
+      <Paper className="max-w-svw">
+        <DataGrid
+          rows={records}
+          columns={columns}
+          initialState={{ pagination: { paginationModel } }}
+          pageSizeOptions={[5, 10]}
+          sx={{ border: 0 }}
+        />
+      </Paper>
     </Box>
   );
 }
