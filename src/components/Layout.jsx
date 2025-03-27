@@ -16,6 +16,7 @@ import {
   AppBar,
   useMediaQuery,
   useTheme,
+  Collapse,
 } from '@mui/material';
 import { NavLink, useNavigate, Outlet } from 'react-router-dom';
 import {
@@ -30,6 +31,8 @@ import {
 } from 'react-icons/fa';
 import { PiTireLight } from 'react-icons/pi';
 import MenuIcon from '@mui/icons-material/Menu';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 
 const DRAWER_WIDTH = 240;
 
@@ -52,6 +55,7 @@ function Layout() {
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [openChecklist, setOpenChecklist] = useState(false);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -67,7 +71,6 @@ function Layout() {
   const drawerContent = (
     <Box
       sx={{
-        // Fundo do Drawer (apenas para o conteúdo)
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -129,20 +132,44 @@ function Layout() {
             </ListItem>
           )}
 
-          {/* Checklist (tela antiga) */}
+          {/* Checklist (Portaria) com dropdown de Entrada e Saída */}
           {['admin', 'portaria'].includes(role) && (
-            <ListItem disablePadding>
-              <ListItemButton
-                component={NavLink}
-                to="/checklist"
-                sx={listItemButtonStyle}
-              >
-                <ListItemIcon sx={{ color: 'inherit' }}>
-                  <FaClipboardCheck />
-                </ListItemIcon>
-                <ListItemText primary="Checklist (Portaria)" />
-              </ListItemButton>
-            </ListItem>
+            <>
+              <ListItem disablePadding>
+                <ListItemButton
+                  onClick={() => setOpenChecklist(!openChecklist)}
+                  sx={listItemButtonStyle}
+                >
+                  <ListItemIcon sx={{ color: 'inherit' }}>
+                    <FaClipboardCheck />
+                  </ListItemIcon>
+                  <ListItemText primary="Checklist (Portaria)" />
+                  {openChecklist ? <ExpandLess /> : <ExpandMore />}
+                </ListItemButton>
+              </ListItem>
+              <Collapse in={openChecklist} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      component={NavLink}
+                      to="/portaria/chegada"
+                      sx={{ pl: 4, ...listItemButtonStyle }}
+                    >
+                      <ListItemText primary="Chegada" />
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      component={NavLink}
+                      to="/portaria/saida"
+                      sx={{ pl: 4, ...listItemButtonStyle }}
+                    >
+                      <ListItemText primary="Saída" />
+                    </ListItemButton>
+                  </ListItem>
+                </List>
+              </Collapse>
+            </>
           )}
 
           {/* Consumo */}
@@ -225,9 +252,7 @@ function Layout() {
             </ListItem>
           )}
 
-          {/* ------------------------------
-              NOVOS ITENS PARA O DRIVER (motorista e admin)
-          ------------------------------ */}
+          {/* NOVOS ITENS PARA O DRIVER */}
           {['admin', 'motorista'].includes(role) && (
             <>
               {/* Criar Checklist (Driver) */}
@@ -337,7 +362,6 @@ function Layout() {
             '& .MuiDrawer-paper': {
               width: DRAWER_WIDTH,
               boxSizing: 'border-box',
-              // Novo: fundo escuro, cor de texto e rolagem
               backgroundColor: '#1f2937',
               color: '#fff',
               overflowY: 'auto',
@@ -354,14 +378,13 @@ function Layout() {
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{
-            keepMounted: true, // Mantém no DOM para suavizar transições
+            keepMounted: true,
           }}
           sx={{
             display: { xs: 'block', md: 'none' },
             '& .MuiDrawer-paper': {
               width: DRAWER_WIDTH,
               boxSizing: 'border-box',
-              // Mesmo estilo de fundo e rolagem
               backgroundColor: '#1f2937',
               color: '#fff',
               overflowY: 'auto',
@@ -377,12 +400,9 @@ function Layout() {
         component="main"
         sx={{
           flexGrow: 1,
-          // Sem margin-left, pois o Drawer fica sobreposto em telas grandes
           ml: { md: 0 },
-          // Espaçamento no topo quando a AppBar está fixa no mobile
           mt: { xs: isDesktop ? 0 : 8, md: 0 },
           p: 2,
-          // Fundo claro só na área de conteúdo
           backgroundColor: '#f5f6fa',
         }}
       >
