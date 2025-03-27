@@ -5,7 +5,6 @@ import Dashboard from '../pages/Dashboard';
 import VehicleList from '../pages/VehicleList';
 // import VehicleChecklist from '../pages/VehicleChecklist'; // rota antiga (opcional)
 import ConsumptionControl from '../pages/ConsumptionControl';
-import PartsReplacement from '../pages/PartsReplacement';
 import TireManagement from '../pages/TireManagement';
 import Refueling from '../pages/Refueling';
 import Layout from '../components/Layout';
@@ -15,6 +14,8 @@ import DriverChecklistsList from '../pages/DriverChecklistsList';
 // Novas páginas para Checklist (Portaria)
 import ChegadaPage from '../pages/ChegadaPage';
 import SaidaPage from '../pages/SaidaPage';
+import PartsReplacementReport from '../pages/PartsReplacementReport';
+import PartsReplacementMaintenance from '../pages/PartsReplacementMaintenance';
 
 // Verifica se há sessionToken no localStorage
 const PrivateRoute = ({ children }) => {
@@ -71,7 +72,8 @@ function AppRoutes() {
         {/* <Route path="checklist" element={<VehicleChecklist />} /> */}
         <Route path="consumption" element={<ConsumptionControl />} />
         <Route path="tire-replacement" element={<TireManagement />} />
-        <Route path="parts-replacement" element={<PartsReplacement />} />
+        <Route path="parts-replacement/report" element={<PartsReplacementReport />} />
+        <Route path="parts-replacement/maintenance" element={<PartsReplacementMaintenance />} />
         <Route path="refueling" element={<Refueling />} />
 
         {/* Rota protegida para gerenciamento de usuários - somente admin */}

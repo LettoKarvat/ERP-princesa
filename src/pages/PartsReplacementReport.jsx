@@ -2,116 +2,22 @@ import React, { useState } from "react";
 import {
   Box,
   Typography,
-  Card,
-  CardContent,
-  Grid,
   TextField,
   Button,
-  FormControlLabel,
-  Checkbox,
-  CardHeader,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import IconButton from "@mui/material/IconButton";
 import * as XLSX from "xlsx";
 import { DataGrid } from "@mui/x-data-grid";
-import Paper from "@mui/material/Paper";
 
-function PartsReplacement() {
+function PartsReplacementReport() {
   // Lista de registros cadastrados
   const [records, setRecords] = useState([]);
-
-  // Estado para o novo registro
-  const [newRecord, setNewRecord] = useState({
-    partCode: "",
-    truck: "",
-    truckPlate: "",
-    mileage: "", // Campo de quilometragem
-    installationDate: "",
-    quantity: 1,
-    partValue: "",
-    includeLabor: false,
-    laborValue: "",
-    observation: "",
-  });
 
   // Estado para controle de edição
   const [editRowId, setEditRowId] = useState(null);
   const [editValues, setEditValues] = useState({});
-
-  // Atualiza os campos do formulário de novo registro
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setNewRecord((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-  };
-
-  // Função para registrar o novo dado
-  const handleRegister = () => {
-    if (
-      !newRecord.partCode ||
-      !newRecord.truck ||
-      !newRecord.installationDate ||
-      !newRecord.partValue ||
-      !newRecord.mileage
-    ) {
-      alert(
-        "Preencha os campos obrigatórios: Código da Peça, Caminhão, Quilometragem, Data de Instalação e Valor da Peça."
-      );
-      return;
-    }
-    if (newRecord.includeLabor && !newRecord.laborValue) {
-      alert(
-        'Preencha o valor da mão de obra ou desmarque "Incluir Mão de Obra".'
-      );
-      return;
-    }
-    if (newRecord.quantity <= 0) {
-      alert("A quantidade de peças deve ser pelo menos 1.");
-      return;
-    }
-
-    const id = records.length ? records[records.length - 1].id + 1 : 1;
-    const partValue = parseFloat(newRecord.partValue) || 0;
-    const laborValue = newRecord.includeLabor
-      ? parseFloat(newRecord.laborValue) || 0
-      : 0;
-    const quantity = parseInt(newRecord.quantity, 10);
-    const totalCost = partValue * quantity + laborValue;
-
-    const recordToAdd = {
-      id,
-      partCode: newRecord.partCode,
-      truck: newRecord.truck,
-      truckPlate: newRecord.truckPlate,
-      mileage: newRecord.mileage, // Incluído
-      installationDate: newRecord.installationDate,
-      quantity,
-      partValue,
-      laborValue,
-      totalCost,
-      observation: newRecord.observation,
-    };
-
-    setRecords((prev) => [...prev, recordToAdd]);
-
-    // Limpa o formulário
-    setNewRecord({
-      partCode: "",
-      truck: "",
-      truckPlate: "",
-      mileage: "", // Reset do campo
-      installationDate: "",
-      quantity: 1,
-      partValue: "",
-      includeLabor: false,
-      laborValue: "",
-      observation: "",
-    });
-  };
 
   // Função para exportar os registros para Excel (.xlsx)
   const exportToExcel = () => {
@@ -391,13 +297,13 @@ function PartsReplacement() {
       prev.map((record) =>
         record.id === id
           ? {
-              ...record,
-              ...editValues,
-              partValue,
-              laborValue,
-              quantity,
-              totalCost,
-            }
+            ...record,
+            ...editValues,
+            partValue,
+            laborValue,
+            quantity,
+            totalCost,
+          }
           : record
       )
     );
@@ -418,91 +324,20 @@ function PartsReplacement() {
     }
   };
 
-  const fields = [
-    { label: "Código da Peça *", name: "partCode" },
-    { label: "Caminhão *", name: "truck" },
-    { label: "Placa do Caminhão", name: "truckPlate" },
-    { label: "Quilometragem *", name: "mileage" },
-    {
-      label: "Data de Instalação *",
-      name: "installationDate",
-      type: "date",
-      InputLabelProps: { shrink: true },
-    },
-    {
-      label: "Quantidade",
-      name: "quantity",
-      type: "number",
-      InputProps: { inputProps: { min: 1 } },
-    },
-    { label: "Valor da Peça (R$) *", name: "partValue", type: "number" },
-  ];
-
-  const paginationModel = { page: 0, pageSize: 5 };
-
   return (
     <Box>
       <Typography variant="h4" sx={{ mb: 3 }}>
         Oficina – Troca de Peças
       </Typography>
 
-      {/* Formulário para novo registro */}
-      <Card>
-        <CardContent>
-          <h3 className="text-xl mb-4">Novo registro</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {fields.map((field, index) => (
-              <TextField
-                fullWidth
-                label={field.label}
-                name={field.name}
-                type={field.type || "text"}
-                value={newRecord[field.name]}
-                onChange={handleChange}
-                {...(field.InputLabelProps
-                  ? { InputLabelProps: field.InputLabelProps }
-                  : {})}
-                {...(field.InputProps ? { InputProps: field.InputProps } : {})}
-              />
-            ))}
-            <FormControlLabel
-              className="col-span-full"
-              control={
-                <Checkbox
-                  name="includeLabor"
-                  checked={newRecord.includeLabor}
-                  onChange={handleChange}
-                />
-              }
-              label="Incluir Mão de Obra"
-            />
-            {newRecord.includeLabor && (
-              <TextField
-                className="col-span-full"
-                label="Valor da Mão de Obra (R$)"
-                type="number"
-                name="laborValue"
-                value={newRecord.laborValue}
-                onChange={handleChange}
-              />
-            )}
-            <TextField
-              className="col-span-full"
-              label="Observação"
-              name="observation"
-              value={newRecord.observation}
-              onChange={handleChange}
-              multiline
-              minRows={2}
-            />
-            <div className="col-span-full flex justify-end">
-              <Button variant="contained" onClick={handleRegister}>
-                Registrar
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <DataGrid
+        className="lg:max-w-[calc(100svw-280px)] max-w-[90vw] mx-auto"
+        rows={records}
+        columns={columns}
+        pageSize={5}
+        autoHeight
+        sx={{ bgcolor: 'background.paper' }}
+      />
 
       {/* Botão para exportar os registros para Excel */}
       <Box sx={{ my: 2, display: "flex", justifyContent: "flex-end" }}>
@@ -510,18 +345,8 @@ function PartsReplacement() {
           Exportar para Excel (.xlsx)
         </Button>
       </Box>
-
-      <Paper className="max-w-svw">
-        <DataGrid
-          rows={records}
-          columns={columns}
-          initialState={{ pagination: { paginationModel } }}
-          pageSizeOptions={[5, 10]}
-          sx={{ border: 0 }}
-        />
-      </Paper>
     </Box>
   );
 }
 
-export default PartsReplacement;
+export default PartsReplacementReport;
