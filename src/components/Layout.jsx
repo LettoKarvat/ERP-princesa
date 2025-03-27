@@ -56,6 +56,9 @@ function Layout() {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openChecklist, setOpenChecklist] = useState(false);
+  const [openPartsReplacement, setOpenPartsReplacement] = useState(false);
+
+
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -76,6 +79,7 @@ function Layout() {
         flexDirection: 'column',
         backgroundColor: '#1f2937',
         color: '#fff',
+        overflowX: 'hidden'
       }}
     >
       {/* Cabeçalho com logo */}
@@ -206,18 +210,54 @@ function Layout() {
 
           {/* Peças */}
           {['admin', 'manutencao'].includes(role) && (
-            <ListItem disablePadding>
-              <ListItemButton
-                component={NavLink}
-                to="/parts-replacement"
-                sx={listItemButtonStyle}
-              >
-                <ListItemIcon sx={{ color: 'inherit' }}>
-                  <FaTools />
-                </ListItemIcon>
-                <ListItemText primary="Troca de Peças" />
-              </ListItemButton>
-            </ListItem>
+            <>
+              <ListItem disablePadding>
+                <ListItemButton
+                  onClick={() => setOpenPartsReplacement(!openPartsReplacement)}
+                  sx={listItemButtonStyle}
+                >
+                  <ListItemIcon sx={{ color: 'inherit' }}>
+                    <FaClipboardCheck />
+                  </ListItemIcon>
+                  <ListItemText primary="Troca de peças" />
+                  {openPartsReplacement ? <ExpandLess /> : <ExpandMore />}
+                </ListItemButton>
+              </ListItem>
+              <Collapse in={openPartsReplacement} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      component={NavLink}
+                      to="/parts-replacement/maintenance"
+                      sx={{ pl: 4, ...listItemButtonStyle }}
+                    >
+                      <ListItemText primary="Manutenção" />
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      component={NavLink}
+                      to="/parts-replacement/report"
+                      sx={{ pl: 4, ...listItemButtonStyle }}
+                    >
+                      <ListItemText primary="Relatórios" />
+                    </ListItemButton>
+                  </ListItem>
+                </List>
+              </Collapse>
+            </>
+            // <ListItem disablePadding>
+            //   <ListItemButton
+            //     component={NavLink}
+            //     to="/parts-replacement"
+            //     sx={listItemButtonStyle}
+            //   >
+            //     <ListItemIcon sx={{ color: 'inherit' }}>
+            //       <FaTools />
+            //     </ListItemIcon>
+            //     <ListItemText primary="Troca de Peças" />
+            //   </ListItemButton>
+            // </ListItem>
           )}
 
           {/* Pneus */}
