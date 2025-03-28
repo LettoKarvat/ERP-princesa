@@ -43,6 +43,11 @@ function UserManagement() {
     const [users, setUsers] = useState([]);
 
     // ---------------------------
+    // CAMPO DE BUSCA
+    // ---------------------------
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // ---------------------------
     // MODAL DE CREDENCIAIS (PÓS-CRIAÇÃO)
     // ---------------------------
     const [modalCredOpen, setModalCredOpen] = useState(false);
@@ -308,6 +313,23 @@ function UserManagement() {
         }
     };
 
+    // ---------------------------
+    // FILTRO DE BUSCA
+    // ---------------------------
+    const filteredUsers = users.filter((u) => {
+        // Se for admin, usamos `email` como identificador;
+        // senão, usamos `matricula`.
+        const isAdmin = u.role === 'admin';
+        const identifierValue = isAdmin ? u.email : u.matricula;
+
+        // Verifica se o nome, matrícula ou email correspondem ao searchTerm (ignora caixa alta/baixa)
+        const lowerSearch = searchTerm.toLowerCase();
+        const matchesFullname = u.fullname?.toLowerCase().includes(lowerSearch);
+        const matchesIdentifier = identifierValue?.toLowerCase().includes(lowerSearch);
+
+        return matchesFullname || matchesIdentifier;
+    });
+
     // ======================
     // RENDER
     // ======================
@@ -401,12 +423,22 @@ function UserManagement() {
                 </Button>
             </Box>
 
+            {/* CAMPO DE BUSCA */}
+            <TextField
+                label="Pesquisar usuário por nome, matrícula ou email"
+                variant="outlined"
+                fullWidth
+                sx={{ mb: 2 }}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
+
             {/* LISTA DE USUÁRIOS */}
             <Typography variant="h6" sx={{ mb: 2 }}>
                 Usuários Cadastrados
             </Typography>
 
-            {users.map((u) => {
+            {filteredUsers.map((u) => {
                 // Se for admin => 'Email', senão => 'Matrícula'
                 const isAdmin = u.role === 'admin';
                 const identifierLabel = isAdmin ? 'Email' : 'Matrícula';
@@ -566,7 +598,7 @@ function UserManagement() {
                 <DialogTitle>Excluir Usuário</DialogTitle>
                 <DialogContent dividers>
                     <Typography>
-                        Tem certeza que deseja excluir (soft-delete) este usuário?
+                        Tem certeza que deseja excluir este usuário?
                     </Typography>
                 </DialogContent>
                 <DialogActions>

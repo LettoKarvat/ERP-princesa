@@ -24,7 +24,6 @@ import {
   FaClipboardCheck,
   FaChartBar,
   FaGasPump,
-  FaTools,
   FaSignOutAlt,
   FaCog,
   FaUsers,
@@ -36,7 +35,6 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 
 const DRAWER_WIDTH = 240;
 
-// Estilos do item de lista
 const listItemButtonStyle = {
   color: '#fff',
   textTransform: 'none',
@@ -57,8 +55,6 @@ function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openChecklist, setOpenChecklist] = useState(false);
   const [openPartsReplacement, setOpenPartsReplacement] = useState(false);
-
-
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -101,11 +97,10 @@ function Layout() {
         </Typography>
       </Box>
 
-      {/* Menu de navegação */}
       <Box component="nav" sx={{ flex: 1 }}>
         <List>
-          {/* Dashboard */}
-          {['admin', 'manutencao'].includes(role) && (
+          {/* Dashboard -> Só admin */}
+          {role === 'admin' && (
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
@@ -120,7 +115,7 @@ function Layout() {
             </ListItem>
           )}
 
-          {/* Veículos */}
+          {/* Veículos -> admin ou manutencao */}
           {['admin', 'manutencao'].includes(role) && (
             <ListItem disablePadding>
               <ListItemButton
@@ -136,8 +131,8 @@ function Layout() {
             </ListItem>
           )}
 
-          {/* Checklist (Portaria) com dropdown de Entrada e Saída */}
-          {['admin', 'portaria'].includes(role) && (
+          {/* Checklist (Portaria) -> admin, portaria, manutencao */}
+          {['admin', 'portaria', 'manutencao'].includes(role) && (
             <>
               <ListItem disablePadding>
                 <ListItemButton
@@ -176,8 +171,8 @@ function Layout() {
             </>
           )}
 
-          {/* Consumo */}
-          {['admin', 'fiscal'].includes(role) && (
+          {/* Consumo -> admin, fiscal, manutencao */}
+          {['admin', 'fiscal', 'manutencao'].includes(role) && (
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
@@ -192,8 +187,8 @@ function Layout() {
             </ListItem>
           )}
 
-          {/* Abastecimento */}
-          {['admin', 'abastecimento'].includes(role) && (
+          {/* Abastecimento -> admin, abastecimento, manutencao */}
+          {['admin', 'abastecimento', 'manutencao'].includes(role) && (
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
@@ -208,7 +203,7 @@ function Layout() {
             </ListItem>
           )}
 
-          {/* Peças */}
+          {/* Troca de peças -> admin, manutencao */}
           {['admin', 'manutencao'].includes(role) && (
             <>
               <ListItem disablePadding>
@@ -246,21 +241,9 @@ function Layout() {
                 </List>
               </Collapse>
             </>
-            // <ListItem disablePadding>
-            //   <ListItemButton
-            //     component={NavLink}
-            //     to="/parts-replacement"
-            //     sx={listItemButtonStyle}
-            //   >
-            //     <ListItemIcon sx={{ color: 'inherit' }}>
-            //       <FaTools />
-            //     </ListItemIcon>
-            //     <ListItemText primary="Troca de Peças" />
-            //   </ListItemButton>
-            // </ListItem>
           )}
 
-          {/* Pneus */}
+          {/* Pneus -> admin, manutencao */}
           {['admin', 'manutencao'].includes(role) && (
             <ListItem disablePadding>
               <ListItemButton
@@ -276,7 +259,7 @@ function Layout() {
             </ListItem>
           )}
 
-          {/* Usuários */}
+          {/* Usuários -> só admin */}
           {role === 'admin' && (
             <ListItem disablePadding>
               <ListItemButton
@@ -292,10 +275,9 @@ function Layout() {
             </ListItem>
           )}
 
-          {/* NOVOS ITENS PARA O DRIVER */}
-          {['admin', 'motorista'].includes(role) && (
+          {/* Checklists do motorista -> admin, motorista, manutencao */}
+          {['admin', 'motorista', 'manutencao'].includes(role) && (
             <>
-              {/* Criar Checklist (Driver) */}
               <ListItem disablePadding>
                 <ListItemButton
                   component={NavLink}
@@ -308,7 +290,6 @@ function Layout() {
                   <ListItemText primary="Criar Checklist (Caminhão/Motorista)" />
                 </ListItemButton>
               </ListItem>
-              {/* Listar Checklists (Driver) */}
               <ListItem disablePadding>
                 <ListItemButton
                   component={NavLink}
@@ -324,7 +305,7 @@ function Layout() {
             </>
           )}
 
-          {/* Botão Sair */}
+          {/* Sair (para todos) */}
           <ListItem disablePadding>
             <ListItemButton onClick={handleLogout} sx={listItemButtonStyle}>
               <ListItemIcon sx={{ color: 'inherit' }}>
@@ -392,7 +373,7 @@ function Layout() {
         </AppBar>
       )}
 
-      {/* Drawer (sidebar) em telas grandes */}
+      {/* Drawer (sidebar) */}
       {isDesktop ? (
         <Drawer
           variant="permanent"
@@ -412,14 +393,11 @@ function Layout() {
           {drawerContent}
         </Drawer>
       ) : (
-        // Drawer em telas menores (mobile)
         <Drawer
           variant="temporary"
           open={mobileOpen}
           onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true,
-          }}
+          ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: 'block', md: 'none' },
             '& .MuiDrawer-paper': {

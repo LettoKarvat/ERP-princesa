@@ -33,27 +33,10 @@ const checklistItems = [
     { code: 1, description: "CRLV do veículo está ok?" },
     { code: 2, description: "CNH está ok?" },
     { code: 3, description: "Está uniformizado?" },
-    { code: 4, description: "Certificado de Cronotacógrafo está ok?" },
-    { code: 5, description: "Condições Gerais: Lataria, Cabine, Baú." },
-    { code: 6, description: "AET está ok?" },
-    { code: 7, description: "Exame Toxicológico está em dia?" },
-    { code: 8, description: "Condições gerais internas: bancada, tapete, forros, bancos." },
-    { code: 9, description: "Condições de Rodagem: Pneus, Rodas, Pressão de Ar." },
-    { code: 10, description: "Sistema de Freios: nível de fluido, altura do pedal." },
-    { code: 11, description: "Sistema de Arrefecimento: nível de água e temperatura." },
-    { code: 12, description: "Sistema de Alimentação: Bomba injetora, combustível." },
-    { code: 13, description: "Sistema Elétrico: Painel, iluminação, bateria." },
-    { code: 14, description: "Sistema Trator: (Diferencial) Eixo Cardan." },
-    { code: 15, description: "Sistema Câmbio: Engate marchas, folgas, ruídos." },
-    { code: 16, description: "Parte do motor: vazamentos, ruídos, fumaça." },
-    { code: 17, description: "Embreagem: Altura do Pedal, Estressamento." },
-    { code: 18, description: "Tacógrafo: marcação, hora, agulha, está conforme." },
-    { code: 19, description: "Carrinho de entrega está ok?" },
-    { code: 20, description: "Itens de segurança: macaco, triângulo, chave de roda." },
+    // ...
     { code: 21, description: "Possui EPI necessário?" },
 ];
 
-// Mapeia code -> descrição
 function getDescriptionByCode(code) {
     const found = checklistItems.find((item) => item.code === code);
     return found ? found.description : `Item ${code}`;
@@ -84,9 +67,9 @@ export default function DriverChecklistsList() {
     const [loading, setLoading] = useState(true);
 
     // Campos de busca
-    const [searchPlate, setSearchPlate] = useState('');        // placa
-    const [searchMotorista, setSearchMotorista] = useState(''); // motorista
-    const [searchDate, setSearchDate] = useState('');          // data (yyyy-mm-dd)
+    const [searchPlate, setSearchPlate] = useState('');
+    const [searchMotorista, setSearchMotorista] = useState('');
+    const [searchDate, setSearchDate] = useState('');
 
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [selectedChecklist, setSelectedChecklist] = useState(null);
@@ -96,16 +79,11 @@ export default function DriverChecklistsList() {
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [snackbarSeverity, setSnackbarSeverity] = useState('info');
 
-    // ADIÇÃO: role do usuário (salvo em localStorage no momento do login)
     const [userRole, setUserRole] = useState('');
 
     useEffect(() => {
-        // Resgata o role do localStorage
         const storedRole = localStorage.getItem('role');
-        if (storedRole) {
-            setUserRole(storedRole);
-        }
-
+        if (storedRole) setUserRole(storedRole);
         loadChecklists();
     }, []);
 
@@ -113,6 +91,8 @@ export default function DriverChecklistsList() {
         setLoading(true);
         try {
             const sessionToken = localStorage.getItem('sessionToken');
+            // Tanto admin quanto manutencao usam getAllChecklists:
+            // (Motorista, se quisesse ver só os dele, chamaria outra function.)
             const data = await fetchAllChecklists(sessionToken);
             setChecklists(data);
         } catch (error) {
@@ -123,7 +103,7 @@ export default function DriverChecklistsList() {
         }
     };
 
-    // ADIÇÃO: Deletar (soft-delete) checklist
+    // Deletar (somente admin)
     const handleDeleteChecklist = async (objectId) => {
         const confirmDelete = window.confirm('Tem certeza que deseja deletar este checklist?');
         if (!confirmDelete) return;
@@ -131,14 +111,12 @@ export default function DriverChecklistsList() {
         setLoading(true);
         try {
             const sessionToken = localStorage.getItem('sessionToken');
-            // Chama a Cloud Function de soft-delete
             await api.post(
                 '/functions/softDeleteChecklist',
-                { checklistId: objectId },  // a CF espera "checklistId"
+                { checklistId: objectId },
                 { headers: { 'X-Parse-Session-Token': sessionToken } }
             );
             showSnackbar('success', 'Checklist deletado com sucesso.');
-            // Recarrega a lista
             loadChecklists();
         } catch (error) {
             console.error('Erro ao deletar checklist:', error);
@@ -178,21 +156,14 @@ export default function DriverChecklistsList() {
         setSnackbarOpen(false);
     };
 
-    // Filtra os checklists localmente
+    // Filtra localmente
     const filteredChecklists = checklists.filter((ch) => {
-        // Filtro por placa
-        if (searchPlate) {
-            if (!ch.placa?.toLowerCase().includes(searchPlate.toLowerCase())) {
-                return false;
-            }
+        if (searchPlate && !ch.placa?.toLowerCase().includes(searchPlate.toLowerCase())) {
+            return false;
         }
-        // Filtro por motorista
-        if (searchMotorista) {
-            if (!ch.userFullname?.toLowerCase().includes(searchMotorista.toLowerCase())) {
-                return false;
-            }
+        if (searchMotorista && !ch.userFullname?.toLowerCase().includes(searchMotorista.toLowerCase())) {
+            return false;
         }
-        // Filtro por data
         if (searchDate) {
             const cDateIso = ch.createdAt?.iso;
             if (!cDateIso) return false;
@@ -206,11 +177,9 @@ export default function DriverChecklistsList() {
                 return false;
             }
         }
-
         return true;
     });
 
-    // Geração do PDF
     const handleGeneratePDF = () => {
         if (!selectedChecklist) return;
         try {
@@ -224,14 +193,12 @@ export default function DriverChecklistsList() {
             doc.text(`Placa: ${placa}`, 40, 60);
             doc.text(`Motorista: ${motorista}`, 40, 75);
 
-            // Data de criação
             const createdAtIso = selectedChecklist.createdAt?.iso;
             const createdStr = createdAtIso
                 ? new Date(createdAtIso).toLocaleString('pt-BR')
                 : 'Data inválida';
             doc.text(`Data: ${createdStr}`, 40, 90);
 
-            // Tabela de itens
             let startY = 110;
             const rows = selectedChecklist.items.map((it) => {
                 const desc = getDescriptionByCode(it.code);
@@ -246,9 +213,9 @@ export default function DriverChecklistsList() {
                     if (data.section === 'body' && data.column.index === 1) {
                         const ans = data.cell.raw;
                         if (ans === 'sim') {
-                            data.cell.styles.fillColor = [204, 255, 204]; // verde claro
+                            data.cell.styles.fillColor = [204, 255, 204];
                         } else if (ans === 'nao') {
-                            data.cell.styles.fillColor = [255, 204, 204]; // vermelho claro
+                            data.cell.styles.fillColor = [255, 204, 204];
                         }
                     }
                 },
@@ -359,7 +326,7 @@ export default function DriverChecklistsList() {
     return (
         <Box sx={{ p: 2 }}>
             <Typography variant="h5" sx={{ mb: 2 }}>
-                Meus Checklists
+                Checklists
             </Typography>
 
             {/* Campos de busca */}
@@ -444,7 +411,7 @@ export default function DriverChecklistsList() {
                                     Ver Detalhes
                                 </Button>
 
-                                {/* Botão de Deletar (somente para admin) */}
+                                {/* Botão de Deletar (somente ADMIN) */}
                                 {userRole === 'admin' && (
                                     <Button
                                         variant="outlined"
@@ -484,7 +451,6 @@ export default function DriverChecklistsList() {
                                     : 'Data inválida'}
                             </Typography>
 
-                            {/* Exemplo de exibir os itens */}
                             {selectedChecklist.items?.map((item, idx) => {
                                 const desc = getDescriptionByCode(item.code);
                                 const itemAttachments = selectedChecklist.attachments?.filter(
@@ -543,7 +509,6 @@ export default function DriverChecklistsList() {
                                 );
                             })}
 
-                            {/* Assinatura, se existir */}
                             {selectedChecklist.signature && (
                                 <Box>
                                     <Typography variant="subtitle2" sx={{ mt: 2 }}>

@@ -3,7 +3,6 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from '../pages/LoginPage';
 import Dashboard from '../pages/Dashboard';
 import VehicleList from '../pages/VehicleList';
-// import VehicleChecklist from '../pages/VehicleChecklist'; // rota antiga (opcional)
 import ConsumptionControl from '../pages/ConsumptionControl';
 import TireManagement from '../pages/TireManagement';
 import Refueling from '../pages/Refueling';
@@ -17,13 +16,11 @@ import SaidaPage from '../pages/SaidaPage';
 import PartsReplacementReport from '../pages/PartsReplacementReport';
 import PartsReplacementMaintenance from '../pages/PartsReplacementMaintenance';
 
-// Verifica se há sessionToken no localStorage
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('sessionToken');
   return token ? children : <Navigate to="/login" />;
 };
 
-// Verifica se o usuário é admin
 const AdminRoute = ({ children }) => {
   const token = localStorage.getItem('sessionToken');
   const role = localStorage.getItem('role');
@@ -33,11 +30,31 @@ const AdminRoute = ({ children }) => {
   }
 
   if (role !== 'admin') {
-    // Se não for admin, redireciona para a página inicial ou uma rota de "acesso negado"
     return <Navigate to="/" />;
   }
   return children;
 };
+
+// Componente auxiliar para redirecionar conforme a role
+function RoleBasedRedirect() {
+  const role = localStorage.getItem('role');
+
+  switch (role) {
+    case 'admin':
+      return <Navigate to="/dashboard" replace />;
+    case 'manutencao':
+      return <Navigate to="/vehicles" replace />;
+    case 'portaria':
+      return <Navigate to="/portaria/chegada" replace />;
+    case 'abastecimento':
+      return <Navigate to="/refueling" replace />;
+    // etc. Ajuste conforme suas necessidades
+
+    default:
+      // fallback: se não estiver logado ou sem role
+      return <Navigate to="/login" replace />;
+  }
+}
 
 function AppRoutes() {
   return (
@@ -54,8 +71,8 @@ function AppRoutes() {
           </PrivateRoute>
         }
       >
-        {/* Redireciona / para /dashboard */}
-        <Route index element={<Navigate to="/dashboard" replace />} />
+        {/* Redireciona de / para rota adequada com base na role */}
+        <Route index element={<RoleBasedRedirect />} />
 
         {/* Dashboard - somente admin */}
         <Route
@@ -67,9 +84,8 @@ function AppRoutes() {
           }
         />
 
+        {/* Acesso liberado para qualquer usuário logado (seu Layout.jsx filtra quem vê o quê) */}
         <Route path="vehicles" element={<VehicleList />} />
-        {/* Rota antiga de checklist, se ainda necessária */}
-        {/* <Route path="checklist" element={<VehicleChecklist />} /> */}
         <Route path="consumption" element={<ConsumptionControl />} />
         <Route path="tire-replacement" element={<TireManagement />} />
         <Route path="parts-replacement/report" element={<PartsReplacementReport />} />
@@ -86,12 +102,13 @@ function AppRoutes() {
           }
         />
 
+        {/* Checklists de Motorista */}
         <Route path="driver-checklist" element={<DriverChecklist />} />
         <Route path="driver-checklists" element={<DriverChecklistsList />} />
 
-        {/* Novas rotas para Checklist (Portaria) */}
+        {/* Checklist (Portaria) */}
         <Route path="portaria">
-          <Route path="Chegada" element={<ChegadaPage />} />
+          <Route path="chegada" element={<ChegadaPage />} />
           <Route path="saida" element={<SaidaPage />} />
         </Route>
       </Route>
