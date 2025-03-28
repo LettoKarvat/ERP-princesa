@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+:root {
+  --sidebar-width: 256px;
+}
+
 html,
 body,
 #root {
@@ -15,6 +19,10 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.max-w-sidebar-based {
+  max-width: calc(100svw - var(--sidebar-width));
 }
 
 /* Opcional, se quiser esconder rolagem horizontal */
