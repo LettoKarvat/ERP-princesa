@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -15,197 +15,209 @@ import {
   Radio,
   Select,
   MenuItem,
+  InputLabel,
+  Input,
 } from "@mui/material";
+import { Controller, useForm } from "react-hook-form";
+import { InputError } from "../InputError";
 
-export function RefuelingDialog({
-  open,
-  onClose,
-  selectedItem,
-  isEditing = false,
-  handleSave,
-}) {
-  const isInternal = selectedItem?.post === "interno";
+export function RefuelingDialog({ open, onClose, selectedItem }) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    control,
+    watch,
+    formState: { errors },
+  } = useForm({
+    defaultValues: selectedItem,
+    fuelType: selectedItem?.fuelType || "",
+    post: selectedItem?.post || "",
+  });
 
-  const [attachments, setAttachments] = useState([]);
+  const onSubmit = (data) => console.log(data);
 
-  const handleFileChange = (e) => {
-    if (!e.target.files) return;
-    setAttachments(Array.from(e.target.files));
-  };
+  useEffect(() => {
+    if (selectedItem) {
+      reset(selectedItem);
+    }
+  }, [selectedItem, reset]);
 
-  const [newRefueling, setNewRefueling] = useState(initialRefueling);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setNewRefueling((prev) => ({ ...prev, [name]: value }));
-  };
+  const postValue = watch("post");
+  const isInternal = postValue === "interno";
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth>
       <DialogTitle>
-        {isEditing ? "Editar Abastecimento" : "Novo Abastecimento"}
+        {selectedItem?.id ? "Editar abastecimento" : "Novo abastecimento"}
       </DialogTitle>
 
-      <DialogContent
-        dividers
-        className="md:grid md:grid-cols-2 gap-4 *:self-center *:w-full flex flex-col "
-      >
-        {/* Veículo */}
-        <TextField
-          margin="dense"
-          name="vehicle"
-          label="Veículo"
-          placeholder="Placa ou nome do veículo"
-          InputLabelProps={{ shrink: true }}
-          value={selectedItem?.vehicle}
-          onChange={handleChange}
-          className="md:col-span-2"
-        />
-
-        {/* Combustível e Data */}
-        <FormControl component="fieldset" className="col-span-2">
-          <FormLabel component="legend">Combustível</FormLabel>
-          <RadioGroup
-            row
-            className="gap-8"
-            name="fuelType"
-            value={selectedItem?.fuelType}
-            onChange={handleChange}
-          >
-            <FormControlLabel
-              value="DIESEL"
-              control={<Radio />}
-              label="DIESEL"
-              size=""
+      <DialogContent className="!pt-2 pb-6">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="w-full flex flex-col gap-6 md:grid grid-cols-2"
+        >
+          <FormControl className="col-span-2">
+            <InputLabel htmlFor="vehicle">Veículo (Nome ou placa)</InputLabel>
+            <Input
+              {...register("vehicle", {
+                required: "Insira o nome ou a placa do veículo",
+              })}
+              aria-describedby="vehicle"
             />
-            <FormControlLabel value="ARLA" control={<Radio />} label="ARLA" />
-          </RadioGroup>
-        </FormControl>
+            {errors.vehicle && (
+              <InputError>{errors.vehicle.message}</InputError>
+            )}
+          </FormControl>
 
-        <TextField
-          margin="dense"
-          name="date"
-          label="Data de Abastecimento"
-          type="datetime-local"
-          fullWidth
-          InputLabelProps={{ shrink: true }}
-          value={selectedItem?.date}
-          onChange={handleChange}
-        />
+          <FormControl className="col-span-2">
+            <FormLabel component="legend">Combustível</FormLabel>
 
-        {/* Posto (interno/externo) */}
-        <FormControl>
-          <Select
-            name="post"
-            margin="dense"
-            value={selectedItem?.post}
-            onChange={handleChange}
-            displayEmpty
-          >
-            <MenuItem value="interno">Interno</MenuItem>
-            <MenuItem value="externo">Externo</MenuItem>
-          </Select>
-        </FormControl>
-
-        {/* Se for interno: exibe campo bomba */}
-        {isInternal && (
-          <TextField
-            margin="dense"
-            label="Bomba"
-            name="pump"
-            value={selectedItem?.pump}
-            onChange={handleChange}
-          />
-        )}
-
-        {/* Se for externo: exibe campos de nota e preço */}
-        {!isInternal && (
-          <>
-            <TextField
-              margin="dense"
-              name="invoiceNumber"
-              label="Número da Nota"
-              value={selectedItem?.invoiceNumber}
-              onChange={handleChange}
+            <Controller
+              name="fuelType"
+              control={control}
+              rules={{ required: "Selecione o tipo de combustível" }}
+              render={({ field }) => (
+                <RadioGroup row {...field} value={field.value || ""}>
+                  <FormControlLabel
+                    value="ARLA"
+                    control={<Radio />}
+                    label="ARLA"
+                  />
+                  <FormControlLabel
+                    value="DIESEL"
+                    control={<Radio />}
+                    label="DIESEL"
+                  />
+                </RadioGroup>
+              )}
             />
-            <TextField
-              margin="dense"
-              name="unitPrice"
-              label="Preço Unitário (R$)"
-              type="number"
-              value={selectedItem?.unitPrice}
-              onChange={handleChange}
+
+            {errors.fuelType && (
+              <InputError>{errors.fuelType.message}</InputError>
+            )}
+          </FormControl>
+
+          <FormControl className="col-span-2">
+            <FormLabel component="legend" htmlFor="date">
+              Data do abastecimento
+            </FormLabel>
+            <Input
+              type="date"
+              {...register("date", {
+                required: "Insira a data do abastecimento",
+              })}
+              aria-describedby="date"
             />
-          </>
-        )}
+            {errors.date && <InputError>{errors.date.message}</InputError>}
+          </FormControl>
 
-        {/* Litros abastecidos e KM */}
-        <TextField
-          margin="dense"
-          name="liters"
-          label="Litros Abastecidos"
-          type="number"
-          value={selectedItem?.liters}
-          onChange={handleChange}
-        />
-        <TextField
-          margin="dense"
-          name="mileage"
-          label="KM Atual"
-          type="number"
-          value={selectedItem?.mileage}
-          onChange={handleChange}
-        />
+          <FormControl className="col-span-2">
+            <InputLabel htmlFor="post">Posto</InputLabel>
 
-        {/* Observação */}
-        <TextField
-          className="col-span-2"
-          margin="dense"
-          name="observation"
-          label="Observação"
-          multiline
-          minRows={2}
-          fullWidth
-          value={selectedItem?.observation}
-          onChange={handleChange}
-        />
+            <Controller
+              name="post"
+              control={control}
+              rules={{ required: "Selecione se o posto é interno ou externo" }}
+              render={({ field }) => (
+                <Select {...field} value={field.value || ""}>
+                  <MenuItem value="interno">Interno</MenuItem>
+                  <MenuItem value="externo">Externo</MenuItem>
+                </Select>
+              )}
+            />
 
-        {/* Seção de Anexos */}
-        <Box>
-          <Typography variant="subtitle1">
-            Anexos (obrigatório pelo menos um)
-          </Typography>
-          <input
-            accept="image/*,application/pdf"
-            style={{ display: "none" }}
-            id="attachment-upload"
-            multiple
-            type="file"
-            onChange={handleFileChange}
-          />
-          <label htmlFor="attachment-upload">
-            <Button variant="contained" component="span">
-              Adicionar Arquivos
-            </Button>
-          </label>
-          {attachments.length > 0 && (
-            <Box>
-              {attachments.map((file, index) => (
-                <Typography key={index} variant="body2">
-                  {file.name || file}
-                </Typography>
-              ))}
-            </Box>
+            {errors.post && (
+              <span className="text-red-500">{errors.post.message}</span>
+            )}
+          </FormControl>
+
+          {isInternal && (
+            <FormControl>
+              <InputLabel htmlFor="pump">Bomba</InputLabel>
+              <Input
+                {...register("pump", {
+                  required: "Insira a bomba",
+                })}
+                aria-describedby="pump"
+              />
+              {errors.pump && <InputError>{errors.pump.message}</InputError>}
+            </FormControl>
           )}
-        </Box>
+
+          {!isInternal && (
+            <>
+              <FormControl>
+                <InputLabel htmlFor="invoiceNumber">Número da nota</InputLabel>
+                <Input
+                  {...register("invoiceNumber", {
+                    required: "Insira o número da nota",
+                  })}
+                  aria-describedby="invoiceNumber"
+                />
+                {errors.invoiceNumber && (
+                  <InputError>{errors.invoiceNumber.message}</InputError>
+                )}
+              </FormControl>
+
+              <FormControl>
+                <InputLabel htmlFor="unitPrice">Preço unitário</InputLabel>
+                <Input
+                  {...register("unitPrice", {
+                    required: "Insira o preço unitário",
+                  })}
+                  aria-describedby="unitPrice"
+                />
+                {errors.unitPrice && (
+                  <InputError>{errors.unitPrice.message}</InputError>
+                )}
+              </FormControl>
+            </>
+          )}
+
+          <FormControl>
+            <InputLabel htmlFor="liters">Litros abastecidos</InputLabel>
+            <Input
+              {...register("liters", {
+                required: "Insira quantos litros foram abastecidos",
+              })}
+              aria-describedby="liters"
+            />
+            {errors.liters && <InputError>{errors.liters.message}</InputError>}
+          </FormControl>
+
+          <FormControl>
+            <InputLabel htmlFor="mileage">Kilometragem atual</InputLabel>
+            <Input
+              {...register("mileage", {
+                required: "Insira a kilometragem atual",
+              })}
+              aria-describedby="mileage"
+            />
+            {errors.mileage && (
+              <InputError>{errors.mileage.message}</InputError>
+            )}
+          </FormControl>
+
+          <FormControl className="col-span-2">
+            <InputLabel htmlFor="observation">Observação</InputLabel>
+            <Input
+              {...register("observation")}
+              aria-describedby="observation"
+            />
+          </FormControl>
+
+          <div className="flex justify-end col-span-2">
+            <Button variant="contained" type="submit">
+              Salvar
+            </Button>
+          </div>
+        </form>
       </DialogContent>
 
-      <DialogActions>
+      {/* <DialogActions>
         <Button onClick={onClose}>Cancelar</Button>
-        <Button onClick={handleSave} variant="contained">
-          Salvar
-        </Button>
-      </DialogActions>
+      </DialogActions> */}
     </Dialog>
   );
 }

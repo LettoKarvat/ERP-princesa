@@ -240,12 +240,9 @@ export default function Refueling() {
       </div>
 
       <RefuelingDialog
-        handleSave={handleSave}
         onClose={handleCloseDialog}
         open={open}
         selectedItem={selectedItem}
-        isEditing={isEditing}
-        handleChange={handleChange}
       />
 
       {/* MODAL DE ASSINATURA (chamado se não tiver assinatura no momento do Save) */}
