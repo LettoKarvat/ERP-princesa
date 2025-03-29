@@ -17,37 +17,86 @@ import {
   MenuItem,
   InputLabel,
   Input,
+  Autocomplete,
 } from "@mui/material";
 import { Controller, useForm } from "react-hook-form";
 import { InputError } from "../InputError";
+import { getAllVeiculos } from "../../services/vehicleService";
 
 export function RefuelingDialog({ open, onClose, selectedItem }) {
+  const [unitPrice, setUnitPrice] = useState(selectedItem?.unitPrice ?? "");
+  const [litersFueled, setLitersFueled] = useState("");
+  const [mileageState, setMileageState] = useState("");
+  const [vehicles, setVehicles] = useState([]);
+  const [selectedVehicle, setSelectedVehicle] = useState(null);
+
+  console.log(selectedItem);
+
   const {
     register,
     handleSubmit,
     reset,
     control,
     watch,
+    setValue,
     formState: { errors },
   } = useForm({
     defaultValues: selectedItem,
-    fuelType: selectedItem?.fuelType || "",
-    post: selectedItem?.post || "",
+    unitPrice: unitPrice,
   });
 
-  const onSubmit = (data) => console.log(data);
+  const onSubmit = (data) => {
+    console.log(data);
+  };
+
+  const postValue = watch("post");
+  const isInternal = postValue === "interno";
+
+  const handleFloatMask = (e, setState) => {
+    const value = e.target.value.replace(/[^0-9.]/g, "");
+    setState(value);
+  };
+
+  useEffect(() => {
+    if (open && selectedItem) {
+      setUnitPrice(selectedItem.unitPrice);
+      setValue("unitPrice", selectedItem.unitPrice);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (selectedItem) {
       reset(selectedItem);
     }
+    setSelectedVehicle(null);
   }, [selectedItem, reset]);
 
-  const postValue = watch("post");
-  const isInternal = postValue === "interno";
+  useEffect(() => {
+    const getVehicles = async () => {
+      try {
+        const vehiclesData = await getAllVeiculos();
+        setVehicles(vehiclesData);
+        console.log(vehiclesData);
+      } catch (error) {
+        console.error("Erro ao buscar veículos:", error);
+      }
+    };
+
+    getVehicles();
+  }, []);
+
+  const handleClose = () => {
+    setSelectedVehicle(null);
+    setMileageState("");
+    setLitersFueled("");
+    setUnitPrice("");
+    reset();
+
+    onClose();
+  };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth>
+    <Dialog open={open} onClose={handleClose} fullWidth>
       <DialogTitle>
         {selectedItem?.id ? "Editar abastecimento" : "Novo abastecimento"}
       </DialogTitle>
@@ -57,7 +106,51 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
           onSubmit={handleSubmit(onSubmit)}
           className="w-full flex flex-col gap-6 md:grid grid-cols-2"
         >
-          <FormControl className="col-span-2">
+          <Autocomplete
+            className="col-span-2"
+            freeSolo
+            value={selectedItem?.vehicle ?? selectedVehicle}
+            onChange={(e, newValue) => {
+              if (typeof newValue === "string") {
+                setSelectedVehicle(null);
+              } else if (newValue && newValue.placa) {
+                setSelectedVehicle(newValue);
+              } else {
+                setSelectedVehicle(null);
+              }
+              setMileageState(newValue?.quilometragem ?? "");
+            }}
+            onInputChange={(event, newInputValue) => {
+              setSelectedVehicle(null);
+            }}
+            options={vehicles}
+            getOptionLabel={(option) => {
+              if (typeof option === "string") return option;
+              return option.placa
+                ? `${option.placa} - ${option.marca || ""} ${
+                    option.modelo || ""
+                  }`
+                : "";
+            }}
+            renderInput={(params) => (
+              <>
+                <TextField
+                  {...params}
+                  label="Placa ou nome do Veículo"
+                  variant="outlined"
+                  {...register("vehicle", {
+                    required: "Insira o nome ou a placa do veículo",
+                  })}
+                  aria-describedby="vehicle"
+                />
+                {errors.vehicle && (
+                  <InputError>{errors.vehicle.message}</InputError>
+                )}
+              </>
+            )}
+          />
+
+          {/* <FormControl className="col-span-2">
             <InputLabel htmlFor="vehicle">Veículo (Nome ou placa)</InputLabel>
             <Input
               {...register("vehicle", {
@@ -68,7 +161,7 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
             {errors.vehicle && (
               <InputError>{errors.vehicle.message}</InputError>
             )}
-          </FormControl>
+          </FormControl> */}
 
           <FormControl className="col-span-2">
             <FormLabel component="legend">Combustível</FormLabel>
@@ -167,6 +260,9 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
                     required: "Insira o preço unitário",
                   })}
                   aria-describedby="unitPrice"
+                  type="text"
+                  value={unitPrice}
+                  onChange={(e) => handleFloatMask(e, setUnitPrice)}
                 />
                 {errors.unitPrice && (
                   <InputError>{errors.unitPrice.message}</InputError>
@@ -182,17 +278,27 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
                 required: "Insira quantos litros foram abastecidos",
               })}
               aria-describedby="liters"
+              type="text"
+              value={litersFueled}
+              onChange={(e) => handleFloatMask(e, setLitersFueled)}
             />
             {errors.liters && <InputError>{errors.liters.message}</InputError>}
           </FormControl>
 
           <FormControl>
-            <InputLabel htmlFor="mileage">Kilometragem atual</InputLabel>
+            <InputLabel htmlFor="mileage">Quilometragem atual</InputLabel>
             <Input
               {...register("mileage", {
-                required: "Insira a kilometragem atual",
+                required: "Insira a quilometragem atual",
+                min: {
+                  value: selectedVehicle?.quilometragem,
+                  message: "A quilometragem não pode ser menor que a anterior",
+                },
               })}
               aria-describedby="mileage"
+              type="text"
+              value={mileageState}
+              onChange={(e) => handleFloatMask(e, setMileageState)}
             />
             {errors.mileage && (
               <InputError>{errors.mileage.message}</InputError>
