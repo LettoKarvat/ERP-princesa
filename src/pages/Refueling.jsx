@@ -1,36 +1,18 @@
 import React, { useState, useRef } from "react";
 import {
-  Box,
   Button,
   Typography,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
-  IconButton,
-  FormControl,
-  FormLabel,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
-  Select,
-  MenuItem,
   useMediaQuery,
-  Tooltip,
-  Card,
-  CardContent,
-  CardHeader,
 } from "@mui/material";
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-} from "@mui/icons-material";
-import * as XLSX from "xlsx";
+import { Add as AddIcon } from "@mui/icons-material";
 import SignatureCanvas from "react-signature-canvas";
 import { useTheme } from "@mui/material/styles";
-import dayjs from "dayjs";
+import { RefuelingDialog } from "../components/Refueling/RefuelingDialog";
+import { RefuelingCard } from "../components/Refueling/RefuelingCard";
 
 export default function Refueling() {
   // Lista de abastecimentos salvos
@@ -67,13 +49,28 @@ export default function Refueling() {
     },
   ]);
 
+  const initialRefueling = {
+    vehicle: "",
+    fuelType: "DIESEL",
+    date: "",
+    post: "interno",
+    pump: "",
+    invoiceNumber: "",
+    unitPrice: 0,
+    liters: "",
+    mileage: "",
+    observation: "",
+    signature: "", // Campo para armazenar a assinatura
+    attachments: [], // Campo para armazenar anexos
+  };
+
   // Controles do diálogo principal (novo/editar)
   const [open, setOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
 
   // Objeto abastecimento em edição
-  const [newRefueling, setNewRefueling] = useState(initialRefueling());
+  const [newRefueling, setNewRefueling] = useState(initialRefueling);
 
   // Estado para anexos (no momento da criação/edição)
   const [attachments, setAttachments] = useState([]);
@@ -86,204 +83,33 @@ export default function Refueling() {
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
   // --------------------------------------------------------------------------------
-  // UPLOAD DE ARQUIVOS (ANEXOS)
-  // --------------------------------------------------------------------------------
-  const handleFileChange = (e) => {
-    if (!e.target.files) return;
-    setAttachments(Array.from(e.target.files));
-  };
-
-  // --------------------------------------------------------------------------------
-  // EXPORTAR PARA EXCEL
-  // --------------------------------------------------------------------------------
-  const exportToExcel = () => {
-    // Definindo os títulos das colunas em português
-    const headers = [
-      "Veículo",
-      "Combustível",
-      "Data",
-      "Posto",
-      "Bomba",
-      "Nota",
-      "Preço Unitário",
-      "Litros",
-      "KM",
-      "Observação",
-      "Assinatura",
-      "Anexos",
-    ];
-
-    // Monta os dados (array de arrays)
-    const data = [headers];
-    refuelings.forEach((r) => {
-      data.push([
-        r.vehicle,
-        r.fuelType,
-        r.date,
-        r.post,
-        r.pump,
-        r.invoiceNumber,
-        r.unitPrice,
-        r.liters,
-        r.mileage,
-        r.observation,
-        r.signature ? "Sim" : "Não",
-        r.attachments.map((f) => f.name || f).join(", "),
-      ]);
-    });
-
-    // Cria a worksheet a partir do array de arrays
-    const worksheet = XLSX.utils.aoa_to_sheet(data);
-
-    // Aplica formatação simples nos cabeçalhos (primeira linha)
-    const range = XLSX.utils.decode_range(worksheet["!ref"]);
-    for (let C = range.s.c; C <= range.e.c; C++) {
-      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
-      if (!worksheet[cellAddress]) continue;
-      worksheet[cellAddress].s = {
-        font: { bold: true, color: { rgb: "FFFFFF" } },
-        fill: { fgColor: { rgb: "4F81BD" } },
-      };
-    }
-
-    // Define larguras para as colunas (em pixels)
-    worksheet["!cols"] = [
-      { wpx: 100 },
-      { wpx: 100 },
-      { wpx: 120 },
-      { wpx: 80 },
-      { wpx: 80 },
-      { wpx: 80 },
-      { wpx: 120 },
-      { wpx: 80 },
-      { wpx: 80 },
-      { wpx: 150 },
-      { wpx: 90 },
-      { wpx: 160 },
-    ];
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Abastecimentos");
-    XLSX.writeFile(workbook, "registros_abastecimentos.xlsx");
-  };
-
-  // --------------------------------------------------------------------------------
-  // COLUNAS DO DATA GRID
-  // --------------------------------------------------------------------------------
-  const columns = [
-    { field: "vehicle", headerName: "Veículo", width: 130 },
-    { field: "fuelType", headerName: "Combustível", width: 120 },
-    {
-      field: "date",
-      headerName: "Data",
-      width: 160,
-    },
-    { field: "post", headerName: "Posto", width: 100 },
-    { field: "pump", headerName: "Bomba", width: 90 },
-    { field: "invoiceNumber", headerName: "Nota", width: 90 },
-    {
-      field: "unitPrice",
-      headerName: "Preço Un.",
-      width: 90,
-      valueFormatter: (params) => (params.value ? `R$ ${params.value}` : ""),
-    },
-    { field: "liters", headerName: "Litros", width: 80 },
-    { field: "mileage", headerName: "KM", width: 100 },
-    {
-      field: "observation",
-      headerName: "Observação",
-      width: 150,
-      flex: 1,
-    },
-    {
-      field: "signature",
-      headerName: "Assinatura",
-      width: 100,
-      renderCell: (params) => (params.value ? "OK" : "Falta"),
-    },
-    {
-      field: "actions",
-      headerName: "Ações",
-      width: 130,
-      renderCell: (params) => (
-        <>
-          <Tooltip title="Editar">
-            <IconButton
-              color="primary"
-              onClick={() => handleEdit(params.row.id)}
-              size="small"
-            >
-              <EditIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Excluir">
-            <IconButton
-              color="error"
-              onClick={() => handleDelete(params.row.id)}
-              size="small"
-            >
-              <DeleteIcon />
-            </IconButton>
-          </Tooltip>
-        </>
-      ),
-    },
-  ];
-
-  // --------------------------------------------------------------------------------
   // AÇÕES DE ABRIR/FECHAR DIÁLOGO
   // --------------------------------------------------------------------------------
-  const handleOpenDialog = () => {
-    setIsEditing(false);
-    setEditId(null);
-    setNewRefueling(initialRefueling());
-    setAttachments([]);
+  const handleOpenDialog = (item) => {
+    if (item) {
+      setSelectedItem(item);
+      setIsEditing(true);
+    } else {
+      setIsEditing(false);
+      setEditId(null);
+      setNewRefueling(initialRefueling);
+      setAttachments([]);
+    }
     setOpen(true);
   };
 
   const handleCloseDialog = () => {
     setOpen(false);
-  };
-
-  // --------------------------------------------------------------------------------
-  // EDIÇÃO E EXCLUSÃO
-  // --------------------------------------------------------------------------------
-  const handleEdit = (id) => {
-    const refuelToEdit = refuelings.find((r) => r.id === id);
-    if (!refuelToEdit) return;
-
-    setIsEditing(true);
-    setEditId(id);
-    setNewRefueling({
-      vehicle: refuelToEdit.vehicle,
-      fuelType: refuelToEdit.fuelType,
-      date: refuelToEdit.date,
-      post: refuelToEdit.post,
-      pump: refuelToEdit.pump,
-      invoiceNumber: refuelToEdit.invoiceNumber,
-      unitPrice: refuelToEdit.unitPrice,
-      liters: refuelToEdit.liters,
-      mileage: refuelToEdit.mileage,
-      observation: refuelToEdit.observation,
-      signature: refuelToEdit.signature, // Carrega a assinatura já existente
-    });
-    setAttachments(refuelToEdit.attachments || []);
-    setOpen(true);
-  };
-
-  const handleDelete = (id) => {
-    const confirmed = window.confirm("Deseja excluir este abastecimento?");
-    if (!confirmed) return;
-    setRefuelings((prev) => prev.filter((r) => r.id !== id));
+    setSelectedItem(null);
+    setIsEditing(false);
+    setEditId(null);
+    setNewRefueling(initialRefueling);
+    setAttachments([]);
   };
 
   // --------------------------------------------------------------------------------
   // HANDLES DO FORMULÁRIO
   // --------------------------------------------------------------------------------
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setNewRefueling((prev) => ({ ...prev, [name]: value }));
-  };
 
   // --------------------------------------------------------------------------------
   // SALVAR (NOVO OU EDIÇÃO)
@@ -354,8 +180,6 @@ export default function Refueling() {
       setRefuelings((prev) => [...prev, recordToAdd]);
     }
 
-    console.log("Arquivos anexados:", attachments);
-
     setOpen(false);
   };
 
@@ -389,36 +213,7 @@ export default function Refueling() {
     }
   };
 
-  // Verifica se é posto interno ou externo para renderizar campos específicos
-  const isInternal = newRefueling.post === "interno";
-  const isExternal = newRefueling.post === "externo";
-
-  const data = [
-    { id: 1, name: "Item 1", description: "Descrição do item 1" },
-    { id: 2, name: "Item 2", description: "Descrição do item 2" },
-    { id: 3, name: "Item 3", description: "Descrição do item 3" },
-    { id: 4, name: "Item 4", description: "Descrição do item 4" },
-    { id: 5, name: "Item 5", description: "Descrição do item 5" },
-    { id: 6, name: "Item 6", description: "Descrição do item 6" },
-    { id: 7, name: "Item 7", description: "Descrição do item 7" },
-  ];
-
-  const testeArray = [1, 2, 3, 4, 5, 6, 7, 8];
-
-  const [openDialogCardInfo, setOpenDialogCardInfo] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-
-  const handleOpenDialogCardInfo = (item) => {
-    setSelectedItem(item);
-    setOpenDialogCardInfo(true);
-  };
-
-  const handleCloseDialogCardInfo = (value) => {
-    setOpenDialogCardInfo(false);
-    setSelectedItem(null);
-  };
-
-  console.log(refuelings);
 
   return (
     <>
@@ -434,200 +229,24 @@ export default function Refueling() {
         </Button>
       </div>
 
-      <Dialog open={open} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {isEditing ? "Editar Abastecimento" : "Novo Abastecimento"}
-        </DialogTitle>
-        <DialogContent
-          dividers
-          className="grid grid-cols-2 gap-4 *:self-center"
-        >
-          {/* Veículo */}
-          <TextField
-            margin="dense"
-            name="vehicle"
-            label="Veículo"
-            placeholder="Placa ou nome do veículo"
-            InputLabelProps={{ shrink: true }}
-            value={newRefueling.vehicle}
-            onChange={handleChange}
-            className="col-span-2"
-          />
-
-          {/* Combustível e Data */}
-          <FormControl component="fieldset" className="col-span-2">
-            <FormLabel component="legend">Combustível</FormLabel>
-            <RadioGroup
-              row
-              className="gap-8"
-              name="fuelType"
-              value={newRefueling.fuelType}
-              onChange={handleChange}
-            >
-              <FormControlLabel
-                value="DIESEL"
-                control={<Radio />}
-                label="DIESEL"
-                size=""
-              />
-              <FormControlLabel value="ARLA" control={<Radio />} label="ARLA" />
-            </RadioGroup>
-          </FormControl>
-
-          <TextField
-            margin="dense"
-            name="date"
-            label="Data de Abastecimento"
-            type="datetime-local"
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-            value={newRefueling.date}
-            onChange={handleChange}
-          />
-
-          {/* Posto (interno/externo) */}
-          <FormControl>
-            <Select
-              name="post"
-              margin="dense"
-              value={newRefueling.post}
-              onChange={handleChange}
-              displayEmpty
-            >
-              <MenuItem value="interno">Interno</MenuItem>
-              <MenuItem value="externo">Externo</MenuItem>
-            </Select>
-          </FormControl>
-
-          {/* Se for interno: exibe campo bomba */}
-          {isInternal && (
-            <TextField
-              margin="dense"
-              label="Bomba"
-              name="pump"
-              value={newRefueling.pump}
-              onChange={handleChange}
-            />
-          )}
-
-          {/* Se for externo: exibe campos de nota e preço */}
-          {isExternal && (
-            <>
-              <TextField
-                margin="dense"
-                name="invoiceNumber"
-                label="Número da Nota"
-                value={newRefueling.invoiceNumber}
-                onChange={handleChange}
-              />
-              <TextField
-                margin="dense"
-                name="unitPrice"
-                label="Preço Unitário (R$)"
-                type="number"
-                value={newRefueling.unitPrice}
-                onChange={handleChange}
-              />
-            </>
-          )}
-
-          {/* Litros abastecidos e KM */}
-          <TextField
-            margin="dense"
-            name="liters"
-            label="Litros Abastecidos"
-            type="number"
-            value={newRefueling.liters}
-            onChange={handleChange}
-          />
-          <TextField
-            margin="dense"
-            name="mileage"
-            label="KM Atual"
-            type="number"
-            value={newRefueling.mileage}
-            onChange={handleChange}
-          />
-
-          {/* Observação */}
-          <TextField
-            className="col-span-2"
-            margin="dense"
-            name="observation"
-            label="Observação"
-            multiline
-            minRows={2}
-            fullWidth
-            value={newRefueling.observation}
-            onChange={handleChange}
-          />
-
-          {/* Seção de Anexos */}
-          <Box>
-            <Typography variant="subtitle1">
-              Anexos (obrigatório pelo menos um)
-            </Typography>
-            <input
-              accept="image/*,application/pdf"
-              style={{ display: "none" }}
-              id="attachment-upload"
-              multiple
-              type="file"
-              onChange={handleFileChange}
-            />
-            <label htmlFor="attachment-upload">
-              <Button variant="contained" component="span">
-                Adicionar Arquivos
-              </Button>
-            </label>
-            {attachments.length > 0 && (
-              <Box>
-                {attachments.map((file, index) => (
-                  <Typography key={index} variant="body2">
-                    {file.name || file}
-                  </Typography>
-                ))}
-              </Box>
-            )}
-          </Box>
-        </DialogContent>
-
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancelar</Button>
-          <Button onClick={handleSave} variant="contained">
-            Salvar
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-4">
         {refuelings.map((refueling) => (
-          <Card key={refueling.id} className="p-4">
-            <h3>{refueling.vehicle}</h3>
-            <CardContent className="!p-0">
-              <p>{refueling.mileage}</p>
-              <p>{dayjs(refueling.date).format("DD/MM/YYYY HH:mm")}</p>
-              <div className=" w-full flex justify-end">
-                <Button
-                  onClick={() => handleOpenDialogCardInfo(refueling)}
-                  variant="contained"
-                >
-                  Mais informações
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <RefuelingCard
+            key={refueling.id}
+            refueling={refueling}
+            handleOpenDialog={() => handleOpenDialog(refueling)}
+          />
         ))}
       </div>
 
-      <Dialog open={openDialogCardInfo} onClose={handleCloseDialogCardInfo}>
-        <DialogTitle>
-          Abastecimento - {dayjs(selectedItem?.date).format("DD/MM/YYYY HH:mm")}
-        </DialogTitle>
-        <DialogContent>
-          <p>{selectedItem?.vehicle}</p>
-        </DialogContent>
-      </Dialog>
+      <RefuelingDialog
+        handleSave={handleSave}
+        onClose={handleCloseDialog}
+        open={open}
+        selectedItem={selectedItem}
+        isEditing={isEditing}
+        handleChange={handleChange}
+      />
 
       {/* MODAL DE ASSINATURA (chamado se não tiver assinatura no momento do Save) */}
       <Dialog
@@ -662,22 +281,4 @@ export default function Refueling() {
       </Dialog>
     </>
   );
-}
-
-// Função que devolve um objeto “limpo” para criar abastecimento
-function initialRefueling() {
-  return {
-    vehicle: "",
-    fuelType: "DIESEL",
-    date: "",
-    post: "interno",
-    pump: "",
-    invoiceNumber: "",
-    unitPrice: 0,
-    liters: "",
-    mileage: "",
-    observation: "",
-    signature: "", // Campo para armazenar a assinatura
-    attachments: [], // Campo para armazenar anexos
-  };
 }
