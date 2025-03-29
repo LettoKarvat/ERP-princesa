@@ -22,7 +22,7 @@ body {
 }
 
 .max-w-sidebar-based {
-  max-width: calc(100svw - var(--sidebar-width));
+  max-width: calc(90svw - var(--sidebar-width));
 }
 
 /* Opcional, se quiser esconder rolagem horizontal */

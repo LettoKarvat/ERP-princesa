@@ -20,8 +20,8 @@ import {
   Tooltip,
   Card,
   CardContent,
+  CardHeader,
 } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -30,6 +30,7 @@ import {
 import * as XLSX from "xlsx";
 import SignatureCanvas from "react-signature-canvas";
 import { useTheme } from "@mui/material/styles";
+import dayjs from "dayjs";
 
 export default function Refueling() {
   // Lista de abastecimentos salvos
@@ -392,6 +393,33 @@ export default function Refueling() {
   const isInternal = newRefueling.post === "interno";
   const isExternal = newRefueling.post === "externo";
 
+  const data = [
+    { id: 1, name: "Item 1", description: "Descrição do item 1" },
+    { id: 2, name: "Item 2", description: "Descrição do item 2" },
+    { id: 3, name: "Item 3", description: "Descrição do item 3" },
+    { id: 4, name: "Item 4", description: "Descrição do item 4" },
+    { id: 5, name: "Item 5", description: "Descrição do item 5" },
+    { id: 6, name: "Item 6", description: "Descrição do item 6" },
+    { id: 7, name: "Item 7", description: "Descrição do item 7" },
+  ];
+
+  const testeArray = [1, 2, 3, 4, 5, 6, 7, 8];
+
+  const [openDialogCardInfo, setOpenDialogCardInfo] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+
+  const handleOpenDialogCardInfo = (item) => {
+    setSelectedItem(item);
+    setOpenDialogCardInfo(true);
+  };
+
+  const handleCloseDialogCardInfo = (value) => {
+    setOpenDialogCardInfo(false);
+    setSelectedItem(null);
+  };
+
+  console.log(refuelings);
+
   return (
     <>
       <Typography variant="h4">Abastecimentos</Typography>
@@ -410,12 +438,17 @@ export default function Refueling() {
         <DialogTitle>
           {isEditing ? "Editar Abastecimento" : "Novo Abastecimento"}
         </DialogTitle>
-        <DialogContent dividers className="grid grid-cols-2 gap-4">
+        <DialogContent
+          dividers
+          className="grid grid-cols-2 gap-4 *:self-center"
+        >
           {/* Veículo */}
           <TextField
             margin="dense"
             name="vehicle"
-            label="Veículo (Placa ou Nome)"
+            label="Veículo"
+            placeholder="Placa ou nome do veículo"
+            InputLabelProps={{ shrink: true }}
             value={newRefueling.vehicle}
             onChange={handleChange}
             className="col-span-2"
@@ -425,7 +458,8 @@ export default function Refueling() {
           <FormControl component="fieldset" className="col-span-2">
             <FormLabel component="legend">Combustível</FormLabel>
             <RadioGroup
-              className="flex"
+              row
+              className="gap-8"
               name="fuelType"
               value={newRefueling.fuelType}
               onChange={handleChange}
@@ -434,6 +468,7 @@ export default function Refueling() {
                 value="DIESEL"
                 control={<Radio />}
                 label="DIESEL"
+                size=""
               />
               <FormControlLabel value="ARLA" control={<Radio />} label="ARLA" />
             </RadioGroup>
@@ -451,9 +486,10 @@ export default function Refueling() {
           />
 
           {/* Posto (interno/externo) */}
-          <FormControl fullWidth sx={{ mb: 2 }}>
+          <FormControl>
             <Select
               name="post"
+              margin="dense"
               value={newRefueling.post}
               onChange={handleChange}
               displayEmpty
@@ -467,12 +503,10 @@ export default function Refueling() {
           {isInternal && (
             <TextField
               margin="dense"
-              name="pump"
               label="Bomba"
-              fullWidth
+              name="pump"
               value={newRefueling.pump}
               onChange={handleChange}
-              sx={{ mb: 2 }}
             />
           )}
 
@@ -483,48 +517,41 @@ export default function Refueling() {
                 margin="dense"
                 name="invoiceNumber"
                 label="Número da Nota"
-                fullWidth
                 value={newRefueling.invoiceNumber}
                 onChange={handleChange}
-                sx={{ mb: 2 }}
               />
               <TextField
                 margin="dense"
                 name="unitPrice"
                 label="Preço Unitário (R$)"
                 type="number"
-                fullWidth
                 value={newRefueling.unitPrice}
                 onChange={handleChange}
-                sx={{ mb: 2 }}
               />
             </>
           )}
 
           {/* Litros abastecidos e KM */}
-          <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
-            <TextField
-              margin="dense"
-              name="liters"
-              label="Litros Abastecidos"
-              type="number"
-              fullWidth
-              value={newRefueling.liters}
-              onChange={handleChange}
-            />
-            <TextField
-              margin="dense"
-              name="mileage"
-              label="KM Atual"
-              type="number"
-              fullWidth
-              value={newRefueling.mileage}
-              onChange={handleChange}
-            />
-          </Box>
+          <TextField
+            margin="dense"
+            name="liters"
+            label="Litros Abastecidos"
+            type="number"
+            value={newRefueling.liters}
+            onChange={handleChange}
+          />
+          <TextField
+            margin="dense"
+            name="mileage"
+            label="KM Atual"
+            type="number"
+            value={newRefueling.mileage}
+            onChange={handleChange}
+          />
 
           {/* Observação */}
           <TextField
+            className="col-span-2"
             margin="dense"
             name="observation"
             label="Observação"
@@ -536,7 +563,7 @@ export default function Refueling() {
           />
 
           {/* Seção de Anexos */}
-          <Box sx={{ mt: 2 }}>
+          <Box>
             <Typography variant="subtitle1">
               Anexos (obrigatório pelo menos um)
             </Typography>
@@ -554,7 +581,7 @@ export default function Refueling() {
               </Button>
             </label>
             {attachments.length > 0 && (
-              <Box sx={{ mt: 1 }}>
+              <Box>
                 {attachments.map((file, index) => (
                   <Typography key={index} variant="body2">
                     {file.name || file}
@@ -571,6 +598,35 @@ export default function Refueling() {
             Salvar
           </Button>
         </DialogActions>
+      </Dialog>
+
+      <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {refuelings.map((refueling) => (
+          <Card key={refueling.id} className="p-4">
+            <h3>{refueling.vehicle}</h3>
+            <CardContent className="!p-0">
+              <p>{refueling.mileage}</p>
+              <p>{dayjs(refueling.date).format("DD/MM/YYYY HH:mm")}</p>
+              <div className=" w-full flex justify-end">
+                <Button
+                  onClick={() => handleOpenDialogCardInfo(refueling)}
+                  variant="contained"
+                >
+                  Mais informações
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Dialog open={openDialogCardInfo} onClose={handleCloseDialogCardInfo}>
+        <DialogTitle>
+          Abastecimento - {dayjs(selectedItem?.date).format("DD/MM/YYYY HH:mm")}
+        </DialogTitle>
+        <DialogContent>
+          <p>{selectedItem?.vehicle}</p>
+        </DialogContent>
       </Dialog>
 
       {/* MODAL DE ASSINATURA (chamado se não tiver assinatura no momento do Save) */}
@@ -605,7 +661,6 @@ export default function Refueling() {
         </DialogActions>
       </Dialog>
     </>
-    //   </Box>
   );
 }
 

@@ -19,6 +19,7 @@
     "@mui/x-data-grid": "^6.19.4",
     "@tailwindcss/vite": "^4.0.15",
     "axios": "^1.6.7",
+    "dayjs": "^1.11.13",
     "jspdf": "^3.0.0",
     "jspdf-autotable": "^5.0.2",
     "lightningcss": "^1.29.3",
