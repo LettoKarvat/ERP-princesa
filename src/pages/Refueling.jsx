@@ -107,29 +107,7 @@ export default function Refueling() {
     setAttachments([]);
   };
 
-  // --------------------------------------------------------------------------------
-  // HANDLES DO FORMULÁRIO
-  // --------------------------------------------------------------------------------
-
-  // --------------------------------------------------------------------------------
-  // SALVAR (NOVO OU EDIÇÃO)
-  // --------------------------------------------------------------------------------
   const handleSave = () => {
-    // Validações básicas
-    if (!newRefueling.vehicle.trim()) {
-      alert("Informe o veículo!");
-      return;
-    }
-    if (!newRefueling.date) {
-      alert("Informe a data!");
-      return;
-    }
-    if (!newRefueling.liters) {
-      alert("Informe a quantidade de litros!");
-      return;
-    }
-
-    // Validação: precisa ter ANEXOS
     if (!attachments || attachments.length === 0) {
       alert("É obrigatório adicionar pelo menos um anexo!");
       return;
@@ -137,48 +115,16 @@ export default function Refueling() {
 
     // Validação: precisa ter ASSINATURA
     if (!newRefueling.signature) {
-      // Se não houver assinatura, abre modal para assinar
       setOpenSignatureModal(true);
       return;
     }
 
-    // Se estiver tudo certo, salva
     doFinalSave();
   };
 
   // Função que realmente salva (após validação e assinatura)
   const doFinalSave = () => {
-    if (isEditing && editId != null) {
-      // Modo edição
-      setRefuelings((prev) =>
-        prev.map((r) =>
-          r.id === editId
-            ? {
-                ...r,
-                ...newRefueling,
-                liters: Number(newRefueling.liters),
-                mileage: Number(newRefueling.mileage),
-                unitPrice: Number(newRefueling.unitPrice),
-                attachments: attachments, // Salva anexos
-              }
-            : r
-        )
-      );
-    } else {
-      // Novo abastecimento
-      const newId = refuelings.length
-        ? refuelings[refuelings.length - 1].id + 1
-        : 1;
-      const recordToAdd = {
-        id: newId,
-        ...newRefueling,
-        liters: Number(newRefueling.liters),
-        mileage: Number(newRefueling.mileage),
-        unitPrice: Number(newRefueling.unitPrice),
-        attachments: attachments,
-      };
-      setRefuelings((prev) => [...prev, recordToAdd]);
-    }
+    // Save the refueling
 
     setOpen(false);
   };
@@ -243,6 +189,7 @@ export default function Refueling() {
         onClose={handleCloseDialog}
         open={open}
         selectedItem={selectedItem}
+        onSubmit={handleSave}
       />
 
       {/* MODAL DE ASSINATURA (chamado se não tiver assinatura no momento do Save) */}

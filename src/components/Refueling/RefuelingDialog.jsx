@@ -18,16 +18,30 @@ import {
   InputLabel,
   Input,
   Autocomplete,
+  Paper,
+  IconButton,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import { Controller, useForm } from "react-hook-form";
 import { InputError } from "../InputError";
 import { getAllVeiculos } from "../../services/vehicleService";
+import {
+  AttachFile,
+  Delete as DeleteIcon,
+  Image as ImageIcon,
+  PictureAsPdf as PictureAsPdfIcon,
+  InsertDriveFile as InsertDriveFileIcon,
+} from "@mui/icons-material";
 
-export function RefuelingDialog({ open, onClose, selectedItem }) {
+export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
-
-  // console.log(selectedItem);
+  const [attachments, setAttachments] = useState(
+    selectedItem?.attachments ?? []
+  );
 
   const {
     register,
@@ -39,8 +53,11 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
     formState: { errors },
   } = useForm();
 
-  const onSubmit = (data) => {
-    console.log("FILHA DA PUTA", data);
+  const onSubmitReal = (data) => {
+    // Do something with the data
+    console.table(data);
+
+    onSubmit();
   };
 
   const postValue = watch("post");
@@ -81,7 +98,7 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
     onClose();
   };
 
-  const handleInputChange = (e, field) => {
+  const handleNumberField = (e, field) => {
     let value = e.target.value;
 
     // Permitir apenas números e ponto (para decimais)
@@ -96,6 +113,14 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
     setValue(field, value, { shouldValidate: true });
   };
 
+  const handleFileChange = (e) => {
+    if (!e.target.files) return;
+
+    setAttachments((prev) => [...prev, ...Array.from(e.target.files)]);
+
+    setValue("attachments", attachments);
+  };
+
   return (
     <Dialog open={open} onClose={handleClose} fullWidth>
       <DialogTitle>
@@ -104,7 +129,7 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
 
       <DialogContent className="!pt-2 pb-6">
         <form
-          onSubmit={handleSubmit(onSubmit)}
+          onSubmit={handleSubmit(onSubmitReal)}
           className="w-full flex flex-col gap-6 md:grid grid-cols-2"
         >
           <Autocomplete
@@ -248,7 +273,7 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
                     required: "Insira o preço unitário",
                   })}
                   aria-describedby="unitPrice"
-                  onChange={(e) => handleInputChange(e, "unitPrice")}
+                  onChange={(e) => handleNumberField(e, "unitPrice")}
                 />
                 {errors.unitPrice && (
                   <InputError>{errors.unitPrice.message}</InputError>
@@ -264,7 +289,7 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
                 required: "Insira quantos litros foram abastecidos",
               })}
               aria-describedby="liters"
-              onChange={(e) => handleInputChange(e, "liters")}
+              onChange={(e) => handleNumberField(e, "liters")}
             />
             {errors.liters && <InputError>{errors.liters.message}</InputError>}
           </FormControl>
@@ -295,17 +320,90 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
             />
           </FormControl>
 
+          <FormControl className="col-span-2">
+            <label htmlFor="attachments">
+              <Button variant="contained" component="span">
+                Adicionar Arquivos
+              </Button>
+            </label>
+            <Input
+              accept="image/*,application/pdf"
+              style={{ display: "none" }}
+              id="attachments"
+              multiple
+              type="file"
+              {...register(
+                "attachments"
+                //   {
+                //   required: "Adicione pelo menos 1 anexo!",
+                // }
+              )}
+              onChange={handleFileChange}
+            />
+            <p className="mt-2">Necessário pelo menos 1</p>
+            {/* {errors.attachments && (
+              <InputError>{errors.attachments.message}</InputError>
+            )} */}
+          </FormControl>
+
+          {attachments.length > 0 && (
+            <div className="col-span-2">
+              <Typography variant="subtitle2" gutterBottom>
+                Arquivos anexados:
+              </Typography>
+              <List dense className="w-full md:grid grid-cols-2 gap-4">
+                {attachments.map((file, index) => (
+                  <ListItem
+                    key={index}
+                    secondaryAction={
+                      <IconButton
+                        edge="end"
+                        aria-label="remover"
+                        onClick={() => {
+                          const newAttachments = [...attachments];
+                          newAttachments.splice(index, 1);
+                          setAttachments(newAttachments);
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    }
+                    sx={{
+                      backgroundColor: "#f5f5f5",
+                      borderRadius: "4px",
+                      marginBottom: "8px",
+                      padding: "8px 16px",
+                    }}
+                  >
+                    <ListItemIcon>
+                      {file.type?.includes("image") ? (
+                        <ImageIcon />
+                      ) : file.type?.includes("pdf") ? (
+                        <PictureAsPdfIcon />
+                      ) : (
+                        <InsertDriveFileIcon />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={file.name || file}
+                      secondary={`${(file.size / 1024).toFixed(2)} KB`}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </div>
+          )}
+
           <div className="flex justify-end col-span-2">
-            <Button variant="contained" type="submit">
-              Salvar
-            </Button>
+            <DialogActions>
+              <Button onClick={onClose}>Cancelar</Button>
+              <Button variant="contained" type="submit">
+                Salvar
+              </Button>
+            </DialogActions>
           </div>
         </form>
       </DialogContent>
-
-      {/* <DialogActions>
-        <Button onClick={onClose}>Cancelar</Button>
-      </DialogActions> */}
     </Dialog>
   );
 }
