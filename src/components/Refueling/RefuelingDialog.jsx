@@ -248,6 +248,7 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
                     required: "Insira o preço unitário",
                   })}
                   aria-describedby="unitPrice"
+                  onChange={(e) => handleInputChange(e, "unitPrice")}
                 />
                 {errors.unitPrice && (
                   <InputError>{errors.unitPrice.message}</InputError>
@@ -263,6 +264,7 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
                 required: "Insira quantos litros foram abastecidos",
               })}
               aria-describedby="liters"
+              onChange={(e) => handleInputChange(e, "liters")}
             />
             {errors.liters && <InputError>{errors.liters.message}</InputError>}
           </FormControl>
@@ -270,6 +272,7 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
           <FormControl>
             <InputLabel htmlFor="mileage">Quilometragem atual</InputLabel>
             <Input
+              type="number"
               {...register("mileage", {
                 required: "Insira a quilometragem atual",
                 min: {
