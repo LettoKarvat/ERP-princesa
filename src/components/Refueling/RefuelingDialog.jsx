@@ -27,7 +27,7 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
 
-  console.log(selectedItem);
+  // console.log(selectedItem);
 
   const {
     register,
@@ -37,26 +37,14 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
     watch,
     setValue,
     formState: { errors },
-  } = useForm({
-    defaultValues: {
-      mileage: selectedItem?.mileage,
-    },
-    // shouldUnregister: false,
-  });
+  } = useForm();
 
   const onSubmit = (data) => {
-    console.log(data);
+    console.log("FILHA DA PUTA", data);
   };
 
   const postValue = watch("post");
   const isInternal = postValue === "interno";
-
-  // useEffect(() => {
-  //   if (selectedItem) {
-  //     reset(selectedItem);
-  //   }
-  //   setSelectedVehicle(null);
-  // }, [selectedItem, reset]);
 
   useEffect(() => {
     const getVehicles = async () => {
@@ -73,7 +61,17 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
   }, []);
 
   useEffect(() => {
-    setTimeout(() => setValue("mileage", 123));
+    setTimeout(() => {
+      setValue("vehicle", selectedItem?.vehicle);
+      setValue("fuelType", selectedItem?.fuelType);
+      setValue("date", selectedItem?.date);
+      setValue("invoiceNumber", selectedItem?.invoiceNumber);
+      setValue("unitPrice", selectedItem?.unitPrice);
+      setValue("liters", selectedItem?.liters);
+      setValue("mileage", selectedItem?.mileage);
+      setValue("observation", selectedItem?.observation);
+      setValue("post", selectedItem?.post);
+    });
   }, [setValue, open]);
 
   const handleClose = () => {
@@ -98,16 +96,6 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
     setValue(field, value, { shouldValidate: true });
   };
 
-  const changeValue = () => {
-    setTimeout(() => setValue("mileage", 123));
-
-    // setValue("mileage", 100, {
-    //   shouldValidate: true,
-    //   shouldDirty: true,
-    //   shouldTouch: true,
-    // });
-  };
-
   return (
     <Dialog open={open} onClose={handleClose} fullWidth>
       <DialogTitle>
@@ -119,7 +107,6 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
           onSubmit={handleSubmit(onSubmit)}
           className="w-full flex flex-col gap-6 md:grid grid-cols-2"
         >
-          <Button onClick={changeValue}>mudar valor</Button>
           <Autocomplete
             className="col-span-2"
             freeSolo
@@ -132,7 +119,7 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
               } else {
                 setSelectedVehicle(null);
               }
-              setMileageState(newValue?.quilometragem ?? "");
+              setValue("mileage", newValue?.quilometragem ?? "");
             }}
             onInputChange={(event, newInputValue) => {
               setSelectedVehicle(null);
@@ -163,19 +150,6 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
               </>
             )}
           />
-
-          {/* <FormControl className="col-span-2">
-            <InputLabel htmlFor="vehicle">Veículo (Nome ou placa)</InputLabel>
-            <Input
-              {...register("vehicle", {
-                required: "Insira o nome ou a placa do veículo",
-              })}
-              aria-describedby="vehicle"
-            />
-            {errors.vehicle && (
-              <InputError>{errors.vehicle.message}</InputError>
-            )}
-          </FormControl> */}
 
           <FormControl className="col-span-2">
             <FormLabel component="legend">Combustível</FormLabel>
@@ -210,7 +184,7 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
               Data do abastecimento
             </FormLabel>
             <Input
-              type="date"
+              type="datetime-local"
               {...register("date", {
                 required: "Insira a data do abastecimento",
               })}
@@ -293,32 +267,14 @@ export function RefuelingDialog({ open, onClose, selectedItem }) {
             {errors.liters && <InputError>{errors.liters.message}</InputError>}
           </FormControl>
 
-          {/* <Controller
-            as={
-              <TextField
-                error={!!errors.mileage}
-                helperText={errors.mileage && errors.mileage.message}
-              />
-            }
-            control={control}
-            name="mileage"
-            rule={{
-              required: "Insira a quilometragem atual",
-              min: {
-                value: selectedVehicle?.quilometragem,
-                message: "A quilometragem não pode ser menor que a anterior",
-              },
-            }}
-          /> */}
-
           <FormControl>
             <InputLabel htmlFor="mileage">Quilometragem atual</InputLabel>
             <Input
               {...register("mileage", {
                 required: "Insira a quilometragem atual",
                 min: {
-                  value: selectedVehicle?.quilometragem,
-                  message: "A quilometragem não pode ser menor que a anterior",
+                  value: selectedItem?.mileage,
+                  message: `A quilometragem não pode ser menor que a atual`,
                 },
               })}
               aria-describedby="mileage"
