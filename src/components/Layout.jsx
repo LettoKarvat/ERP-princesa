@@ -33,7 +33,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 
-const DRAWER_WIDTH = 240;
+const DRAWER_WIDTH = 256;
 
 const listItemButtonStyle = {
   color: '#fff',

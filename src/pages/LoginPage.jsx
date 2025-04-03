@@ -38,7 +38,7 @@ function LoginPage() {
   const roleToRoute = {
     admin: '/dashboard',
     abastecimento: '/refueling',
-    manutencao: '/parts-replacement',
+    manutencao: '/parts-replacement/maintenance',
     motorista: '/driver-checklists', // <-- Agora aponta para /driver-checklists
     portaria: '/checklist',
   };
