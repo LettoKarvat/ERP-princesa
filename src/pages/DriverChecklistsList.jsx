@@ -33,9 +33,26 @@ const checklistItems = [
     { code: 1, description: "CRLV do veículo está ok?" },
     { code: 2, description: "CNH está ok?" },
     { code: 3, description: "Está uniformizado?" },
-    // ...
+    { code: 4, description: "Certificado de Cronotacógrafo está ok?" },
+    { code: 5, description: "Condições Gerais: Lataria, Cabine, Baú." },
+    { code: 6, description: "AET está ok?" },
+    { code: 7, description: "Exame Toxicológico está em dia?" },
+    { code: 8, description: "Condições gerais internas: bancada, tapete, forros, bancos." },
+    { code: 9, description: "Condições de Rodagem: Pneus, Rodas, Pressão de Ar." },
+    { code: 10, description: "Sistema de Freios: nível de fluido, altura do pedal." },
+    { code: 11, description: "Sistema de Arrefecimento: nível de água e temperatura." },
+    { code: 12, description: "Sistema de Alimentação: Bomba injetora, combustível." },
+    { code: 13, description: "Sistema Elétrico: Painel, iluminação, bateria." },
+    { code: 14, description: "Sistema Trator: (Diferencial) Eixo Cardan." },
+    { code: 15, description: "Sistema Câmbio: Engate marchas, folgas, ruídos." },
+    { code: 16, description: "Parte do motor: vazamentos, ruídos, fumaça." },
+    { code: 17, description: "Embreagem: Altura do Pedal, Estressamento." },
+    { code: 18, description: "Tacógrafo: marcação, hora, agulha, está conforme." },
+    { code: 19, description: "Carrinho de entrega está ok?" },
+    { code: 20, description: "Itens de segurança: macaco, triângulo, chave de roda." },
     { code: 21, description: "Possui EPI necessário?" },
 ];
+
 
 function getDescriptionByCode(code) {
     const found = checklistItems.find((item) => item.code === code);
