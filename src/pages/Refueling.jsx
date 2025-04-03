@@ -19,7 +19,7 @@ export default function Refueling() {
   const [refuelings, setRefuelings] = useState([
     {
       id: 1,
-      vehicle: "HHK1G29",
+      vehicle: "HHK1G29 - M. BENZ M. BENZ 710",
       fuelType: "DIESEL",
       date: "2022-11-03T00:00",
       post: "interno",
@@ -34,7 +34,7 @@ export default function Refueling() {
     },
     {
       id: 2,
-      vehicle: "ABC1234",
+      vehicle: "OSY1H11 - M. BENZ M. BENZ ACELLO 815",
       fuelType: "ARLA",
       date: "2025-01-10T10:00",
       post: "externo",
@@ -175,7 +175,7 @@ export default function Refueling() {
         </Button>
       </div>
 
-      <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
         {refuelings.map((refueling) => (
           <RefuelingCard
             key={refueling.id}
