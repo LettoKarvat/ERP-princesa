@@ -7,6 +7,8 @@ import {
   DialogContent,
   DialogActions,
   useMediaQuery,
+  Input,
+  TextField,
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import SignatureCanvas from "react-signature-canvas";
@@ -160,6 +162,29 @@ export default function Refueling() {
   };
 
   const [selectedItem, setSelectedItem] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [fuelFilter, setFuelFilter] = useState("");
+  const [postFilter, setPostFilter] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  const filteredData = refuelings.filter((item) => {
+    const searchMatch =
+      item.vehicle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.observation.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const fuelMatch = fuelFilter === "" || item.fuelType === fuelFilter;
+
+    const postMatch = postFilter === "" || item.post === postFilter;
+
+    const itemDate = item.date.split("T")[0];
+
+    const dateMatch =
+      (!startDate || itemDate >= startDate) &&
+      (!endDate || itemDate <= endDate);
+
+    return searchMatch && fuelMatch && postMatch && dateMatch;
+  });
 
   return (
     <>
@@ -175,8 +200,58 @@ export default function Refueling() {
         </Button>
       </div>
 
+      <div className="gap-4 my-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 items-end">
+        <TextField
+          variant="outlined"
+          placeholder="Pesquise um veículo:"
+          className="lg:col-span-2 p-4"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+
+        <select
+          value={fuelFilter}
+          onChange={(e) => setFuelFilter(e.target.value)}
+          className="border p-4 h-fit rounded border-gray-300"
+        >
+          <option value="">Todos os combustíveis</option>
+          <option value="DIESEL">DIESEL</option>
+          <option value="ARLA">ARLA</option>
+        </select>
+
+        <select
+          value={postFilter}
+          onChange={(e) => setPostFilter(e.target.value)}
+          className="border p-4 h-fit rounded border-gray-300"
+        >
+          <option value="">Todos os postos</option>
+          <option value="interno">Interno</option>
+          <option value="externo">Externo</option>
+        </select>
+
+        <div className="">
+          <label className="block text-sm">Data inicial:</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="border p-3 h-fit w-full rounded border-gray-300"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm">Data final:</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="border p-3 h-fit w-full rounded border-gray-300"
+          />
+        </div>
+      </div>
+
       <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-        {refuelings.map((refueling) => (
+        {filteredData.map((refueling) => (
           <RefuelingCard
             key={refueling.id}
             refueling={refueling}
