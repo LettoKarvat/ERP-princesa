@@ -1,35 +1,36 @@
 // src/routes/AppRoutes.jsx
-import { Routes, Route, Navigate } from 'react-router-dom';
-import LoginPage from '../pages/LoginPage';
-import Dashboard from '../pages/Dashboard';
-import VehicleList from '../pages/VehicleList';
-import ConsumptionControl from '../pages/ConsumptionControl';
-import TireManagement from '../pages/TireManagement';
-import Refueling from '../pages/Refueling';
-import Layout from '../components/Layout';
-import UserManagement from '../pages/UserManagement';
-import DriverChecklist from '../pages/DriverChecklist';
-import DriverChecklistsList from '../pages/DriverChecklistsList';
+import { Routes, Route, Navigate } from "react-router-dom";
+import LoginPage from "../pages/LoginPage";
+import Dashboard from "../pages/Dashboard";
+import VehicleList from "../pages/VehicleList";
+import ConsumptionControl from "../pages/ConsumptionControl";
+import TireManagement from "../pages/TireManagement";
+import Refueling from "../pages/Refueling";
+import Layout from "../components/Layout";
+import UserManagement from "../pages/UserManagement";
+import DriverChecklist from "../pages/DriverChecklist";
+import DriverChecklistsList from "../pages/DriverChecklistsList";
 // Novas páginas para Checklist (Portaria)
-import ChegadaPage from '../pages/ChegadaPage';
-import SaidaPage from '../pages/SaidaPage';
-import PartsReplacementReport from '../pages/PartsReplacementReport';
-import PartsReplacementMaintenance from '../pages/PartsReplacementMaintenance';
+import ChegadaPage from "../pages/ChegadaPage";
+import SaidaPage from "../pages/SaidaPage";
+import PartsReplacementReport from "../pages/PartsReplacementReport";
+import PartsReplacementMaintenance from "../pages/PartsReplacementMaintenance";
+import RefuelingsReport from "../pages/RefuelingsReport";
 
 const PrivateRoute = ({ children }) => {
-  const token = localStorage.getItem('sessionToken');
+  const token = localStorage.getItem("sessionToken");
   return token ? children : <Navigate to="/login" />;
 };
 
 const AdminRoute = ({ children }) => {
-  const token = localStorage.getItem('sessionToken');
-  const role = localStorage.getItem('role');
+  const token = localStorage.getItem("sessionToken");
+  const role = localStorage.getItem("role");
 
   if (!token) {
     return <Navigate to="/login" />;
   }
 
-  if (role !== 'admin') {
+  if (role !== "admin") {
     return <Navigate to="/" />;
   }
   return children;
@@ -37,16 +38,16 @@ const AdminRoute = ({ children }) => {
 
 // Componente auxiliar para redirecionar conforme a role
 function RoleBasedRedirect() {
-  const role = localStorage.getItem('role');
+  const role = localStorage.getItem("role");
 
   switch (role) {
-    case 'admin':
+    case "admin":
       return <Navigate to="/dashboard" replace />;
-    case 'manutencao':
+    case "manutencao":
       return <Navigate to="/vehicles" replace />;
-    case 'portaria':
+    case "portaria":
       return <Navigate to="/portaria/chegada" replace />;
-    case 'abastecimento':
+    case "abastecimento":
       return <Navigate to="/refueling" replace />;
     // etc. Ajuste conforme suas necessidades
 
@@ -88,9 +89,16 @@ function AppRoutes() {
         <Route path="vehicles" element={<VehicleList />} />
         <Route path="consumption" element={<ConsumptionControl />} />
         <Route path="tire-replacement" element={<TireManagement />} />
-        <Route path="parts-replacement/report" element={<PartsReplacementReport />} />
-        <Route path="parts-replacement/maintenance" element={<PartsReplacementMaintenance />} />
+        <Route
+          path="parts-replacement/report"
+          element={<PartsReplacementReport />}
+        />
+        <Route
+          path="parts-replacement/maintenance"
+          element={<PartsReplacementMaintenance />}
+        />
         <Route path="refueling" element={<Refueling />} />
+        <Route path="refueling/report" element={<RefuelingsReport />} />
 
         {/* Rota protegida para gerenciamento de usuários - somente admin */}
         <Route
