@@ -40,6 +40,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
     selectedItem?.attachments ?? []
   );
   const [userRole, setUserRole] = useState("");
+  const [kmLabel, setKmLabel] = useState("Quilometragem atual");
 
   useEffect(() => {
     const storedRole = localStorage.getItem("role");
@@ -50,9 +51,6 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
   const isCreating = selectedItem?.id === undefined;
 
   const isDisabled = !isAdmin && !isCreating;
-
-  // console.log("ADMIN: ", isAdmin);
-  // console.log("CRIANDO: ", isCreating);
 
   const {
     register,
@@ -74,12 +72,17 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
   const postValue = watch("post");
   const isInternal = postValue === "interno";
 
+  const kmValue = watch("mileage");
+
+  useEffect(() => {
+    !kmValue ? setKmLabel("Quilometragem atual") : setKmLabel("");
+  }, [kmValue]);
+
   useEffect(() => {
     const getVehicles = async () => {
       try {
         const vehiclesData = await getAllVeiculos();
         setVehicles(vehiclesData);
-        console.log(vehiclesData);
       } catch (error) {
         console.error("Erro ao buscar veículos:", error);
       }
@@ -155,7 +158,9 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               } else {
                 setSelectedVehicle(null);
               }
-              setValue("mileage", newValue?.quilometragem ?? "");
+
+              setKmLabel("");
+              setValue("mileage", newValue?.quilometragem);
             }}
             onInputChange={(event, newInputValue) => {
               setSelectedVehicle(null);
@@ -314,7 +319,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
           </FormControl>
 
           <FormControl>
-            <InputLabel htmlFor="mileage">Quilometragem atual</InputLabel>
+            <InputLabel htmlFor="mileage">{kmLabel}</InputLabel>
             <Input
               type="number"
               disabled={isDisabled}
