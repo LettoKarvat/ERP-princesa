@@ -305,7 +305,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             </>
           )}
 
-          <FormControl>
+          <FormControl className="self-end">
             <InputLabel htmlFor="liters">Litros abastecidos</InputLabel>
             <Input
               disabled={isDisabled}
@@ -318,24 +318,27 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             {errors.liters && <InputError>{errors.liters.message}</InputError>}
           </FormControl>
 
-          <FormControl>
-            <InputLabel htmlFor="mileage">{kmLabel}</InputLabel>
-            <Input
-              type="number"
-              disabled={isDisabled}
-              {...register("mileage", {
-                required: "Insira a quilometragem atual",
-                min: {
-                  value: selectedItem?.mileage,
-                  message: `A quilometragem não pode ser menor que a atual`,
-                },
-              })}
-              aria-describedby="mileage"
-            />
-            {errors.mileage && (
-              <InputError>{errors.mileage.message}</InputError>
-            )}
-          </FormControl>
+          <div>
+            <p className="text-xs text-black/60">Km</p>
+            <FormControl className="w-full">
+              <InputLabel htmlFor="mileage">{kmLabel}</InputLabel>
+              <Input
+                type="number"
+                disabled={isDisabled}
+                {...register("mileage", {
+                  required: "Insira a quilometragem atual",
+                  min: {
+                    value: selectedItem?.mileage,
+                    message: `A quilometragem não pode ser menor que a atual`,
+                  },
+                })}
+                aria-describedby="mileage"
+              />
+              {errors.mileage && (
+                <InputError>{errors.mileage.message}</InputError>
+              )}
+            </FormControl>
+          </div>
 
           <FormControl className="col-span-2">
             <InputLabel htmlFor="observation">Observação</InputLabel>
