@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Box,
   Button,
   Typography,
   Dialog,
@@ -18,7 +17,6 @@ import {
   InputLabel,
   Input,
   Autocomplete,
-  Paper,
   IconButton,
   List,
   ListItem,
@@ -29,7 +27,6 @@ import { Controller, useForm } from "react-hook-form";
 import { InputError } from "../InputError";
 import { getAllVeiculos } from "../../services/vehicleService";
 import {
-  AttachFile,
   Delete as DeleteIcon,
   Image as ImageIcon,
   PictureAsPdf as PictureAsPdfIcon,
@@ -42,6 +39,20 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
   const [attachments, setAttachments] = useState(
     selectedItem?.attachments ?? []
   );
+  const [userRole, setUserRole] = useState("");
+
+  useEffect(() => {
+    const storedRole = localStorage.getItem("role");
+    if (storedRole) setUserRole(storedRole);
+  }, []);
+
+  const isAdmin = userRole === "admin";
+  const isCreating = selectedItem?.id === undefined;
+
+  const isDisabled = !isAdmin && !isCreating;
+
+  // console.log("ADMIN: ", isAdmin);
+  // console.log("CRIANDO: ", isCreating);
 
   const {
     register,
@@ -162,6 +173,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               <>
                 <TextField
                   {...params}
+                  disabled={isDisabled}
                   label="Placa ou nome do Veículo"
                   variant="outlined"
                   {...register("vehicle", {
@@ -182,6 +194,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             <Controller
               name="fuelType"
               control={control}
+              disabled={isDisabled}
               rules={{ required: "Selecione o tipo de combustível" }}
               render={({ field }) => (
                 <RadioGroup row {...field} value={field.value || ""}>
@@ -210,6 +223,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             </FormLabel>
             <Input
               type="datetime-local"
+              disabled={isDisabled}
               {...register("date", {
                 required: "Insira a data do abastecimento",
               })}
@@ -223,6 +237,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
 
             <Controller
               name="post"
+              disabled={isDisabled}
               control={control}
               rules={{ required: "Selecione se o posto é interno ou externo" }}
               render={({ field }) => (
@@ -242,6 +257,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             <FormControl>
               <InputLabel htmlFor="pump">Bomba</InputLabel>
               <Input
+                disabled={isDisabled}
                 {...register("pump", {
                   required: "Insira a bomba",
                 })}
@@ -256,6 +272,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               <FormControl>
                 <InputLabel htmlFor="invoiceNumber">Número da nota</InputLabel>
                 <Input
+                  disabled={isDisabled}
                   {...register("invoiceNumber", {
                     required: "Insira o número da nota",
                   })}
@@ -269,6 +286,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               <FormControl>
                 <InputLabel htmlFor="unitPrice">Preço unitário</InputLabel>
                 <Input
+                  disabled={isDisabled}
                   {...register("unitPrice", {
                     required: "Insira o preço unitário",
                   })}
@@ -285,6 +303,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
           <FormControl>
             <InputLabel htmlFor="liters">Litros abastecidos</InputLabel>
             <Input
+              disabled={isDisabled}
               {...register("liters", {
                 required: "Insira quantos litros foram abastecidos",
               })}
@@ -298,6 +317,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             <InputLabel htmlFor="mileage">Quilometragem atual</InputLabel>
             <Input
               type="number"
+              disabled={isDisabled}
               {...register("mileage", {
                 required: "Insira a quilometragem atual",
                 min: {
@@ -315,6 +335,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
           <FormControl className="col-span-2">
             <InputLabel htmlFor="observation">Observação</InputLabel>
             <Input
+              disabled={isDisabled}
               {...register("observation")}
               aria-describedby="observation"
             />
@@ -327,6 +348,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               </Button>
             </label>
             <Input
+              disabled={isDisabled}
               accept="image/*,application/pdf"
               style={{ display: "none" }}
               id="attachments"
@@ -360,6 +382,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                         edge="end"
                         aria-label="remover"
                         onClick={() => {
+                          if (isDisabled) return;
                           const newAttachments = [...attachments];
                           newAttachments.splice(index, 1);
                           setAttachments(newAttachments);
@@ -397,7 +420,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
           <div className="flex justify-end col-span-2">
             <DialogActions>
               <Button onClick={onClose}>Cancelar</Button>
-              <Button variant="contained" type="submit">
+              <Button variant="contained" type="submit" disabled={isDisabled}>
                 Salvar
               </Button>
             </DialogActions>
