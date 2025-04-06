@@ -164,7 +164,7 @@ export default function Refueling() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [fuelFilter, setFuelFilter] = useState("");
-  const [postFilter, setPostFilter] = useState("");
+  const [userFilter, setUserFilter] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -175,7 +175,7 @@ export default function Refueling() {
 
     const fuelMatch = fuelFilter === "" || item.fuelType === fuelFilter;
 
-    const postMatch = postFilter === "" || item.post === postFilter;
+    // const userMatch = userFilter === "" || item.post === userFilter;
 
     const itemDate = item.date.split("T")[0];
 
@@ -183,7 +183,7 @@ export default function Refueling() {
       (!startDate || itemDate >= startDate) &&
       (!endDate || itemDate <= endDate);
 
-    return searchMatch && fuelMatch && postMatch && dateMatch;
+    return searchMatch && fuelMatch && dateMatch;
   });
 
   return (
@@ -220,13 +220,11 @@ export default function Refueling() {
         </select>
 
         <select
-          value={postFilter}
-          onChange={(e) => setPostFilter(e.target.value)}
+          value={userFilter}
+          onChange={(e) => setUserFilter(e.target.value)}
           className="border p-4 h-fit rounded border-gray-300"
         >
-          <option value="">Todos os postos</option>
-          <option value="interno">Interno</option>
-          <option value="externo">Externo</option>
+          <option value="">Todos os usuários</option>
         </select>
 
         <div className="">
