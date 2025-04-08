@@ -1,5 +1,5 @@
 // src/components/Layout.jsx
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   CssBaseline,
@@ -17,8 +17,8 @@ import {
   useMediaQuery,
   useTheme,
   Collapse,
-} from '@mui/material';
-import { NavLink, useNavigate, Outlet } from 'react-router-dom';
+} from "@mui/material";
+import { NavLink, useNavigate, Outlet } from "react-router-dom";
 import {
   FaHome,
   FaClipboardCheck,
@@ -27,72 +27,72 @@ import {
   FaSignOutAlt,
   FaCog,
   FaUsers,
-} from 'react-icons/fa';
-import { PiTireLight } from 'react-icons/pi';
-import MenuIcon from '@mui/icons-material/Menu';
-import ExpandLess from '@mui/icons-material/ExpandLess';
-import ExpandMore from '@mui/icons-material/ExpandMore';
+} from "react-icons/fa";
+import { PiTireLight } from "react-icons/pi";
+import MenuIcon from "@mui/icons-material/Menu";
+import ExpandLess from "@mui/icons-material/ExpandLess";
+import ExpandMore from "@mui/icons-material/ExpandMore";
 
 const DRAWER_WIDTH = 256;
 
 const listItemButtonStyle = {
-  color: '#fff',
-  textTransform: 'none',
-  '&.active': {
-    backgroundColor: '#333',
+  color: "#fff",
+  textTransform: "none",
+  "&.active": {
+    backgroundColor: "#333",
   },
-  '&:hover': {
-    backgroundColor: '#374151',
+  "&:hover": {
+    backgroundColor: "#374151",
   },
 };
 
 function Layout() {
   const navigate = useNavigate();
-  const role = localStorage.getItem('role') || '';
+  const role = localStorage.getItem("role") || "";
   const theme = useTheme();
-  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openChecklist, setOpenChecklist] = useState(false);
   const [openPartsReplacement, setOpenPartsReplacement] = useState(false);
+  const [openRefueling, setOpenRefueling] = useState(false);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('sessionToken');
-    localStorage.removeItem('role');
-    localStorage.removeItem('fullname');
-    navigate('/login');
+    localStorage.removeItem("sessionToken");
+    localStorage.removeItem("role");
+    localStorage.removeItem("fullname");
+    navigate("/login");
   };
-
   const drawerContent = (
     <Box
       sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: '#1f2937',
-        color: '#fff',
-        overflowX: 'hidden'
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        backgroundColor: "#1f2937",
+        color: "#fff",
+        overflowX: "hidden",
       }}
     >
       {/* Cabeçalho com logo */}
       <Box
         sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
           p: 2,
-          backgroundColor: '#111827',
+          backgroundColor: "#111827",
         }}
       >
-        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
+        <Typography variant="h6" sx={{ display: "flex", alignItems: "center" }}>
           <img
             src="https://iili.io/39JTE5Q.png"
             alt="Logo Princesa"
-            style={{ height: '100px', marginRight: '2px' }}
+            style={{ height: "100px", marginRight: "2px" }}
           />
         </Typography>
       </Box>
@@ -100,14 +100,14 @@ function Layout() {
       <Box component="nav" sx={{ flex: 1 }}>
         <List>
           {/* Dashboard -> Só admin */}
-          {role === 'admin' && (
+          {role === "admin" && (
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
                 to="/dashboard"
                 sx={listItemButtonStyle}
               >
-                <ListItemIcon sx={{ color: 'inherit' }}>
+                <ListItemIcon sx={{ color: "inherit" }}>
                   <FaHome />
                 </ListItemIcon>
                 <ListItemText primary="Dashboard" />
@@ -116,14 +116,14 @@ function Layout() {
           )}
 
           {/* Veículos -> admin ou manutencao */}
-          {['admin', 'manutencao'].includes(role) && (
+          {["admin", "manutencao"].includes(role) && (
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
                 to="/vehicles"
                 sx={listItemButtonStyle}
               >
-                <ListItemIcon sx={{ color: 'inherit' }}>
+                <ListItemIcon sx={{ color: "inherit" }}>
                   <FaCog />
                 </ListItemIcon>
                 <ListItemText primary="Veículos" />
@@ -132,14 +132,14 @@ function Layout() {
           )}
 
           {/* Checklist (Portaria) -> admin, portaria, manutencao */}
-          {['admin', 'portaria', 'manutencao'].includes(role) && (
+          {["admin", "portaria", "manutencao"].includes(role) && (
             <>
               <ListItem disablePadding>
                 <ListItemButton
                   onClick={() => setOpenChecklist(!openChecklist)}
                   sx={listItemButtonStyle}
                 >
-                  <ListItemIcon sx={{ color: 'inherit' }}>
+                  <ListItemIcon sx={{ color: "inherit" }}>
                     <FaClipboardCheck />
                   </ListItemIcon>
                   <ListItemText primary="Checklist (Portaria)" />
@@ -172,14 +172,14 @@ function Layout() {
           )}
 
           {/* Consumo -> admin, fiscal, manutencao */}
-          {['admin', 'fiscal', 'manutencao'].includes(role) && (
+          {["admin", "fiscal", "manutencao"].includes(role) && (
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
                 to="/consumption"
                 sx={listItemButtonStyle}
               >
-                <ListItemIcon sx={{ color: 'inherit' }}>
+                <ListItemIcon sx={{ color: "inherit" }}>
                   <FaChartBar />
                 </ListItemIcon>
                 <ListItemText primary="Consumo" />
@@ -188,30 +188,54 @@ function Layout() {
           )}
 
           {/* Abastecimento -> admin, abastecimento, manutencao */}
-          {['admin', 'abastecimento', 'manutencao'].includes(role) && (
-            <ListItem disablePadding>
-              <ListItemButton
-                component={NavLink}
-                to="/refueling"
-                sx={listItemButtonStyle}
-              >
-                <ListItemIcon sx={{ color: 'inherit' }}>
-                  <FaGasPump />
-                </ListItemIcon>
-                <ListItemText primary="Abastecimento" />
-              </ListItemButton>
-            </ListItem>
+          {["admin", "abastecimento", "manutencao"].includes(role) && (
+            <>
+              <ListItem disablePadding>
+                <ListItemButton
+                  onClick={() => setOpenRefueling(!openRefueling)}
+                  sx={listItemButtonStyle}
+                >
+                  <ListItemIcon sx={{ color: "inherit" }}>
+                    <FaClipboardCheck />
+                  </ListItemIcon>
+                  <ListItemText primary="Abastecimento" />
+                  {openRefueling ? <ExpandLess /> : <ExpandMore />}
+                </ListItemButton>
+              </ListItem>
+              <Collapse in={openRefueling} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      component={NavLink}
+                      to="/refueling"
+                      sx={{ pl: 4, ...listItemButtonStyle }}
+                    >
+                      <ListItemText primary="Abastecimentos" />
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      component={NavLink}
+                      to="/refueling/report"
+                      sx={{ pl: 4, ...listItemButtonStyle }}
+                    >
+                      <ListItemText primary="Relatórios" />
+                    </ListItemButton>
+                  </ListItem>
+                </List>
+              </Collapse>
+            </>
           )}
 
           {/* Troca de peças -> admin, manutencao */}
-          {['admin', 'manutencao'].includes(role) && (
+          {["admin", "manutencao"].includes(role) && (
             <>
               <ListItem disablePadding>
                 <ListItemButton
                   onClick={() => setOpenPartsReplacement(!openPartsReplacement)}
                   sx={listItemButtonStyle}
                 >
-                  <ListItemIcon sx={{ color: 'inherit' }}>
+                  <ListItemIcon sx={{ color: "inherit" }}>
                     <FaClipboardCheck />
                   </ListItemIcon>
                   <ListItemText primary="Troca de peças" />
@@ -244,14 +268,14 @@ function Layout() {
           )}
 
           {/* Pneus -> admin, manutencao */}
-          {['admin', 'manutencao'].includes(role) && (
+          {["admin", "manutencao"].includes(role) && (
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
                 to="/tire-replacement"
                 sx={listItemButtonStyle}
               >
-                <ListItemIcon sx={{ color: 'inherit' }}>
+                <ListItemIcon sx={{ color: "inherit" }}>
                   <PiTireLight size={24} />
                 </ListItemIcon>
                 <ListItemText primary="Pneus" />
@@ -260,14 +284,14 @@ function Layout() {
           )}
 
           {/* Usuários -> só admin */}
-          {role === 'admin' && (
+          {role === "admin" && (
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
                 to="/user-management"
                 sx={listItemButtonStyle}
               >
-                <ListItemIcon sx={{ color: 'inherit' }}>
+                <ListItemIcon sx={{ color: "inherit" }}>
                   <FaUsers />
                 </ListItemIcon>
                 <ListItemText primary="Usuários" />
@@ -276,7 +300,7 @@ function Layout() {
           )}
 
           {/* Checklists do motorista -> admin, motorista, manutencao */}
-          {['admin', 'motorista', 'manutencao'].includes(role) && (
+          {["admin", "motorista", "manutencao"].includes(role) && (
             <>
               <ListItem disablePadding>
                 <ListItemButton
@@ -284,7 +308,7 @@ function Layout() {
                   to="/driver-checklist"
                   sx={listItemButtonStyle}
                 >
-                  <ListItemIcon sx={{ color: 'inherit' }}>
+                  <ListItemIcon sx={{ color: "inherit" }}>
                     <FaClipboardCheck />
                   </ListItemIcon>
                   <ListItemText primary="Criar Checklist (Caminhão/Motorista)" />
@@ -296,7 +320,7 @@ function Layout() {
                   to="/driver-checklists"
                   sx={listItemButtonStyle}
                 >
-                  <ListItemIcon sx={{ color: 'inherit' }}>
+                  <ListItemIcon sx={{ color: "inherit" }}>
                     <FaClipboardCheck />
                   </ListItemIcon>
                   <ListItemText primary="Meus Checklists" />
@@ -308,8 +332,8 @@ function Layout() {
           {/* Sair (para todos) */}
           <ListItem disablePadding>
             <ListItemButton onClick={handleLogout} sx={listItemButtonStyle}>
-              <ListItemIcon sx={{ color: 'inherit' }}>
-                <FaSignOutAlt style={{ color: 'red' }} />
+              <ListItemIcon sx={{ color: "inherit" }}>
+                <FaSignOutAlt style={{ color: "red" }} />
               </ListItemIcon>
               <ListItemText primary="Sair" />
             </ListItemButton>
@@ -318,7 +342,7 @@ function Layout() {
       </Box>
 
       {/* Rodapé */}
-      <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+      <Box sx={{ p: 2, borderTop: "1px solid rgba(255,255,255,0.2)" }}>
         <Typography variant="subtitle1" sx={{ mb: 1 }}>
           Suporte:
         </Typography>
@@ -331,9 +355,9 @@ function Layout() {
           target="_blank"
           rel="noopener noreferrer"
           sx={{
-            fontSize: '1rem',
-            padding: '8px 16px',
-            textTransform: 'none',
+            fontSize: "1rem",
+            padding: "8px 16px",
+            textTransform: "none",
           }}
         >
           Atendimento
@@ -343,7 +367,9 @@ function Layout() {
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#1f2937' }}>
+    <Box
+      sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#1f2937" }}
+    >
       <CssBaseline />
 
       {/* AppBar no mobile */}
@@ -351,9 +377,9 @@ function Layout() {
         <AppBar
           position="fixed"
           sx={{
-            width: '100%',
+            width: "100%",
             ml: 0,
-            backgroundColor: '#1f2937',
+            backgroundColor: "#1f2937",
           }}
         >
           <Toolbar>
@@ -380,12 +406,12 @@ function Layout() {
           sx={{
             width: DRAWER_WIDTH,
             flexShrink: 0,
-            '& .MuiDrawer-paper': {
+            "& .MuiDrawer-paper": {
               width: DRAWER_WIDTH,
-              boxSizing: 'border-box',
-              backgroundColor: '#1f2937',
-              color: '#fff',
-              overflowY: 'auto',
+              boxSizing: "border-box",
+              backgroundColor: "#1f2937",
+              color: "#fff",
+              overflowY: "auto",
             },
           }}
           open
@@ -399,13 +425,13 @@ function Layout() {
           onClose={handleDrawerToggle}
           ModalProps={{ keepMounted: true }}
           sx={{
-            display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': {
+            display: { xs: "block", md: "none" },
+            "& .MuiDrawer-paper": {
               width: DRAWER_WIDTH,
-              boxSizing: 'border-box',
-              backgroundColor: '#1f2937',
-              color: '#fff',
-              overflowY: 'auto',
+              boxSizing: "border-box",
+              backgroundColor: "#1f2937",
+              color: "#fff",
+              overflowY: "auto",
             },
           }}
         >
@@ -421,7 +447,7 @@ function Layout() {
           ml: { md: 0 },
           mt: { xs: isDesktop ? 0 : 8, md: 0 },
           p: 2,
-          backgroundColor: '#f5f6fa',
+          backgroundColor: "#f5f6fa",
         }}
       >
         {!isDesktop && <Toolbar />}

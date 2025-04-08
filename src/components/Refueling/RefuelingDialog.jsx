@@ -149,6 +149,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
           <Autocomplete
             className="col-span-2"
             freeSolo
+            readOnly={isDisabled}
             value={selectedItem?.vehicle ?? selectedVehicle}
             onChange={(e, newValue) => {
               if (typeof newValue === "string") {
@@ -178,7 +179,6 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               <>
                 <TextField
                   {...params}
-                  disabled={isDisabled}
                   label="Placa ou nome do Veículo"
                   variant="outlined"
                   {...register("vehicle", {
@@ -202,7 +202,12 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               disabled={isDisabled}
               rules={{ required: "Selecione o tipo de combustível" }}
               render={({ field }) => (
-                <RadioGroup row {...field} value={field.value || ""}>
+                <RadioGroup
+                  row
+                  {...field}
+                  value={field.value || ""}
+                  disabled={isDisabled}
+                >
                   <FormControlLabel
                     value="ARLA"
                     control={<Radio />}
@@ -228,7 +233,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             </FormLabel>
             <Input
               type="datetime-local"
-              disabled={isDisabled}
+              readOnly={isDisabled}
               {...register("date", {
                 required: "Insira a data do abastecimento",
               })}
@@ -262,7 +267,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             <FormControl>
               <InputLabel htmlFor="pump">Bomba</InputLabel>
               <Input
-                disabled={isDisabled}
+                readOnly={isDisabled}
                 {...register("pump", {
                   required: "Insira a bomba",
                 })}
@@ -308,7 +313,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
           <FormControl className="self-end">
             <InputLabel htmlFor="liters">Litros abastecidos</InputLabel>
             <Input
-              disabled={isDisabled}
+              readOnly={isDisabled}
               {...register("liters", {
                 required: "Insira quantos litros foram abastecidos",
               })}
@@ -324,7 +329,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               <InputLabel htmlFor="mileage">{kmLabel}</InputLabel>
               <Input
                 type="number"
-                disabled={isDisabled}
+                readOnly={isDisabled}
                 {...register("mileage", {
                   required: "Insira a quilometragem atual",
                   min: {
@@ -343,7 +348,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
           <FormControl className="col-span-2">
             <InputLabel htmlFor="observation">Observação</InputLabel>
             <Input
-              disabled={isDisabled}
+              readOnly={isDisabled}
               {...register("observation")}
               aria-describedby="observation"
             />
@@ -356,7 +361,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               </Button>
             </label>
             <Input
-              disabled={isDisabled}
+              readOnly={isDisabled}
               accept="image/*,application/pdf"
               style={{ display: "none" }}
               id="attachments"

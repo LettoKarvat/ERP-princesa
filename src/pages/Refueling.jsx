@@ -188,9 +188,8 @@ export default function Refueling() {
 
   return (
     <>
-      <Typography variant="h4">Abastecimentos</Typography>
-
-      <div className="py-8 w-full flex justify-end px-4">
+      <div className="py-8 w-full flex justify-between px-4">
+        <Typography variant="h4">Abastecimentos</Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
