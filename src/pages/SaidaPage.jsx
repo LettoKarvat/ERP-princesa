@@ -113,6 +113,8 @@ export default function SaidaPage() {
 
     const theme = useTheme();
     const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
+    const [isSaving, setIsSaving] = useState(false);
+
 
     // ───────────────────── lifecycle ──────────────────────
     useEffect(() => {
@@ -240,7 +242,10 @@ export default function SaidaPage() {
             setOpenSignature(true);
             return;
         }
+
         submitSaida(newSaida.assinaturaMotorista);
+
+
     };
 
 
@@ -290,6 +295,11 @@ export default function SaidaPage() {
         } catch (err) {
             console.error(err);
             alert("Falha ao salvar.");
+        } finally {
+            setIsSaving(false);           // libera o botão
+            // await loadChecklists();       // atualiza a lista
+            // ou, se preferir recarregar a página inteira:
+            window.location.reload();
         }
     };
 
@@ -297,6 +307,8 @@ export default function SaidaPage() {
         if (signatureRef.current.isEmpty()) {
             return alert("Assine antes de confirmar.");
         }
+
+        setIsSaving(true);
         const sig = signatureRef.current.toDataURL();
         setNewSaida((p) => ({ ...p, assinaturaMotorista: sig }));
         setOpenSignature(false);
@@ -688,9 +700,18 @@ export default function SaidaPage() {
 
                 <DialogActions>
                     <Button onClick={handleClose}>Cancelar</Button>
-                    <Button variant="contained" onClick={handleSave}>
-                        {isEditing ? "Atualizar" : "Salvar"}
+                    <Button
+                        variant="contained"
+                        onClick={handleSave}
+                        disabled={isSaving}
+                    >
+                        {isSaving
+                            ? "Salvando..."
+                            : isEditing
+                                ? "Atualizar"
+                                : "Salvar"}
                     </Button>
+
                 </DialogActions>
             </Dialog>
 
@@ -717,11 +738,18 @@ export default function SaidaPage() {
                     </Button>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setOpenSignature(false)}>Cancelar</Button>
-                    <Button variant="contained" onClick={handleConfirmSignature}>
-                        Confirmar
+                    <Button onClick={() => setOpenSignature(false)}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmSignature}
+                        disabled={isSaving}
+                    >
+                        {isSaving ? "Salvando..." : "Confirmar"}
                     </Button>
                 </DialogActions>
+
             </Dialog>
 
             {/* ──────────── DIALOG DETALHES ──────────── */}
