@@ -304,7 +304,7 @@ export default function SaidaPage() {
         try {
             // busca o blob com o header p/ pular aviso
             const res = await apiFlask.get(
-                `/checklists/operacao/${file.id}/attachment/${file.nome_arquivo}`,
+                `/checklists/operacao/${file.id}/attachments/${file.nome_arquivo}`,
                 {
                     headers: {
                         "Content-Type": "application/json",
