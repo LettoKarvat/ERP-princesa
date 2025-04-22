@@ -13,22 +13,14 @@ import {
   Select,
   MenuItem,
   IconButton,
-  Grid,
-  Card,
-  CardActionArea,
-  CardContent,
-  Divider,
 } from '@mui/material';
+import { DataGrid } from '@mui/x-data-grid';
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Badge as BadgeIcon,
-  DirectionsCar as CarIcon,
-  Business as BrandIcon,
-  Speed as SpeedIcon,
 } from '@mui/icons-material';
-import api from '../services/apiFlask';
+import api from '../services/apiFlask'; // Axios configurado para apontar ao seu Flask
 
 const vehicleTypes = [
   { label: 'Passeio', value: 'Passeio', tires: 5 },
@@ -38,16 +30,15 @@ const vehicleTypes = [
   { label: 'Truck', value: 'Truck', tires: 11 },
   { label: 'Bi-truck', value: 'Bi-truck', tires: 13 },
   { label: 'Cavalo', value: 'Cavalo', tires: 10 },
-  { label: 'Semi-Reboque (Bi-Trem)', value: 'Semi-Reboque (Bi-Trem)', tires: 10 },
-  { label: 'Semi-Reboque (Rodo-Trem)', value: 'Semi-Reboque (Rodo-Trem)', tires: 14 },
+  { label: 'Semi-reboque Bi-trem', value: 'Semi-Reboque (Bi-Trem)', tires: 10 },
+  { label: 'Semi-reboque Rodo-trem', value: 'Semi-Reboque (Rodo-Trem)', tires: 14 },
 ];
 
-export default function VehicleList() {
-  const [vehicles, setVehicles] = useState([]);
-  const [filter, setFilter] = useState('');
+function VehicleList() {
   const [open, setOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [vehicles, setVehicles] = useState([]);
   const [newVehicle, setNewVehicle] = useState({
     placa: '',
     marca: '',
@@ -66,17 +57,60 @@ export default function VehicleList() {
     loadVehicles();
   }, []);
 
-  async function loadVehicles() {
+  // === LISTAGEM VIA FLASK ===
+  const loadVehicles = async () => {
     try {
-      const { data } = await api.get('/vehicles');
-      setVehicles(data.map(v => ({ ...v, qtdPneus: v.qtd_pneus })));
+      const response = await api.get('/vehicles');
+      // response.data é um array de veículos no formato Snake_case
+      const fetched = response.data.map((v) => ({
+        id: v.id,
+        placa: v.placa || '',
+        marca: v.marca || '',
+        modelo: v.modelo || '',
+        ano: v.ano || '',
+        cor: v.cor || '',
+        quilometragem: v.quilometragem || 0,
+        chassi: v.chassi || '',
+        status: v.status || 'Ativo',
+        tipo: v.tipo || '',
+        qtdPneus: v.qtd_pneus || 0,
+      }));
+      setVehicles(fetched);
     } catch (err) {
-      console.error(err);
+      console.error('Erro ao carregar veículos:', err);
       alert('Não foi possível carregar os veículos.');
     }
-  }
+  };
 
-  function handleOpenDialog() {
+  const columns = [
+    { field: 'placa', headerName: 'Placa', width: 100 },
+    { field: 'marca', headerName: 'Marca', width: 90 },
+    { field: 'modelo', headerName: 'Modelo', width: 100 },
+    { field: 'ano', headerName: 'Ano', width: 70 },
+    { field: 'cor', headerName: 'Cor', width: 70 },
+    { field: 'quilometragem', headerName: 'KM', width: 100 },
+    { field: 'chassi', headerName: 'Chassi', width: 150 },
+    { field: 'status', headerName: 'Status', width: 90 },
+    { field: 'tipo', headerName: 'Tipo', width: 100 },
+    { field: 'qtdPneus', headerName: 'Pneus', width: 80 },
+    {
+      field: 'actions',
+      headerName: 'Ações',
+      width: 130,
+      renderCell: (params) => (
+        <Box>
+          <IconButton color="primary" onClick={() => handleEdit(params.row.id)} size="small">
+            <EditIcon />
+          </IconButton>
+          <IconButton color="error" onClick={() => handleDelete(params.row.id)} size="small">
+            <DeleteIcon />
+          </IconButton>
+        </Box>
+      ),
+    },
+  ];
+
+  const handleOpenDialog = () => {
     setIsEditing(false);
     setEditId(null);
     setErrors({});
@@ -93,69 +127,69 @@ export default function VehicleList() {
       qtdPneus: 0,
     });
     setOpen(true);
-  }
+  };
 
-  function handleEdit(id) {
-    const v = vehicles.find(x => x.id === id);
+  const handleEdit = (vehicleId) => {
+    const v = vehicles.find((x) => x.id === vehicleId);
     if (!v) return;
     setIsEditing(true);
-    setEditId(id);
+    setEditId(vehicleId);
     setErrors({});
     setNewVehicle({ ...v });
     setOpen(true);
-  }
+  };
 
-  async function handleDelete(id) {
+  // === SOFT-DELETE VIA FLASK ===
+  const handleDelete = async (vehicleId) => {
     if (!window.confirm('Deseja realmente excluir este veículo?')) return;
     try {
-      await api.delete(`/vehicles/${id}`);
+      await api.delete(`/vehicles/${vehicleId}`);
       loadVehicles();
-    } catch {
+    } catch (err) {
+      console.error('Erro ao excluir veículo:', err);
       alert('Falha ao excluir veículo.');
     }
-  }
+  };
 
-  function handleClose() {
+  const handleCloseDialog = () => {
     setOpen(false);
-  }
+  };
 
-  function handleChange(e) {
+  const handleChange = (e) => {
     const { name, value } = e.target;
-    setNewVehicle(prev => ({ ...prev, [name]: value }));
-  }
+    setNewVehicle((prev) => ({ ...prev, [name]: value }));
+  };
 
-  function handleTipoChange(e) {
-    const tipo = e.target.value;
-    const found = vehicleTypes.find(t => t.value === tipo);
-    setNewVehicle(prev => ({
+  const handleTipoChange = (e) => {
+    const selected = e.target.value;
+    const found = vehicleTypes.find((t) => t.value === selected);
+    setNewVehicle((prev) => ({
       ...prev,
-      tipo,
+      tipo: selected,
       qtdPneus: found ? found.tires : 0,
     }));
-  }
+  };
 
-  function validateVehicle() {
+  const validateVehicle = () => {
     const errs = {};
     if (!newVehicle.placa.trim()) errs.placa = 'Placa é obrigatória.';
-    if (!newVehicle.marca.trim()) errs.marca = 'Marca é obrigatória.';
     if (!newVehicle.modelo.trim()) errs.modelo = 'Modelo é obrigatório.';
+    if (!newVehicle.marca.trim()) errs.marca = 'Marca é obrigatória.';
     if (!newVehicle.ano) errs.ano = 'Ano é obrigatório.';
     else {
       const y = parseInt(newVehicle.ano, 10);
-      if (y < 1900 || y > new Date().getFullYear() + 1)
-        errs.ano = 'Ano inválido.';
+      if (y < 1900 || y > new Date().getFullYear() + 1) errs.ano = 'Ano inválido.';
     }
-    if (!newVehicle.quilometragem.toString().trim())
-      errs.quilometragem = 'Quilometragem é obrigatória.';
-    else if (parseInt(newVehicle.quilometragem, 10) < 0)
-      errs.quilometragem = 'Quilometragem inválida.';
+    if (!newVehicle.quilometragem.toString().trim()) errs.quilometragem = 'Quilometragem é obrigatória.';
+    else if (parseInt(newVehicle.quilometragem, 10) < 0) errs.quilometragem = 'Quilometragem inválida.';
     return errs;
-  }
+  };
 
-  async function handleSave() {
-    const newErrs = validateVehicle();
-    if (Object.keys(newErrs).length) {
-      setErrors(newErrs);
+  // === CREATE / UPDATE VIA FLASK ===
+  const handleSave = async () => {
+    const newErrors = validateVehicle();
+    if (Object.keys(newErrors).length) {
+      setErrors(newErrors);
       return;
     }
     const payload = {
@@ -170,108 +204,40 @@ export default function VehicleList() {
       tipo: newVehicle.tipo,
       qtd_pneus: parseInt(newVehicle.qtdPneus, 10),
     };
+
     try {
-      if (isEditing) await api.put(`/vehicles/${editId}`, payload);
-      else await api.post('/vehicles', payload);
-      handleClose();
+      if (isEditing && editId) {
+        await api.put(`/vehicles/${editId}`, payload);
+      } else {
+        await api.post('/vehicles', payload);
+      }
+      setOpen(false);
       loadVehicles();
-    } catch {
+    } catch (err) {
+      console.error('Erro ao salvar veículo:', err);
       alert('Falha ao salvar veículo.');
     }
-  }
-
-  const filtered = vehicles.filter(v => {
-    const term = filter.toLowerCase();
-    return (
-      v.placa.toLowerCase().includes(term) ||
-      v.modelo.toLowerCase().includes(term) ||
-      v.marca.toLowerCase().includes(term)
-    );
-  });
+  };
 
   return (
-    <Box p={2}>
-      {/* Cabeçalho */}
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={3}
-      >
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
         <Typography variant="h4">Veículos</Typography>
-        <Box display="flex" alignItems="center" gap={2}>
-          <TextField
-            placeholder="Buscar placa/modelo/marca"
-            size="small"
-            value={filter}
-            onChange={e => setFilter(e.target.value)}
-          />
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleOpenDialog}
-          >
-            Novo
-          </Button>
-        </Box>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenDialog}>
+          Novo Veículo
+        </Button>
       </Box>
 
-      {/* Cards com cor clara e ícones */}
-      <Grid container spacing={2}>
-        {filtered.map(v => (
-          <Grid item xs={12} sm={6} md={4} lg={3} key={v.id}>
-            <Card
-              sx={{
-                bgcolor: '#e0f2f1', // tom de verde-água suave
-                color: '#004d40',
-                boxShadow: 4,
-                borderRadius: 2,
-                transition: 'transform .2s',
-                '&:hover': { transform: 'scale(1.03)' },
-              }}
-            >
-              <CardActionArea onClick={() => handleEdit(v.id)}>
-                <CardContent>
-                  <Box display="flex" alignItems="center" mb={1}>
-                    <BadgeIcon sx={{ mr: 1 }} />
-                    <Typography variant="h6">{v.placa}</Typography>
-                  </Box>
-                  <Divider sx={{ bgcolor: '#004d40', mb: 1 }} />
-                  <Box display="flex" alignItems="center" mb={0.5}>
-                    <CarIcon fontSize="small" sx={{ mr: 1 }} />
-                    <Typography variant="body2">Modelo: {v.modelo}</Typography>
-                  </Box>
-                  <Box display="flex" alignItems="center" mb={0.5}>
-                    <BrandIcon fontSize="small" sx={{ mr: 1 }} />
-                    <Typography variant="body2">Marca: {v.marca}</Typography>
-                  </Box>
-                  <Box display="flex" alignItems="center">
-                    <SpeedIcon fontSize="small" sx={{ mr: 1 }} />
-                    <Typography variant="body2">
-                      KM: {v.quilometragem}
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </CardActionArea>
-              <Box display="flex" justifyContent="flex-end" p={1}>
-                <IconButton
-                  size="small"
-                  onClick={() => handleDelete(v.id)}
-                  sx={{ color: '#b71c1c' }}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </Box>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+      <DataGrid
+        rows={vehicles}
+        columns={columns}
+        pageSize={5}
+        autoHeight
+        sx={{ bgcolor: 'background.paper' }}
+      />
 
-      {/* Modal de cadastro/edição */}
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {isEditing ? 'Editar Veículo' : 'Novo Veículo'}
-        </DialogTitle>
+      <Dialog open={open} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>{isEditing ? 'Editar Veículo' : 'Novo Veículo'}</DialogTitle>
         <DialogContent dividers>
           <TextField
             autoFocus
@@ -285,6 +251,7 @@ export default function VehicleList() {
             helperText={errors.placa}
             sx={{ mb: 2 }}
           />
+
           <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
             <TextField
               name="marca"
@@ -305,6 +272,7 @@ export default function VehicleList() {
               helperText={errors.modelo}
             />
           </Box>
+
           <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
             <TextField
               name="ano"
@@ -324,6 +292,7 @@ export default function VehicleList() {
               onChange={handleChange}
             />
           </Box>
+
           <TextField
             name="quilometragem"
             label="Quilometragem"
@@ -335,6 +304,7 @@ export default function VehicleList() {
             helperText={errors.quilometragem}
             sx={{ mb: 2 }}
           />
+
           <TextField
             name="chassi"
             label="Chassi"
@@ -343,52 +313,53 @@ export default function VehicleList() {
             onChange={handleChange}
             sx={{ mb: 2 }}
           />
-          <FormControl fullWidth sx={{ mb: 2 }}>
+
+          <Box sx={{ mb: 2 }}>
             <InputLabel>Status</InputLabel>
             <Select
               name="status"
+              fullWidth
               value={newVehicle.status}
-              onChange={e =>
-                setNewVehicle(prev => ({
-                  ...prev,
-                  status: e.target.value,
-                }))
-              }
+              onChange={(e) => setNewVehicle((prev) => ({ ...prev, status: e.target.value }))}
             >
               <MenuItem value="Ativo">Ativo</MenuItem>
               <MenuItem value="Manutenção">Manutenção</MenuItem>
               <MenuItem value="Inativo">Inativo</MenuItem>
             </Select>
-          </FormControl>
+          </Box>
+
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel id="tipo-label">Tipo do Veículo</InputLabel>
             <Select
               labelId="tipo-label"
               name="tipo"
+              label="Tipo do Veículo"
               value={newVehicle.tipo}
               onChange={handleTipoChange}
             >
               <MenuItem value="">Selecione...</MenuItem>
-              {vehicleTypes.map(vt => (
+              {vehicleTypes.map((vt) => (
                 <MenuItem key={vt.value} value={vt.value}>
                   {vt.label}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
+
           <TextField
             name="qtdPneus"
             label="Qtd. Pneus"
             type="number"
             fullWidth
             value={newVehicle.qtdPneus}
-            onChange={handleChange}
+            onChange={(e) => setNewVehicle((prev) => ({ ...prev, qtdPneus: e.target.value }))}
             helperText="Preenchido automaticamente pelo tipo escolhido."
             sx={{ mb: 2 }}
           />
         </DialogContent>
+
         <DialogActions>
-          <Button onClick={handleClose}>Cancelar</Button>
+          <Button onClick={handleCloseDialog}>Cancelar</Button>
           <Button onClick={handleSave} variant="contained">
             Salvar
           </Button>
@@ -397,3 +368,5 @@ export default function VehicleList() {
     </Box>
   );
 }
+
+export default VehicleList;
