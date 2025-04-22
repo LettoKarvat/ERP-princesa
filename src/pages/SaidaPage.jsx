@@ -216,7 +216,20 @@ export default function SaidaPage() {
         }
     };
 
+    // 2) handleSave: valida antes de submeter
     const handleSave = () => {
+        if (!newSaida.motorista1) {
+            return alert("Por favor, selecione o Motorista.");
+        }
+        if (!newSaida.kmSaida) {
+            return alert("Por favor, informe o KM de saída.");
+        }
+        if (!newSaida.motivoSaida.trim()) {
+            return alert("Por favor, explique o Motivo da saída.");
+        }
+        if (!newSaida.destino.trim()) {
+            return alert("Por favor, informe o Destino.");
+        }
         if (!isEditing && !newSaida.attachments.length) {
             return alert("Anexos são obrigatórios!");
         }
@@ -224,10 +237,12 @@ export default function SaidaPage() {
             return alert("KM não pode ser menor que a atual.");
         }
         if (!newSaida.assinaturaMotorista.trim()) {
-            return setOpenSignature(true);
+            setOpenSignature(true);
+            return;
         }
         submitSaida(newSaida.assinaturaMotorista);
     };
+
 
     const submitSaida = async (signature) => {
         try {
@@ -481,25 +496,24 @@ export default function SaidaPage() {
                 <DialogContent dividers>
                     <Grid container spacing={2}>
                         {/* Veículo */}
-                        {/* Veículo */}
                         <Grid item xs={12} sm={6}>
                             <Autocomplete
                                 options={vehicles}
-                                getOptionLabel={(o) => `${o.placa} - ${o.marca} ${o.modelo}`}
+                                getOptionLabel={o => `${o.placa} - ${o.marca} ${o.modelo}`}
                                 onChange={(_, v) => {
                                     if (v) {
-                                        setNewSaida((p) => ({
+                                        setNewSaida(p => ({
                                             ...p,
                                             vehicle: v.id,
                                             kmSaida: v.quilometragem || 0,
-                                            // aqui vamos definir também o horímetro:
-                                            horimetroSaida: v.horimetro !== undefined
-                                                ? v.horimetro
-                                                : v.quilometragem || 0,
+                                            horimetroSaida:
+                                                v.horimetro !== undefined
+                                                    ? v.horimetro
+                                                    : v.quilometragem || 0,
                                         }));
                                         setInitialKm(v.quilometragem || 0);
                                     } else {
-                                        setNewSaida((p) => ({
+                                        setNewSaida(p => ({
                                             ...p,
                                             vehicle: "",
                                             kmSaida: 0,
@@ -508,81 +522,85 @@ export default function SaidaPage() {
                                         setInitialKm(0);
                                     }
                                 }}
-                                value={vehicles.find((v) => v.id === newSaida.vehicle) || null}
-                                renderInput={(params) => <TextField {...params} label="Veículo (Placa)" />}
-                            />
-                        </Grid>
-
-                        {/* Motorista */}
-                        <Grid item xs={12} sm={6}>
-                            <Autocomplete
-                                options={motoristas}
-                                getOptionLabel={(o) => o.fullname}
-                                onChange={(_, v) =>
-                                    setNewSaida((p) => ({
-                                        ...p,
-                                        motorista1: v?.id || "",
-                                    }))
-                                }
-                                value={
-                                    motoristas.find((u) => u.id === newSaida.motorista1) ||
-                                    null
-                                }
-                                renderInput={(params) => (
-                                    <TextField {...params} label="Motorista" />
+                                value={vehicles.find(v => v.id === newSaida.vehicle) || null}
+                                renderInput={params => (
+                                    <TextField {...params} label="Veículo (Placa)" />
                                 )}
                             />
                         </Grid>
+
+                        {/* Motorista (obrigatório) */}
+                        <Grid item xs={12} sm={6}>
+                            <Autocomplete
+                                options={motoristas}
+                                getOptionLabel={o => o.fullname}
+                                onChange={(_, v) =>
+                                    setNewSaida(p => ({ ...p, motorista1: v?.id || "" }))
+                                }
+                                value={motoristas.find(u => u.id === newSaida.motorista1) || null}
+                                renderInput={params => (
+                                    <TextField
+                                        {...params}
+                                        label="Motorista *"
+                                        required
+                                    />
+                                )}
+                            />
+                        </Grid>
+
                         {/* Departamento */}
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 label="Departamento"
                                 fullWidth
                                 value={newSaida.departamento}
-                                onChange={(e) =>
+                                onChange={e =>
                                     setNewSaida({ ...newSaida, departamento: e.target.value })
                                 }
                             />
                         </Grid>
+
                         {/* Semi‑reboque */}
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 label="Semi‑reboque"
                                 fullWidth
                                 value={newSaida.semiReboque}
-                                onChange={(e) =>
+                                onChange={e =>
                                     setNewSaida({ ...newSaida, semiReboque: e.target.value })
                                 }
                             />
                         </Grid>
+
                         {/* Placa do Semi */}
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 label="Placa do Semi"
                                 fullWidth
                                 value={newSaida.placaSemiReboque}
-                                onChange={(e) =>
-                                    setNewSaida({
-                                        ...newSaida,
-                                        placaSemiReboque: e.target.value,
-                                    })
+                                onChange={e =>
+                                    setNewSaida({ ...newSaida, placaSemiReboque: e.target.value })
                                 }
                             />
                         </Grid>
-                        {/* KM Saída */}
+
+                        {/* KM Saída (obrigatório) */}
                         <Grid item xs={12} sm={6}>
                             <TextField
-                                label="KM Saída"
+                                label="KM Saída *"
                                 type="number"
                                 fullWidth
+                                required
                                 value={newSaida.kmSaida}
-                                onChange={(e) => {
+                                onChange={e => {
                                     const km = +e.target.value;
-                                    if (km >= initialKm)
+                                    if (km >= initialKm) {
                                         setNewSaida({ ...newSaida, kmSaida: km });
+                                    }
                                 }}
                             />
                         </Grid>
+
                         {/* Data/Hora de Saída */}
                         <Grid item xs={12} sm={6}>
                             <TextField
@@ -592,11 +610,12 @@ export default function SaidaPage() {
                                 fullWidth
                                 InputLabelProps={{ shrink: true }}
                                 value={newSaida.dataSaida}
-                                onChange={(e) =>
+                                onChange={e =>
                                     setNewSaida({ ...newSaida, dataSaida: e.target.value })
                                 }
                             />
                         </Grid>
+
                         {/* Horímetro */}
                         <Grid item xs={12} sm={6}>
                             <TextField
@@ -604,36 +623,38 @@ export default function SaidaPage() {
                                 type="number"
                                 fullWidth
                                 value={newSaida.horimetroSaida}
-                                onChange={(e) =>
-                                    setNewSaida({
-                                        ...newSaida,
-                                        horimetroSaida: e.target.value,
-                                    })
+                                onChange={e =>
+                                    setNewSaida({ ...newSaida, horimetroSaida: e.target.value })
                                 }
                             />
                         </Grid>
-                        {/* Motivo */}
+
+                        {/* Motivo (obrigatório) */}
                         <Grid item xs={12} sm={6}>
                             <TextField
-                                label="Motivo"
+                                label="Motivo *"
                                 fullWidth
+                                required
                                 value={newSaida.motivoSaida}
-                                onChange={(e) =>
+                                onChange={e =>
                                     setNewSaida({ ...newSaida, motivoSaida: e.target.value })
                                 }
                             />
                         </Grid>
-                        {/* Destino */}
+
+                        {/* Destino (obrigatório) */}
                         <Grid item xs={12} sm={6}>
                             <TextField
-                                label="Destino"
+                                label="Destino *"
                                 fullWidth
+                                required
                                 value={newSaida.destino}
-                                onChange={(e) =>
+                                onChange={e =>
                                     setNewSaida({ ...newSaida, destino: e.target.value })
                                 }
                             />
                         </Grid>
+
                         {/* Observações */}
                         <Grid item xs={12}>
                             <TextField
@@ -642,14 +663,12 @@ export default function SaidaPage() {
                                 multiline
                                 minRows={2}
                                 value={newSaida.observacoesSaida}
-                                onChange={(e) =>
-                                    setNewSaida({
-                                        ...newSaida,
-                                        observacoesSaida: e.target.value,
-                                    })
+                                onChange={e =>
+                                    setNewSaida({ ...newSaida, observacoesSaida: e.target.value })
                                 }
                             />
                         </Grid>
+
                         {/* Anexos (só no create) */}
                         {!isEditing && (
                             <Grid item xs={12}>
@@ -665,6 +684,8 @@ export default function SaidaPage() {
                         )}
                     </Grid>
                 </DialogContent>
+
+
                 <DialogActions>
                     <Button onClick={handleClose}>Cancelar</Button>
                     <Button variant="contained" onClick={handleSave}>
