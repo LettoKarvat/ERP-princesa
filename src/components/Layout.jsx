@@ -148,15 +148,7 @@ function Layout() {
               </ListItem>
               <Collapse in={openChecklist} timeout="auto" unmountOnExit>
                 <List component="div" disablePadding>
-                  <ListItem disablePadding>
-                    <ListItemButton
-                      component={NavLink}
-                      to="/portaria/chegada"
-                      sx={{ pl: 4, ...listItemButtonStyle }}
-                    >
-                      <ListItemText primary="Chegada" />
-                    </ListItemButton>
-                  </ListItem>
+
                   <ListItem disablePadding>
                     <ListItemButton
                       component={NavLink}
@@ -164,6 +156,15 @@ function Layout() {
                       sx={{ pl: 4, ...listItemButtonStyle }}
                     >
                       <ListItemText primary="Saída" />
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      component={NavLink}
+                      to="/portaria/chegada"
+                      sx={{ pl: 4, ...listItemButtonStyle }}
+                    >
+                      <ListItemText primary="Chegada" />
                     </ListItemButton>
                   </ListItem>
                 </List>

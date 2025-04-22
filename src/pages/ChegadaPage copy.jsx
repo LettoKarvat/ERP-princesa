@@ -20,17 +20,17 @@ import {
     useMediaQuery,
     useTheme,
     Chip,
-    Divider
+    Divider,
+    Paper
 } from "@mui/material";
 import {
     Add as AddIcon,
-    CompareArrows as CompareIcon,
+    CompareArrows,
     Close as CloseIcon,
     Delete as DeleteIcon,
     Edit as EditIcon,
     Visibility as VisibilityIcon,
-    LocalShipping as OutIcon,
-    DirectionsCar as InIcon,
+    LocalShipping as VehicleIcon,
     AccessTime as TimeIcon,
     Speed as SpeedIcon,
     Person as PersonIcon,
@@ -52,16 +52,10 @@ import {
     fileToBase64
 } from "../services/arrivalService";
 
-// dentro de ChegadaPage.jsx
-
 const api = axios.create({
-    baseURL: "https://18aa-206-84-60-250.ngrok-free.app",
-    headers: {
-        "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
-    },
+    baseURL: import.meta.env.VITE_FLASK_URL || "http://localhost:5000",
+    headers: { "Content-Type": "application/json" }
 });
-
 
 const nowISO = () => {
     const d = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
@@ -94,7 +88,6 @@ export default function ChegadaPage() {
     const [detailOpen, setDetailOpen] = useState(false);
     const [detailData, setDetailData] = useState(null);
     const [cmpData, setCmpData] = useState(null);
-    const [compareOpen, setCompareOpen] = useState(false);
     const [deleteAsk, setDeleteAsk] = useState(null);
 
     const sigRef = useRef(null);
@@ -261,7 +254,7 @@ export default function ChegadaPage() {
                                     color="primary"
                                     sx={{ display: "flex", alignItems: "center" }}
                                 >
-                                    <InIcon sx={{ mr: 1 }} />
+                                    <VehicleIcon sx={{ mr: 1 }} />
                                     {c.placa}
                                 </Typography>
                                 <Typography
@@ -340,38 +333,30 @@ export default function ChegadaPage() {
                                     <IconButton
                                         size="small"
                                         onClick={async () => {
+                                            // busca direto do backend pelo ID do checklist
                                             const { data: checklistRaw } = await api.get(
                                                 `/checklists/operacao/${c.checklist.id}`
                                             );
+
                                             setCmpData({
                                                 arrival: c,
                                                 checklist: {
                                                     data_saida: checklistRaw.data_saida,
                                                     km_saida: checklistRaw.km_saida,
                                                     horimetro_saida: checklistRaw.horimetro_saida,
-                                                    motoristaNome:
-                                                        checklistRaw.motorista?.fullname || ""
+                                                    motoristaNome: checklistRaw.motorista?.fullname || ""
                                                 }
                                             });
-                                            setCompareOpen(true);
                                         }}
                                     >
-                                        <CompareIcon fontSize="inherit" />
+                                        <CompareArrows fontSize="inherit" />
                                     </IconButton>
                                 </Tooltip>
                                 <Tooltip title="Excluir">
-                                    <IconButton
-                                        size="small"
-                                        onClick={async () => {
-                                            if (window.confirm("Quer mesmo excluir esta chegada?")) {
-                                                await confirmDelete(c.id);
-                                            }
-                                        }}
-                                    >
+                                    <IconButton size="small" onClick={() => setDeleteAsk(c.id)}>
                                         <DeleteIcon fontSize="inherit" color="error" />
                                     </IconButton>
                                 </Tooltip>
-
                             </Box>
                         </Card>
                     ))}
@@ -384,9 +369,7 @@ export default function ChegadaPage() {
                 onClose={() => setDlgOpen(false)}
                 PaperProps={{ sx: { width: isMobile ? "90%" : 600, borderRadius: 3 } }}
             >
-                <DialogTitle>
-                    {editId ? "Editar Chegada" : "Nova Chegada"}
-                </DialogTitle>
+                <DialogTitle>{editId ? "Editar Chegada" : "Nova Chegada"}</DialogTitle>
                 <DialogContent dividers>
                     <Stack spacing={2}>
                         {!editId && (
@@ -418,9 +401,7 @@ export default function ChegadaPage() {
                                 options={motoristas}
                                 size="small"
                                 getOptionLabel={o => o.fullname}
-                                value={
-                                    motoristas.find(m => m.id === form.motoristaId) || null
-                                }
+                                value={motoristas.find(m => m.id === form.motoristaId) || null}
                                 onChange={(_, v) =>
                                     setForm({
                                         ...form,
@@ -443,9 +424,7 @@ export default function ChegadaPage() {
                                 <IconButton
                                     size="small"
                                     sx={{ position: "absolute", right: 8, top: 6 }}
-                                    onClick={() =>
-                                        setForm({ ...form, editDriver: true })
-                                    }
+                                    onClick={() => setForm({ ...form, editDriver: true })}
                                 >
                                     <EditIcon fontSize="small" />
                                 </IconButton>
@@ -460,9 +439,7 @@ export default function ChegadaPage() {
                             type="datetime-local"
                             InputLabelProps={{ shrink: true }}
                             value={form.dataChegada}
-                            onChange={e =>
-                                setForm({ ...form, dataChegada: e.target.value })
-                            }
+                            onChange={e => setForm({ ...form, dataChegada: e.target.value })}
                         />
                         <TextField
                             fullWidth
@@ -471,9 +448,7 @@ export default function ChegadaPage() {
                             label="Horímetro"
                             type="number"
                             value={form.horimetroChegada}
-                            onChange={e =>
-                                setForm({ ...form, horimetroChegada: e.target.value })
-                            }
+                            onChange={e => setForm({ ...form, horimetroChegada: e.target.value })}
                         />
                         <TextField
                             fullWidth
@@ -482,9 +457,7 @@ export default function ChegadaPage() {
                             label="KM Chegada"
                             type="number"
                             value={form.kmChegada}
-                            onChange={e =>
-                                setForm({ ...form, kmChegada: e.target.value })
-                            }
+                            onChange={e => setForm({ ...form, kmChegada: e.target.value })}
                         />
 
                         <TextField
@@ -495,27 +468,16 @@ export default function ChegadaPage() {
                             multiline
                             minRows={2}
                             value={form.observacoesChegada}
-                            onChange={e =>
-                                setForm({ ...form, observacoesChegada: e.target.value })
-                            }
+                            onChange={e => setForm({ ...form, observacoesChegada: e.target.value })}
                         />
 
                         <Box>
-                            <Typography
-                                variant="subtitle2"
-                                fontWeight="bold"
-                                sx={{ mb: 0.5 }}
-                            >
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 0.5 }}>
                                 Anexos
                             </Typography>
                             <Button variant="outlined" component="label" size="small">
                                 Selecionar arquivos
-                                <input
-                                    hidden
-                                    multiple
-                                    type="file"
-                                    onChange={fileChange}
-                                />
+                                <input hidden multiple type="file" onChange={fileChange} />
                             </Button>
                             <Typography variant="caption" sx={{ ml: 1 }}>
                                 {form.attachments.length} arquivo(s)
@@ -525,23 +487,15 @@ export default function ChegadaPage() {
                 </DialogContent>
                 <DialogActions sx={{ pr: 3, pb: 2 }}>
                     <Button onClick={() => setDlgOpen(false)}>Cancelar</Button>
-                    <Button
-                        variant="contained"
-                        onClick={trySave}
-                        disabled={!form.motoristaId}
-                    >
+                    <Button variant="contained" onClick={trySave} disabled={!form.motoristaId}>
                         {editId ? "Salvar" : "Criar"}
                     </Button>
                 </DialogActions>
             </Dialog>
 
             {/* Assinatura Dialog */}
-            <Dialog
-                open={sigOpen}
-                onClose={() => setSigOpen(false)}
-                fullScreen={isMobile}
-            >
-                <DialogTitle>Assinatura</DialogTitle>
+            <Dialog open={sigOpen} onClose={() => setSigOpen(false)} fullScreen={isMobile}>
+                <DialogTitle>Assinatura do Motorista</DialogTitle>
                 <DialogContent dividers>
                     <SignatureCanvas
                         ref={sigRef}
@@ -564,16 +518,11 @@ export default function ChegadaPage() {
             </Dialog>
 
             {/* Detalhes Dialog */}
-            <Dialog
-                open={detailOpen}
-                onClose={() => setDetailOpen(false)}
-                fullWidth
-                maxWidth="md"
-            >
+            <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} fullWidth maxWidth="md">
                 {detailData && (
                     <>
                         <DialogTitle>
-                            <InIcon sx={{ mr: 1 }} />
+                            <VehicleIcon sx={{ mr: 1 }} />
                             Detalhes — {detailData.placa}
                             <IconButton
                                 onClick={() => setDetailOpen(false)}
@@ -586,34 +535,21 @@ export default function ChegadaPage() {
                             <Stack spacing={2}>
                                 <Box sx={{ display: "flex", alignItems: "center" }}>
                                     <TimeIcon sx={{ mr: 1 }} />
-                                    {new Date(detailData.data_chegada).toLocaleString(
-                                        "pt-BR"
-                                    )}
+                                    {new Date(detailData.data_chegada).toLocaleString("pt-BR")}
                                 </Box>
                                 <Divider />
                                 <Grid container spacing={2}>
-                                    <Grid
-                                        item
-                                        xs={6}
-                                        sx={{ display: "flex", alignItems: "center" }}
-                                    >
+                                    <Grid item xs={6} sx={{ display: "flex", alignItems: "center" }}>
                                         <SpeedIcon sx={{ mr: 1 }} /> {detailData.km_chegada} KM
                                     </Grid>
-                                    <Grid
-                                        item
-                                        xs={6}
-                                        sx={{ display: "flex", alignItems: "center" }}
-                                    >
-                                        <SpeedIcon
-                                            sx={{ mr: 1, transform: "rotate(90deg)" }}
-                                        />{" "}
+                                    <Grid item xs={6} sx={{ display: "flex", alignItems: "center" }}>
+                                        <SpeedIcon sx={{ mr: 1, transform: "rotate(90deg)" }} />{" "}
                                         {detailData.horimetro_chegada} Horímetro
                                     </Grid>
                                 </Grid>
                                 <Divider />
                                 <Box sx={{ display: "flex", alignItems: "center" }}>
-                                    <PersonIcon sx={{ mr: 1 }} />{" "}
-                                    {detailData.motorista?.fullname}
+                                    <PersonIcon sx={{ mr: 1 }} /> {detailData.motorista?.fullname}
                                 </Box>
                                 {detailData.observacoes && (
                                     <>
@@ -635,11 +571,7 @@ export default function ChegadaPage() {
                                                 component="img"
                                                 src={detailData.assinatura}
                                                 alt="assinatura"
-                                                sx={{
-                                                    maxWidth: "100%",
-                                                    borderRadius: 1,
-                                                    border: "1px solid"
-                                                }}
+                                                sx={{ maxWidth: "100%", borderRadius: 1, border: "1px solid" }}
                                             />
                                         </Box>
                                     </>
@@ -679,137 +611,6 @@ export default function ChegadaPage() {
                         </DialogActions>
                     </>
                 )}
-            </Dialog>
-
-            {/* Comparar Saída × Chegada Dialog */}
-            <Dialog
-                open={compareOpen}
-                onClose={() => {
-                    setCompareOpen(false);
-                    setCmpData(null);
-                }}
-                fullWidth
-                maxWidth="xs"
-                PaperProps={{ sx: { borderRadius: 3 } }}
-            >
-                <DialogTitle
-                    sx={{
-                        backgroundColor: theme.palette.secondary.main,
-                        color: "#fff",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between"
-                    }}
-                >
-                    <Box sx={{ display: "flex", alignItems: "center" }}>
-                        <CompareIcon sx={{ mr: 1 }} /> Comparar Saída × Chegada
-                    </Box>
-                    <IconButton
-                        onClick={() => {
-                            setCompareOpen(false);
-                            setCmpData(null);
-                        }}
-                        sx={{ color: "#fff" }}
-                    >
-                        <CloseIcon />
-                    </IconButton>
-                </DialogTitle>
-                {cmpData && (
-                    <DialogContent dividers>
-                        <Stack spacing={2}>
-                            {/* Saída */}
-                            <Box>
-                                <Typography
-                                    variant="subtitle2"
-                                    fontWeight="bold"
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <OutIcon sx={{ mr: 1 }} /> Saída
-                                </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <TimeIcon sx={{ mr: 0.5 }} />
-                                    {new Date(cmpData.checklist.data_saida).toLocaleString(
-                                        "pt-BR"
-                                    )}
-                                </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <SpeedIcon sx={{ mr: 0.5 }} /> KM:{" "}
-                                    {cmpData.checklist.km_saida}
-                                </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <SpeedIcon
-                                        sx={{ mr: 0.5, transform: "rotate(90deg)" }}
-                                    />{" "}
-                                    Horímetro: {cmpData.checklist.horimetro_saida}
-                                </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <PersonIcon sx={{ mr: 0.5 }} /> Motorista:{" "}
-                                    {cmpData.checklist.motoristaNome}
-                                </Typography>
-                            </Box>
-                            <Divider />
-                            {/* Chegada */}
-                            <Box>
-                                <Typography
-                                    variant="subtitle2"
-                                    fontWeight="bold"
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <InIcon
-                                        sx={{ mr: 1, color: theme.palette.success.main }}
-                                    />{" "}
-                                    Chegada
-                                </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <TimeIcon sx={{ mr: 0.5 }} />
-                                    {new Date(cmpData.arrival.data_chegada).toLocaleString(
-                                        "pt-BR"
-                                    )}
-                                </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <SpeedIcon sx={{ mr: 0.5 }} /> KM:{" "}
-                                    {cmpData.arrival.km_chegada}
-                                </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <SpeedIcon
-                                        sx={{ mr: 0.5, transform: "rotate(90deg)" }}
-                                    />{" "}
-                                    Horímetro: {cmpData.arrival.horimetro_chegada}
-                                </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <PersonIcon sx={{ mr: 0.5 }} /> Motorista:{" "}
-                                    {cmpData.arrival.motorista?.fullname}
-                                </Typography>
-                            </Box>
-                        </Stack>
-                    </DialogContent>
-                )}
-                <DialogActions>
-                    <Button
-                        onClick={() => {
-                            setCompareOpen(false);
-                            setCmpData(null);
-                        }}
-                    >
-                        Fechar
-                    </Button>
-                </DialogActions>
             </Dialog>
         </Box>
     );
