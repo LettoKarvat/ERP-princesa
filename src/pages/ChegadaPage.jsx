@@ -101,6 +101,8 @@ export default function ChegadaPage() {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
+    const userRole = localStorage.getItem("role");
+
     useEffect(() => {
         loadData();
     }, []);
@@ -311,31 +313,7 @@ export default function ChegadaPage() {
                                         <VisibilityIcon fontSize="inherit" />
                                     </IconButton>
                                 </Tooltip>
-                                <Tooltip title="Editar">
-                                    <IconButton
-                                        size="small"
-                                        onClick={() => {
-                                            setEditId(c.id);
-                                            setForm({
-                                                saidaId: c.checklist.id,
-                                                dataChegada: c.data_chegada
-                                                    ? c.data_chegada.slice(0, 16)
-                                                    : nowISO(),
-                                                horimetroChegada: c.horimetro_chegada,
-                                                kmChegada: c.km_chegada,
-                                                motoristaId: c.motorista?.id || "",
-                                                motoristaNome: c.motorista?.fullname || "",
-                                                editDriver: false,
-                                                assinaturaMotorista: c.assinatura || "",
-                                                observacoesChegada: c.observacoes || "",
-                                                attachments: []
-                                            });
-                                            setDlgOpen(true);
-                                        }}
-                                    >
-                                        <EditIcon fontSize="inherit" />
-                                    </IconButton>
-                                </Tooltip>
+
                                 <Tooltip title="Comparar">
                                     <IconButton
                                         size="small"
@@ -358,20 +336,48 @@ export default function ChegadaPage() {
                                     >
                                         <CompareIcon fontSize="inherit" />
                                     </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Excluir">
-                                    <IconButton
-                                        size="small"
-                                        onClick={async () => {
-                                            if (window.confirm("Quer mesmo excluir esta chegada?")) {
-                                                await confirmDelete(c.id);
-                                            }
-                                        }}
-                                    >
-                                        <DeleteIcon fontSize="inherit" color="error" />
-                                    </IconButton>
-                                </Tooltip>
 
+                                </Tooltip>
+                                {userRole !== "portaria" && (
+                                    <>
+                                        <Tooltip title="Editar">
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => {
+                                                    setEditId(c.id);
+                                                    setForm({
+                                                        saidaId: c.checklist.id,
+                                                        dataChegada: c.data_chegada
+                                                            ? c.data_chegada.slice(0, 16)
+                                                            : nowISO(),
+                                                        horimetroChegada: c.horimetro_chegada,
+                                                        kmChegada: c.km_chegada,
+                                                        motoristaId: c.motorista?.id || "",
+                                                        motoristaNome: c.motorista?.fullname || "",
+                                                        editDriver: false,
+                                                        assinaturaMotorista: c.assinatura || "",
+                                                        observacoesChegada: c.observacoes || "",
+                                                        attachments: []
+                                                    });
+                                                    setDlgOpen(true);
+                                                }}
+                                            >
+                                                <EditIcon fontSize="inherit" />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Excluir">
+                                            <IconButton
+                                                size="small"
+                                                onClick={async () => {
+                                                    if (window.confirm("Quer mesmo excluir esta chegada?")) {
+                                                        await confirmDelete(c.id);
+                                                    }
+                                                }}
+                                            >
+                                                <DeleteIcon fontSize="inherit" color="error" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </>)}
                             </Box>
                         </Card>
                     ))}
