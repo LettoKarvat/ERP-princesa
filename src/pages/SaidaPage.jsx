@@ -115,6 +115,7 @@ export default function SaidaPage() {
     const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
     const [isSaving, setIsSaving] = useState(false);
 
+    const userRole = localStorage.getItem("role");
 
     // ───────────────────── lifecycle ──────────────────────
     useEffect(() => {
@@ -479,20 +480,18 @@ export default function SaidaPage() {
                                         >
                                             <VisibilityIcon fontSize="small" />
                                         </IconButton>
-                                        <IconButton
-                                            size="small"
-                                            title="Editar"
-                                            onClick={() => handleOpenEdit(ch.id)}
-                                        >
-                                            <EditIcon fontSize="small" />
-                                        </IconButton>
-                                        <IconButton
-                                            size="small"
-                                            title="Excluir"
-                                            onClick={() => handleDelete(ch.id)}
-                                        >
-                                            <DeleteIcon fontSize="small" />
-                                        </IconButton>
+                                        {userRole !== "portaria" && (
+                                            <>
+
+
+                                                <IconButton size="small" title="Editar" onClick={() => handleOpenEdit(ch.id)}>
+                                                    <EditIcon fontSize="small" />
+                                                </IconButton>
+                                                <IconButton size="small" title="Excluir" onClick={() => handleDelete(ch.id)}>
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            </>
+                                        )}
                                     </Box>
                                 </CardContent>
                             </Card>

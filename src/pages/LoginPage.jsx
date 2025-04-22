@@ -40,7 +40,7 @@ function LoginPage() {
     abastecimento: '/refueling',
     manutencao: '/parts-replacement/maintenance',
     motorista: '/driver-checklists', // <-- Agora aponta para /driver-checklists
-    portaria: '/checklist',
+    portaria: '/portaria/saida',
   };
 
 
