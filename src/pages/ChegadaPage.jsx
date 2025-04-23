@@ -5,6 +5,7 @@ import {
     Typography,
     Card,
     CardContent,
+    Paper,
     Button,
     Grid,
     TextField,
@@ -20,7 +21,8 @@ import {
     useMediaQuery,
     useTheme,
     Chip,
-    Divider
+    Divider,
+    CircularProgress
 } from "@mui/material";
 import {
     Add as AddIcon,
@@ -35,6 +37,7 @@ import {
     Speed as SpeedIcon,
     Person as PersonIcon,
     Note as NoteIcon,
+    Flag as FlagIcon,
     AttachFile as AttachIcon,
     BorderColor as SignatureIcon
 } from "@mui/icons-material";
@@ -52,17 +55,16 @@ import {
     fileToBase64
 } from "../services/arrivalService";
 
-// dentro de ChegadaPage.jsx
-
+/* ───────────────────── Config Axios ───────────────────── */
 const api = axios.create({
     baseURL: "https://18aa-206-84-60-250.ngrok-free.app",
     headers: {
         "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
-    },
+        "ngrok-skip-browser-warning": "true"
+    }
 });
 
-
+/* ─────────────────── Funções utilitárias ────────────────── */
 const nowISO = () => {
     const d = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
     return d.toISOString().slice(0, 16);
@@ -81,28 +83,61 @@ const emptyForm = () => ({
     attachments: []
 });
 
+/* ─────────────────────── Componente ─────────────────────── */
 export default function ChegadaPage() {
+    /* Estados principais */
     const [saidas, setSaidas] = useState([]);
     const [chegadas, setChegadas] = useState([]);
     const [motoristas, setMotoristas] = useState([]);
     const [form, setForm] = useState(emptyForm());
     const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [editId, setEditId] = useState(null);
 
+    /* Estados de diálogos */
     const [dlgOpen, setDlgOpen] = useState(false);
     const [sigOpen, setSigOpen] = useState(false);
     const [detailOpen, setDetailOpen] = useState(false);
     const [detailData, setDetailData] = useState(null);
     const [cmpData, setCmpData] = useState(null);
     const [compareOpen, setCompareOpen] = useState(false);
-    const [deleteAsk, setDeleteAsk] = useState(null);
 
+    /* Refs, tema, etc. */
     const sigRef = useRef(null);
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-
     const userRole = localStorage.getItem("role");
 
+    /* ─────────── Mini-componente para info compacta ────────── */
+    const InfoItem = ({ icon: Icon, label, value, accent = "primary" }) => (
+        <Paper
+            elevation={2}
+            sx={{
+                p: 1.5,
+                borderRadius: 2,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                bgcolor: theme.palette.background.paper
+            }}
+        >
+            <Icon sx={{ color: theme.palette[accent].main }} />
+            <Box>
+                <Typography
+                    variant="caption"
+                    sx={{ fontWeight: "bold", color: "text.secondary" }}
+                >
+                    {label}
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    {value}
+                </Typography>
+            </Box>
+        </Paper>
+    );
+    /* ──────────────────────────────────────────────────────── */
+
+    /* Carregamento inicial */
     useEffect(() => {
         loadData();
     }, []);
@@ -151,6 +186,7 @@ export default function ChegadaPage() {
         }
     }
 
+    /* ─────────────── Helpers de formulário ─────────────── */
     function fillFromSaida(id) {
         const s = saidas.find(x => x.id === id);
         if (!s) return;
@@ -197,7 +233,7 @@ export default function ChegadaPage() {
 
         setDlgOpen(false);
         setEditId(null);
-        loadData();
+        await loadData();
     }
 
     function trySave() {
@@ -206,28 +242,41 @@ export default function ChegadaPage() {
             return alert("Selecione saída válida e confira KM.");
         if (!form.motoristaId) return alert("Informe o motorista.");
         if (!form.assinaturaMotorista) return setSigOpen(true);
-        upsertArrival();
+        handleUpsert();
     }
 
-    const confirmSig = () => {
+    const handleUpsert = async (sigURL) => {
+        setSaving(true);
+        try {
+            await upsertArrival(sigURL);
+        } catch (err) {
+            console.error(err);
+            alert("Erro ao salvar chegada.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const confirmSig = async () => {
         if (sigRef.current.isEmpty()) return alert("Assine primeiro.");
         const sig = sigRef.current.toDataURL();
         setSigOpen(false);
-        upsertArrival(sig);
+        await handleUpsert(sig);
     };
 
     const confirmDelete = async id => {
         await deleteArrival(id);
-        setDeleteAsk(null);
         loadData();
     };
 
+    /* ─────────────────────────── UI ────────────────────────── */
     return (
         <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
             <Typography variant="h4" gutterBottom>
                 Chegada de Veículos
             </Typography>
 
+            {/* Botão Nova Chegada */}
             <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 3 }}>
                 <Button
                     variant="contained"
@@ -242,6 +291,7 @@ export default function ChegadaPage() {
                 </Button>
             </Box>
 
+            {/* Lista/Cards de chegadas */}
             {loading ? (
                 <Typography>Carregando...</Typography>
             ) : !chegadas.length ? (
@@ -292,6 +342,7 @@ export default function ChegadaPage() {
                                 </Typography>
                             </CardContent>
 
+                            {/* Ações no canto do card */}
                             <Box
                                 sx={{
                                     position: "absolute",
@@ -336,8 +387,8 @@ export default function ChegadaPage() {
                                     >
                                         <CompareIcon fontSize="inherit" />
                                     </IconButton>
-
                                 </Tooltip>
+
                                 {userRole !== "portaria" && (
                                     <>
                                         <Tooltip title="Editar">
@@ -377,22 +428,21 @@ export default function ChegadaPage() {
                                                 <DeleteIcon fontSize="inherit" color="error" />
                                             </IconButton>
                                         </Tooltip>
-                                    </>)}
+                                    </>
+                                )}
                             </Box>
                         </Card>
                     ))}
                 </Box>
             )}
 
-            {/* Criar/Editar Dialog */}
+            {/* ─────────────────── Dialog Criar/Editar ─────────────────── */}
             <Dialog
                 open={dlgOpen}
                 onClose={() => setDlgOpen(false)}
                 PaperProps={{ sx: { width: isMobile ? "90%" : 600, borderRadius: 3 } }}
             >
-                <DialogTitle>
-                    {editId ? "Editar Chegada" : "Nova Chegada"}
-                </DialogTitle>
+                <DialogTitle>{editId ? "Editar Chegada" : "Nova Chegada"}</DialogTitle>
                 <DialogContent dividers>
                     <Stack spacing={2}>
                         {!editId && (
@@ -419,14 +469,13 @@ export default function ChegadaPage() {
                         <Typography variant="subtitle2" fontWeight="bold">
                             Motorista
                         </Typography>
+
                         {form.editDriver ? (
                             <Autocomplete
                                 options={motoristas}
                                 size="small"
                                 getOptionLabel={o => o.fullname}
-                                value={
-                                    motoristas.find(m => m.id === form.motoristaId) || null
-                                }
+                                value={motoristas.find(m => m.id === form.motoristaId) || null}
                                 onChange={(_, v) =>
                                     setForm({
                                         ...form,
@@ -449,15 +498,14 @@ export default function ChegadaPage() {
                                 <IconButton
                                     size="small"
                                     sx={{ position: "absolute", right: 8, top: 6 }}
-                                    onClick={() =>
-                                        setForm({ ...form, editDriver: true })
-                                    }
+                                    onClick={() => setForm({ ...form, editDriver: true })}
                                 >
                                     <EditIcon fontSize="small" />
                                 </IconButton>
                             </Box>
                         )}
 
+                        {/* Demais campos */}
                         <TextField
                             fullWidth
                             size="small"
@@ -466,9 +514,7 @@ export default function ChegadaPage() {
                             type="datetime-local"
                             InputLabelProps={{ shrink: true }}
                             value={form.dataChegada}
-                            onChange={e =>
-                                setForm({ ...form, dataChegada: e.target.value })
-                            }
+                            onChange={e => setForm({ ...form, dataChegada: e.target.value })}
                         />
                         <TextField
                             fullWidth
@@ -492,7 +538,6 @@ export default function ChegadaPage() {
                                 setForm({ ...form, kmChegada: e.target.value })
                             }
                         />
-
                         <TextField
                             fullWidth
                             size="small"
@@ -506,22 +551,14 @@ export default function ChegadaPage() {
                             }
                         />
 
+                        {/* Anexos */}
                         <Box>
-                            <Typography
-                                variant="subtitle2"
-                                fontWeight="bold"
-                                sx={{ mb: 0.5 }}
-                            >
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 0.5 }}>
                                 Anexos
                             </Typography>
                             <Button variant="outlined" component="label" size="small">
                                 Selecionar arquivos
-                                <input
-                                    hidden
-                                    multiple
-                                    type="file"
-                                    onChange={fileChange}
-                                />
+                                <input hidden multiple type="file" onChange={fileChange} />
                             </Button>
                             <Typography variant="caption" sx={{ ml: 1 }}>
                                 {form.attachments.length} arquivo(s)
@@ -530,23 +567,21 @@ export default function ChegadaPage() {
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ pr: 3, pb: 2 }}>
-                    <Button onClick={() => setDlgOpen(false)}>Cancelar</Button>
+                    <Button onClick={() => setDlgOpen(false)} disabled={saving}>
+                        Cancelar
+                    </Button>
                     <Button
                         variant="contained"
                         onClick={trySave}
-                        disabled={!form.motoristaId}
+                        disabled={!form.motoristaId || saving}
                     >
-                        {editId ? "Salvar" : "Criar"}
+                        {saving ? <CircularProgress size={24} /> : editId ? "Salvar" : "Criar"}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* Assinatura Dialog */}
-            <Dialog
-                open={sigOpen}
-                onClose={() => setSigOpen(false)}
-                fullScreen={isMobile}
-            >
+            {/* ─────────────────── Dialog Assinatura ─────────────────── */}
+            <Dialog open={sigOpen} onClose={() => setSigOpen(false)} fullScreen={isMobile}>
                 <DialogTitle>Assinatura</DialogTitle>
                 <DialogContent dividers>
                     <SignatureCanvas
@@ -557,19 +592,21 @@ export default function ChegadaPage() {
                             height: 200
                         }}
                     />
-                    <Button sx={{ mt: 1 }} onClick={() => sigRef.current.clear()}>
+                    <Button sx={{ mt: 1 }} onClick={() => sigRef.current.clear()} disabled={saving}>
                         Limpar
                     </Button>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setSigOpen(false)}>Cancelar</Button>
-                    <Button variant="contained" onClick={confirmSig}>
-                        Confirmar
+                    <Button onClick={() => setSigOpen(false)} disabled={saving}>
+                        Cancelar
+                    </Button>
+                    <Button variant="contained" onClick={confirmSig} disabled={saving}>
+                        {saving ? <CircularProgress size={24} /> : "Confirmar"}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* Detalhes Dialog */}
+            {/* ─────────────────── Dialog Detalhes ─────────────────── */}
             <Dialog
                 open={detailOpen}
                 onClose={() => setDetailOpen(false)}
@@ -578,83 +615,155 @@ export default function ChegadaPage() {
             >
                 {detailData && (
                     <>
-                        <DialogTitle>
+                        <DialogTitle
+                            sx={{
+                                backgroundColor: theme.palette.primary.main,
+                                color: "#fff",
+                                display: "flex",
+                                alignItems: "center"
+                            }}
+                        >
                             <InIcon sx={{ mr: 1 }} />
                             Detalhes — {detailData.placa}
                             <IconButton
                                 onClick={() => setDetailOpen(false)}
-                                sx={{ position: "absolute", right: 8, top: 8 }}
+                                sx={{ position: "absolute", right: 8, top: 8, color: "#fff" }}
                             >
                                 <CloseIcon />
                             </IconButton>
                         </DialogTitle>
+
                         <DialogContent dividers>
                             <Stack spacing={2}>
-                                <Box sx={{ display: "flex", alignItems: "center" }}>
-                                    <TimeIcon sx={{ mr: 1 }} />
-                                    {new Date(detailData.data_chegada).toLocaleString(
-                                        "pt-BR"
-                                    )}
-                                </Box>
-                                <Divider />
+                                {/* Data/Hora */}
+                                <InfoItem
+                                    icon={TimeIcon}
+                                    label="Data/Hora"
+                                    value={new Date(detailData.data_chegada).toLocaleString("pt-BR")}
+                                    accent="secondary"
+                                />
+
+                                {/* KM e Horímetro */}
                                 <Grid container spacing={2}>
-                                    <Grid
-                                        item
-                                        xs={6}
-                                        sx={{ display: "flex", alignItems: "center" }}
-                                    >
-                                        <SpeedIcon sx={{ mr: 1 }} /> {detailData.km_chegada} KM
+                                    <Grid item xs={6}>
+                                        <InfoItem
+                                            icon={SpeedIcon}
+                                            label="KM Chegada"
+                                            value={`${detailData.km_chegada ?? "—"} km`}
+                                        />
                                     </Grid>
-                                    <Grid
-                                        item
-                                        xs={6}
-                                        sx={{ display: "flex", alignItems: "center" }}
-                                    >
-                                        <SpeedIcon
-                                            sx={{ mr: 1, transform: "rotate(90deg)" }}
-                                        />{" "}
-                                        {detailData.horimetro_chegada} Horímetro
+                                    <Grid item xs={6}>
+                                        <InfoItem
+                                            icon={SpeedIcon}
+                                            label="Horímetro"
+                                            value={detailData.horimetro_chegada ?? "—"}
+                                        />
                                     </Grid>
                                 </Grid>
-                                <Divider />
-                                <Box sx={{ display: "flex", alignItems: "center" }}>
-                                    <PersonIcon sx={{ mr: 1 }} />{" "}
-                                    {detailData.motorista?.fullname}
-                                </Box>
+
+                                {/* Motorista */}
+                                <InfoItem
+                                    icon={PersonIcon}
+                                    label="Motorista"
+                                    value={detailData.motorista?.fullname ?? "—"}
+                                />
+
+                                {/* Motivo / Destino */}
+                                {detailData.checklist?.motivo_saida && (
+                                    <InfoItem
+                                        icon={NoteIcon}
+                                        label="Motivo"
+                                        value={detailData.checklist.motivo_saida}
+                                        accent="warning"
+                                    />
+                                )}
+
+                                {detailData.checklist?.destino && (
+                                    <InfoItem
+                                        icon={FlagIcon}
+                                        label="Destino"
+                                        value={detailData.checklist.destino}
+                                        accent="success"
+                                    />
+                                )}
+
+                                {/* Observações */}
                                 {detailData.observacoes && (
-                                    <>
-                                        <Divider />
-                                        <Box>
-                                            <NoteIcon sx={{ mr: 1 }} /> Observações
-                                            <Typography whiteSpace="pre-wrap">
-                                                {detailData.observacoes}
-                                            </Typography>
-                                        </Box>
-                                    </>
+                                    <Paper
+                                        elevation={0}
+                                        sx={{
+                                            p: 2,
+                                            borderRadius: 2,
+                                            bgcolor: theme.palette.grey[100]
+                                        }}
+                                    >
+                                        <Typography
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                mb: 1
+                                            }}
+                                        >
+                                            <NoteIcon
+                                                sx={{ mr: 1, color: theme.palette.info.main }}
+                                            />{" "}
+                                            <strong>Observações</strong>
+                                        </Typography>
+                                        <Typography whiteSpace="pre-wrap">
+                                            {detailData.observacoes}
+                                        </Typography>
+                                    </Paper>
                                 )}
+
+                                {/* Assinatura */}
                                 {detailData.assinatura && (
-                                    <>
-                                        <Divider />
-                                        <Box textAlign="center">
-                                            <SignatureIcon sx={{ mr: 1 }} /> Assinatura
-                                            <Box
-                                                component="img"
-                                                src={detailData.assinatura}
-                                                alt="assinatura"
+                                    <Paper elevation={0} sx={{ p: 2, borderRadius: 2 }}>
+                                        <Typography
+                                            sx={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                mb: 1
+                                            }}
+                                        >
+                                            <SignatureIcon
                                                 sx={{
-                                                    maxWidth: "100%",
-                                                    borderRadius: 1,
-                                                    border: "1px solid"
+                                                    mr: 1,
+                                                    color: theme.palette.success.main
                                                 }}
-                                            />
-                                        </Box>
-                                    </>
+                                            />{" "}
+                                            <strong>Assinatura</strong>
+                                        </Typography>
+                                        <Box
+                                            component="img"
+                                            src={detailData.assinatura}
+                                            alt="assinatura"
+                                            sx={{
+                                                maxWidth: "100%",
+                                                borderRadius: 1,
+                                                border: "1px solid",
+                                                borderColor: theme.palette.divider
+                                            }}
+                                        />
+                                    </Paper>
                                 )}
-                                <Divider />
-                                <Box>
-                                    <AttachIcon sx={{ mr: 1 }} /> Anexos
+
+                                {/* Anexos */}
+                                <Paper elevation={0} sx={{ p: 2, borderRadius: 2 }}>
+                                    <Typography
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            mb: 1
+                                        }}
+                                    >
+                                        <AttachIcon
+                                            sx={{ mr: 1, color: theme.palette.primary.main }}
+                                        />{" "}
+                                        <strong>Anexos</strong>
+                                    </Typography>
+
                                     {!detailData.anexos?.length ? (
-                                        <Typography>Sem anexos.</Typography>
+                                        <Typography variant="body2">Sem anexos.</Typography>
                                     ) : (
                                         <Grid container spacing={1}>
                                             {detailData.anexos.map(ar => (
@@ -670,16 +779,19 @@ export default function ChegadaPage() {
                                                         <Chip
                                                             label={ar.nome_arquivo}
                                                             clickable
-                                                            onClick={() => window.open(ar.url, "_blank")}
+                                                            onClick={() =>
+                                                                window.open(ar.url, "_blank")
+                                                            }
                                                         />
                                                     )}
                                                 </Grid>
                                             ))}
                                         </Grid>
                                     )}
-                                </Box>
+                                </Paper>
                             </Stack>
                         </DialogContent>
+
                         <DialogActions>
                             <Button onClick={() => setDetailOpen(false)}>Fechar</Button>
                         </DialogActions>
@@ -687,7 +799,7 @@ export default function ChegadaPage() {
                 )}
             </Dialog>
 
-            {/* Comparar Saída × Chegada Dialog */}
+            {/* ─────────────── Dialog Comparação ─────────────── */}
             <Dialog
                 open={compareOpen}
                 onClose={() => {
@@ -720,6 +832,7 @@ export default function ChegadaPage() {
                         <CloseIcon />
                     </IconButton>
                 </DialogTitle>
+
                 {cmpData && (
                     <DialogContent dividers>
                         <Stack spacing={2}>
@@ -732,36 +845,27 @@ export default function ChegadaPage() {
                                 >
                                     <OutIcon sx={{ mr: 1 }} /> Saída
                                 </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
+                                <Typography sx={{ display: "flex", alignItems: "center" }}>
                                     <TimeIcon sx={{ mr: 0.5 }} />
-                                    {new Date(cmpData.checklist.data_saida).toLocaleString(
-                                        "pt-BR"
-                                    )}
+                                    {new Date(cmpData.checklist.data_saida).toLocaleString("pt-BR")}
                                 </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <SpeedIcon sx={{ mr: 0.5 }} /> KM:{" "}
-                                    {cmpData.checklist.km_saida}
+                                <Typography sx={{ display: "flex", alignItems: "center" }}>
+                                    <SpeedIcon sx={{ mr: 0.5 }} /> KM: {cmpData.checklist.km_saida}
                                 </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
+                                <Typography sx={{ display: "flex", alignItems: "center" }}>
                                     <SpeedIcon
                                         sx={{ mr: 0.5, transform: "rotate(90deg)" }}
                                     />{" "}
                                     Horímetro: {cmpData.checklist.horimetro_saida}
                                 </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
+                                <Typography sx={{ display: "flex", alignItems: "center" }}>
                                     <PersonIcon sx={{ mr: 0.5 }} /> Motorista:{" "}
                                     {cmpData.checklist.motoristaNome}
                                 </Typography>
                             </Box>
+
                             <Divider />
+
                             {/* Chegada */}
                             <Box>
                                 <Typography
@@ -774,31 +878,20 @@ export default function ChegadaPage() {
                                     />{" "}
                                     Chegada
                                 </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
+                                <Typography sx={{ display: "flex", alignItems: "center" }}>
                                     <TimeIcon sx={{ mr: 0.5 }} />
-                                    {new Date(cmpData.arrival.data_chegada).toLocaleString(
-                                        "pt-BR"
-                                    )}
+                                    {new Date(cmpData.arrival.data_chegada).toLocaleString("pt-BR")}
                                 </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <SpeedIcon sx={{ mr: 0.5 }} /> KM:{" "}
-                                    {cmpData.arrival.km_chegada}
+                                <Typography sx={{ display: "flex", alignItems: "center" }}>
+                                    <SpeedIcon sx={{ mr: 0.5 }} /> KM: {cmpData.arrival.km_chegada}
                                 </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
+                                <Typography sx={{ display: "flex", alignItems: "center" }}>
                                     <SpeedIcon
                                         sx={{ mr: 0.5, transform: "rotate(90deg)" }}
                                     />{" "}
                                     Horímetro: {cmpData.arrival.horimetro_chegada}
                                 </Typography>
-                                <Typography
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
+                                <Typography sx={{ display: "flex", alignItems: "center" }}>
                                     <PersonIcon sx={{ mr: 0.5 }} /> Motorista:{" "}
                                     {cmpData.arrival.motorista?.fullname}
                                 </Typography>
@@ -806,6 +899,7 @@ export default function ChegadaPage() {
                         </Stack>
                     </DialogContent>
                 )}
+
                 <DialogActions>
                     <Button
                         onClick={() => {
