@@ -1,15 +1,17 @@
+// src/components/VehicleTireManagement.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import {
-    Box, Typography, TextField, Button, List, ListItem, ListItemText,
-    Dialog, DialogTitle, DialogContent, DialogActions,
-    Grid, Paper, styled, Alert, FormControl, InputLabel, Select, MenuItem
+    Box, Typography, TextField, Button, Dialog, DialogTitle,
+    DialogContent, DialogActions, Grid, Paper, styled, Alert,
+    FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
+import { DataGrid } from '@mui/x-data-grid';
 import { MdOutlineTireRepair } from 'react-icons/md';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import api from '../services/api';
 
-/* layouts por tipo de veículo */
+/* ─── layouts por tipo de veículo ─── */
 const TIRE_LAYOUTS = {
     'Passeio': [
         { label: 'Eixo Dianteiro', positions: ['1E', '1D'] },
@@ -63,6 +65,7 @@ const TIRE_LAYOUTS = {
     ]
 };
 
+/* ─── card de posição ─── */
 const TirePositionCard = styled(Paper, {
     shouldForwardProp: (prop) => prop !== 'selected'
 })(({ theme, selected }) => ({
@@ -79,6 +82,7 @@ const TirePositionCard = styled(Paper, {
     backgroundColor: selected ? theme.palette.action.selected : undefined
 }));
 
+/* ────────────────────────────────────────────────────────── */
 export default function VehicleTireManagement() {
     const [vehicles, setVehicles] = useState([]);
     const [vehicleSearch, setVehicleSearch] = useState('');
@@ -137,9 +141,9 @@ export default function VehicleTireManagement() {
     const getVehicleLayout = () =>
         selectedVehicle?.tipo ? TIRE_LAYOUTS[selectedVehicle.tipo] || [] : [];
 
-    const handleSelectVehicle = async v => {
-        setSelectedVehicle(v);
+    const handleSelectVehicle = async (v) => {
         await loadVehicleTires(v.objectId);
+        setSelectedVehicle(v);
         setOpenVehicleModal(true);
     };
 
@@ -229,39 +233,49 @@ export default function VehicleTireManagement() {
         }
     };
 
+    /* ─── filtro + tabela de veículos ─── */
     const filteredVehicles = vehicles.filter(v =>
         v.placa.toLowerCase().includes(vehicleSearch.toLowerCase())
     );
 
+    const vehicleColumns = [
+        { field: 'placa', headerName: 'Placa', flex: 1 },
+        { field: 'marca', headerName: 'Marca', flex: 1 },
+        { field: 'modelo', headerName: 'Modelo', flex: 1 },
+        { field: 'tipo', headerName: 'Tipo', flex: 1 }
+    ];
+
+    const vehicleRows = filteredVehicles.map(v => ({ ...v, id: v.objectId }));
+
+    /* ────────────────────────────── */
     return (
         <Box sx={{ p: 2 }}>
-            <Typography variant="h4" sx={{ mb: 2 }}>Pesquisa de Veículos por Placa</Typography>
+            <Typography variant="h4" sx={{ mb: 2 }}>
+                Pesquisa de Veículos por Placa
+            </Typography>
+
             <TextField
                 label="Buscar Veículo pela Placa"
-                fullWidth sx={{ mb: 2 }}
+                fullWidth
+                sx={{ mb: 2 }}
                 value={vehicleSearch}
                 onChange={e => setVehicleSearch(e.target.value)}
             />
-            {filteredVehicles.length === 0 ? (
-                <Typography>Nenhum veículo encontrado.</Typography>
-            ) : (
-                <List>
-                    {filteredVehicles.map(v => (
-                        <ListItem
-                            key={v.objectId}
-                            button
-                            onClick={() => handleSelectVehicle(v)}
-                            selected={selectedVehicle?.objectId === v.objectId}
-                        >
-                            <ListItemText
-                                primary={`${v.placa} - ${v.marca} ${v.modelo} (${v.tipo})`}
-                            />
-                        </ListItem>
-                    ))}
-                </List>
-            )}
 
-            {/* Modal Veículo */}
+            <Box sx={{ height: 400, width: '100%' }}>
+                <DataGrid
+                    rows={vehicleRows}
+                    columns={vehicleColumns}
+                    pageSize={8}
+                    rowsPerPageOptions={[8, 16, 32]}
+                    disableSelectionOnClick
+                    onRowClick={({ row }) => handleSelectVehicle(row)}
+                    localeText={{ noRowsLabel: 'Nenhum veículo encontrado.' }}
+                    autoHeight
+                />
+            </Box>
+
+            {/* ─── Modal Veículo ─── */}
             <Dialog open={openVehicleModal} onClose={() => setOpenVehicleModal(false)} maxWidth="md" fullWidth>
                 <DialogTitle>
                     {selectedVehicle && `Veículo: ${selectedVehicle.placa} - ${selectedVehicle.tipo}`}
@@ -328,7 +342,7 @@ export default function VehicleTireManagement() {
                 </DialogActions>
             </Dialog>
 
-            {/* Modal Posição */}
+            {/* ─── Modal Posição ─── */}
             <Dialog open={openPositionModal} onClose={() => setOpenPositionModal(false)} maxWidth="sm" fullWidth>
                 <DialogTitle>Posição: {positionToEdit}</DialogTitle>
                 <DialogContent dividers>
@@ -392,7 +406,7 @@ export default function VehicleTireManagement() {
                 </DialogActions>
             </Dialog>
 
-            {/* Modal Confirmação de Swap */}
+            {/* ─── Modal Confirmação de Swap ─── */}
             <Dialog open={openSwapConfirm} onClose={() => setOpenSwapConfirm(false)}>
                 <DialogTitle>Confirmar troca</DialogTitle>
                 <DialogContent dividers>
