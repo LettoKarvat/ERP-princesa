@@ -94,7 +94,12 @@ export default function TireManagement() {
     const errs = {};
     if (!tire.numeroSerie.trim()) errs.numeroSerie = 'Obrigatório';
     ['nrSulcos', 'nrLonas', 'librasInicial', 'librasFinal', 'vidaAtual'].forEach(k => {
-      if (tire[k] && isNaN(Number(tire[k]))) errs[k] = 'Deve ser número';
+      const v = tire[k]?.toString().trim();
+      if (!v) {
+        errs[k] = 'Obrigatório';
+      } else if (isNaN(Number(v))) {
+        errs[k] = 'Deve ser número';
+      }
     });
     if (tire.vencimento && isNaN(Date.parse(tire.vencimento))) {
       errs.vencimento = 'Data inválida';
@@ -168,15 +173,24 @@ export default function TireManagement() {
     }
   }
 
-  const change = key => e => setNewTire(n => ({ ...n, [key]: e.target.value }));
+  const change = key => e => {
+    setNewTire(n => ({ ...n, [key]: e.target.value }));
+    if (Object.keys(newErrors).length) {
+      setNewErrors(validate({ ...newTire, [key]: e.target.value }));
+    }
+  };
   const changeToggle = key => (_e, checked) => setNewTire(n => ({ ...n, [key]: checked }));
-  const changeEdit = key => (_e, value) => {
-    const v = typeof value === 'boolean' ? value : value.target.value;
+  const changeEdit = key => e => {
+    const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setEditT(n => ({ ...n, [key]: v }));
+    if (Object.keys(editErrors).length) {
+      setEditErrors(validate({ ...editT, [key]: v }));
+    }
   };
   const changeMarker = (type, i, field) => e => {
+    const vv = e.target.value.replace(/[^0-9]/g, '');
     const arr = [...newTire[type]];
-    arr[i] = { ...arr[i], [field]: e.target.value };
+    arr[i] = { ...arr[i], [field]: vv };
     setNewTire(n => ({ ...n, [type]: arr }));
   };
 
@@ -292,11 +306,17 @@ export default function TireManagement() {
             ].map(({ key, label, type }) => (
               <Grid item xs={3} key={key}>
                 <TextField
+                  required={['numeroSerie', 'vidaAtual'].includes(key)}
                   label={label}
                   size="small"
                   fullWidth
                   type={type}
                   InputLabelProps={type === 'date' ? { shrink: true } : undefined}
+                  inputMode={type === 'number' ? 'numeric' : undefined}
+                  pattern={type === 'number' ? '[0-9]*' : undefined}
+                  onInput={type === 'number'
+                    ? e => e.target.value = e.target.value.replace(/[^0-9]/g, '')
+                    : undefined}
                   value={newTire[key]}
                   onChange={change(key)}
                   error={!!newErrors[key]}
@@ -333,21 +353,27 @@ export default function TireManagement() {
           {/* Características */}
           <Grid container spacing={2} mb={2}>
             {[
-              ['Desenho Original', 'desenhoOriginal'],
-              ['Desenho Atual', 'desenhoAtual'],
-              ['Fabricante', 'fabricante'],
+              ['Desenho Original', 'desenhoOriginal', 'text'],
+              ['Desenho Atual', 'desenhoAtual', 'text'],
+              ['Fabricante', 'fabricante', 'text'],
               ['N° Sulcos', 'nrSulcos', 'number'],
               ['N° Lonas', 'nrLonas', 'number'],
-              ['Dimensão', 'dimensao'],
+              ['Dimensão', 'dimensao', 'text'],
               ['Libras Inicial', 'librasInicial', 'number'],
               ['Libras Final', 'librasFinal', 'number'],
             ].map(([lbl, key, type]) => (
               <Grid item xs={3} key={key}>
                 <TextField
+                  required={['nrSulcos', 'nrLonas', 'librasInicial', 'librasFinal'].includes(key)}
                   label={lbl}
                   size="small"
                   fullWidth
-                  type={type || 'text'}
+                  type={type}
+                  inputMode={type === 'number' ? 'numeric' : undefined}
+                  pattern={type === 'number' ? '[0-9]*' : undefined}
+                  onInput={type === 'number'
+                    ? e => e.target.value = e.target.value.replace(/[^0-9]/g, '')
+                    : undefined}
                   value={newTire[key]}
                   onChange={change(key)}
                   error={!!newErrors[key]}
@@ -374,9 +400,13 @@ export default function TireManagement() {
                     {['previsto', 'implantacao', 'realizado'].map(f => (
                       <Grid item xs={3} key={f}>
                         <TextField
+                          required
                           size="small"
                           fullWidth
                           type="number"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          onInput={e => e.target.value = e.target.value.replace(/[^0-9]/g, '')}
                           value={m[f]}
                           onChange={changeMarker(type, i, f)}
                         />
@@ -390,7 +420,13 @@ export default function TireManagement() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenAdd(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleAdd}>Salvar</Button>
+          <Button
+            variant="contained"
+            onClick={handleAdd}
+            disabled={Object.keys(newErrors).length > 0}
+          >
+            Salvar
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -409,14 +445,20 @@ export default function TireManagement() {
                 ].map(key => (
                   <TextField
                     key={key}
+                    required={['numeroSerie', 'vidaAtual'].includes(key)}
                     label={key.charAt(0).toUpperCase() + key.slice(1)}
                     margin="dense"
                     fullWidth
                     size="small"
-                    type={key === 'vencimento' ? 'date' : 'text'}
+                    type={key === 'vencimento' ? 'date' : key === 'vidaAtual' ? 'number' : 'text'}
                     InputLabelProps={key === 'vencimento' ? { shrink: true } : undefined}
+                    inputMode={key === 'vidaAtual' ? 'numeric' : undefined}
+                    pattern={key === 'vidaAtual' ? '[0-9]*' : undefined}
+                    onInput={key === 'vidaAtual'
+                      ? e => e.target.value = e.target.value.replace(/[^0-9]/g, '')
+                      : undefined}
                     value={editT[key] || ''}
-                    onChange={e => changeEdit(key)(_, e.target.value)}
+                    onChange={changeEdit(key)}
                     error={!!editErrors[key]}
                     helperText={editErrors[key]}
                     sx={{ mb: 2 }}
@@ -427,7 +469,7 @@ export default function TireManagement() {
                   control={
                     <Switch
                       checked={!!editT.chipInstalado}
-                      onChange={e => changeEdit('chipInstalado')(_, e.target.checked)}
+                      onChange={changeEdit('chipInstalado')}
                     />
                   }
                   label="CHIP instalado?"
@@ -440,7 +482,7 @@ export default function TireManagement() {
                   fullWidth
                   size="small"
                   value={editT.nroChip || ''}
-                  onChange={e => changeEdit('nroChip')(_, e.target.value)}
+                  onChange={changeEdit('nroChip')}
                   sx={{ mb: 2 }}
                 />
               </>
@@ -476,7 +518,13 @@ export default function TireManagement() {
           ) : (
             <>
               <Button onClick={() => setEdit(false)}>Cancelar</Button>
-              <Button variant="contained" onClick={saveEdit}>Salvar Alterações</Button>
+              <Button
+                variant="contained"
+                onClick={saveEdit}
+                disabled={Object.keys(editErrors).length > 0}
+              >
+                Salvar Alterações
+              </Button>
             </>
           )}
           <Button onClick={() => setOpenDet(false)}>Fechar</Button>
