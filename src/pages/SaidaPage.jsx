@@ -1,6 +1,5 @@
 // src/pages/SaidaPage.jsx
 import React, { useState, useRef, useEffect } from "react";
-import axios from "axios";
 import {
     Box,
     Typography,
@@ -16,7 +15,6 @@ import {
     Card,
     CardContent,
     IconButton,
-    Divider,
     Paper,
     Chip,
     CircularProgress,
@@ -38,26 +36,15 @@ import {
 } from "@mui/icons-material";
 import SignatureCanvas from "react-signature-canvas";
 import Autocomplete from "@mui/material/Autocomplete";
+import api from "../services/apiFlask";
 
-// src/pages/SaidaPage.jsx
-
-// ───────────────────────── helpers ──────────────────────────
-const apiFlask = axios.create({
-    baseURL: import.meta.env.VITE_FLASK_URL ||
-        "https://18aa-206-84-60-250.ngrok-free.app",
-    headers: {
-        "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true", // pula aviso do Ngrok
-    },
-});
-
-
-const toBase64 = (f) =>
+/* ───────────── helpers ───────────── */
+const toBase64 = (file) =>
     new Promise((res, rej) => {
         const reader = new FileReader();
         reader.onload = () => res(reader.result);
         reader.onerror = rej;
-        reader.readAsDataURL(f);
+        reader.readAsDataURL(file);
     });
 
 const isImage = (name = "") => /\.(png|jpe?g|gif|bmp|webp)$/i.test(name);
@@ -84,19 +71,20 @@ const initialSaidaForm = () => ({
     assinaturaMotorista: "",
 });
 
-// ───────────────────────── component ─────────────────────────
+/* ───────────── component ───────────── */
 export default function SaidaPage() {
+    /* ---------------- state ---------------- */
     const [checklists, setChecklists] = useState([]);
     const [loadingList, setLoadingList] = useState(false);
 
-    // detalhes
     const [openDetails, setOpenDetails] = useState(false);
     const [detailsData, setDetailsData] = useState(null);
 
-    // visualização ampliada de anexo
-    const [attachmentModal, setAttachmentModal] = useState({ open: false, file: null });
+    const [attachmentModal, setAttachmentModal] = useState({
+        open: false,
+        file: null,
+    });
 
-    // criação / edição
     const [openDialog, setOpenDialog] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -110,14 +98,13 @@ export default function SaidaPage() {
     const [motoristas, setMotoristas] = useState([]);
 
     const currentUserName = localStorage.getItem("fullname") || "";
+    const userRole = localStorage.getItem("role");
 
     const theme = useTheme();
     const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
     const [isSaving, setIsSaving] = useState(false);
 
-    const userRole = localStorage.getItem("role");
-
-    // ───────────────────── lifecycle ──────────────────────
+    /* ---------------- lifecycle ---------------- */
     useEffect(() => {
         (async () => {
             await Promise.all([loadChecklists(), loadVehicles(), loadUsers()]);
@@ -127,8 +114,7 @@ export default function SaidaPage() {
     const loadChecklists = async () => {
         try {
             setLoadingList(true);
-            const { data } = await apiFlask.get("/checklists/operacao");
-            console.log('data', data);
+            const { data } = await api.get("/checklists/operacao");
             setChecklists(
                 data.map((c) => ({
                     id: c.id,
@@ -148,20 +134,19 @@ export default function SaidaPage() {
 
     const loadVehicles = async () => {
         try {
-            const { data } = await apiFlask.get('/vehicles/available');
-
+            const { data } = await api.get("/vehicles/available");
             setVehicles(data);
-        } catch { }
+        } catch {/* ignore */ }
     };
 
     const loadUsers = async () => {
         try {
-            const { data } = await apiFlask.get("/users?role=motorista");
+            const { data } = await api.get("/users?role=motorista");
             setMotoristas(data);
-        } catch { }
+        } catch {/* ignore */ }
     };
 
-    // ───────────────────── handlers ──────────────────────
+    /* ---------------- handlers ---------------- */
     const handleOpenCreate = () => {
         setIsEditing(false);
         setEditingId(null);
@@ -172,7 +157,7 @@ export default function SaidaPage() {
 
     const handleOpenEdit = async (id) => {
         try {
-            const { data } = await apiFlask.get(`/checklists/operacao/${id}`);
+            const { data } = await api.get(`/checklists/operacao/${id}`);
             setNewSaida({
                 empresa: data.empresa,
                 departamento: data.departamento,
@@ -202,15 +187,13 @@ export default function SaidaPage() {
     const handleDelete = async (id) => {
         if (!window.confirm("Deseja realmente excluir este checklist?")) return;
         try {
-            await apiFlask.delete(`/checklists/operacao/${id}`);
+            await api.delete(`/checklists/operacao/${id}`);
             await loadChecklists();
         } catch (err) {
             console.error("Erro ao deletar checklist:", err);
             alert("Falha ao excluir.");
         }
     };
-
-    const handleClose = () => setOpenDialog(false);
 
     const handleAttachments = (e) => {
         const files = Array.from(e.target.files || []);
@@ -219,38 +202,24 @@ export default function SaidaPage() {
         }
     };
 
-    // 2) handleSave: valida antes de submeter
     const handleSave = () => {
-        if (!newSaida.motorista1) {
-            return alert("Por favor, selecione o Motorista.");
-        }
-        if (!newSaida.kmSaida) {
-            return alert("Por favor, informe o KM de saída.");
-        }
-        if (!newSaida.motivoSaida.trim()) {
-            return alert("Por favor, explique o Motivo da saída.");
-        }
-        if (!newSaida.destino.trim()) {
-            return alert("Por favor, informe o Destino.");
-        }
-        if (!isEditing && !newSaida.attachments.length) {
+        if (!newSaida.motorista1) return alert("Selecione o Motorista.");
+        if (!newSaida.kmSaida) return alert("Informe o KM de saída.");
+        if (!newSaida.motivoSaida.trim()) return alert("Explique o Motivo da saída.");
+        if (!newSaida.destino.trim()) return alert("Informe o Destino.");
+        if (!isEditing && !newSaida.attachments.length)
             return alert("Anexos são obrigatórios!");
-        }
-        if (+newSaida.kmSaida < +initialKm) {
+        if (+newSaida.kmSaida < +initialKm)
             return alert("KM não pode ser menor que a atual.");
-        }
         if (!newSaida.assinaturaMotorista.trim()) {
             setOpenSignature(true);
             return;
         }
-
         submitSaida(newSaida.assinaturaMotorista);
-
-
     };
 
-
     const submitSaida = async (signature) => {
+        setIsSaving(true);
         try {
             const payload = {
                 veiculoId: newSaida.vehicle,
@@ -271,18 +240,15 @@ export default function SaidaPage() {
 
             let result;
             if (isEditing) {
-                result = await apiFlask.patch(
-                    `/checklists/operacao/${editingId}`,
-                    payload
-                );
+                result = await api.patch(`/checklists/operacao/${editingId}`, payload);
             } else {
-                result = await apiFlask.post("/checklists/operacao", payload);
+                result = await api.post("/checklists/operacao", payload);
             }
 
             const id = result.data.id || result.data.objectId || editingId;
             if (!isEditing) {
                 for (const file of newSaida.attachments) {
-                    await apiFlask.post(`/checklists/operacao/${id}/attachments`, {
+                    await api.post(`/checklists/operacao/${id}/attachments`, {
                         base64file: await toBase64(file),
                         nomeArquivo: file.name,
                         descricao: "Saída",
@@ -297,19 +263,12 @@ export default function SaidaPage() {
             console.error(err);
             alert("Falha ao salvar.");
         } finally {
-            setIsSaving(false);           // libera o botão
-            // await loadChecklists();       // atualiza a lista
-            // ou, se preferir recarregar a página inteira:
-            window.location.reload();
+            setIsSaving(false);
         }
     };
 
     const handleConfirmSignature = () => {
-        if (signatureRef.current.isEmpty()) {
-            return alert("Assine antes de confirmar.");
-        }
-
-        setIsSaving(true);
+        if (signatureRef.current.isEmpty()) return alert("Assine antes de confirmar.");
         const sig = signatureRef.current.toDataURL();
         setNewSaida((p) => ({ ...p, assinaturaMotorista: sig }));
         setOpenSignature(false);
@@ -318,7 +277,7 @@ export default function SaidaPage() {
 
     const openDetailsDialog = async (id) => {
         try {
-            const { data } = await apiFlask.get(`/checklists/operacao/${id}`);
+            const { data } = await api.get(`/checklists/operacao/${id}`);
             setDetailsData(data);
             setOpenDetails(true);
         } catch (err) {
@@ -327,21 +286,12 @@ export default function SaidaPage() {
         }
     };
 
-    // troque sua versão atual por:
     const handleOpenAttachment = async (file) => {
         try {
-            // busca o blob com o header p/ pular aviso
-            const res = await apiFlask.get(
+            const res = await api.get(
                 `/checklists/operacao/${file.id}/attachments/${file.nome_arquivo}`,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "ngrok-skip-browser-warning": "true",
-                    },
-                    responseType: "blob",
-                }
+                { responseType: "blob" }
             );
-            // cria URL temporária
             const blobUrl = URL.createObjectURL(res.data);
             setAttachmentModal({ open: true, file: { ...file, blobUrl } });
         } catch (err) {
@@ -349,10 +299,9 @@ export default function SaidaPage() {
         }
     };
 
-    const handleCloseAttachment = () =>
-        setAttachmentModal({ open: false, file: null });
+    const handleCloseAttachment = () => setAttachmentModal({ open: false, file: null });
 
-    // ───── sub‑components ─────
+    /* ----------- sub-components ----------- */
     const SectionTitle = ({ icon, text }) => (
         <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
             <Box sx={{ mr: 1, color: "text.secondary" }}>{icon}</Box>
@@ -363,7 +312,7 @@ export default function SaidaPage() {
     );
 
     const InfoRow = ({ label, value }) =>
-        value ? (
+        value && (
             <Box sx={{ display: "flex", mb: 0.5 }}>
                 <Typography
                     sx={{ fontWeight: "medium", width: 130, color: "text.secondary" }}
@@ -372,7 +321,7 @@ export default function SaidaPage() {
                 </Typography>
                 <Typography>{value}</Typography>
             </Box>
-        ) : null;
+        );
 
     const ImageThumb = ({ src, alt, onClick }) => (
         <Box
@@ -409,7 +358,7 @@ export default function SaidaPage() {
         />
     );
 
-    // ───────────────────── render ──────────────────────
+    /* --------------- render --------------- */
     return (
         <Box sx={{ p: 2 }}>
             <Typography variant="h4" sx={{ mb: 3 }}>
@@ -445,7 +394,9 @@ export default function SaidaPage() {
                                         Placa: {ch.placaVeiculo || "N/A"}
                                     </Typography>
                                     <Typography>Horário: {hora}</Typography>
-                                    <Typography>Motorista: {ch.motoristaNome || "N/A"}</Typography>
+                                    <Typography>
+                                        Motorista: {ch.motoristaNome || "N/A"}
+                                    </Typography>
                                     <Typography color="text.secondary">
                                         Criado por: {ch.criadoPor}
                                     </Typography>
@@ -482,12 +433,18 @@ export default function SaidaPage() {
                                         </IconButton>
                                         {userRole !== "portaria" && (
                                             <>
-
-
-                                                <IconButton size="small" title="Editar" onClick={() => handleOpenEdit(ch.id)}>
+                                                <IconButton
+                                                    size="small"
+                                                    title="Editar"
+                                                    onClick={() => handleOpenEdit(ch.id)}
+                                                >
                                                     <EditIcon fontSize="small" />
                                                 </IconButton>
-                                                <IconButton size="small" title="Excluir" onClick={() => handleDelete(ch.id)}>
+                                                <IconButton
+                                                    size="small"
+                                                    title="Excluir"
+                                                    onClick={() => handleDelete(ch.id)}
+                                                >
                                                     <DeleteIcon fontSize="small" />
                                                 </IconButton>
                                             </>
@@ -498,33 +455,30 @@ export default function SaidaPage() {
                         );
                     })}
                 </Box>
-
             )}
 
-            {/* ──────────── DIALOG NOVA / EDITAR SAÍDA ──────────── */}
-            <Dialog open={openDialog} onClose={handleClose} fullWidth maxWidth="md">
+            {/* ───────────── DIALOG NOVA / EDITAR SAÍDA ───────────── */}
+            <Dialog open={openDialog} onClose={() => setOpenDialog(false)} fullWidth maxWidth="md">
                 <DialogTitle>{isEditing ? "Editar Checklist" : "Nova Saída"}</DialogTitle>
                 <DialogContent dividers>
                     <Grid container spacing={2}>
-                        {/* Veículo */}
+                        {/* veículo */}
                         <Grid item xs={12} sm={6}>
                             <Autocomplete
                                 options={vehicles}
-                                getOptionLabel={o => `${o.placa} - ${o.marca} ${o.modelo}`}
+                                getOptionLabel={(o) => `${o.placa} - ${o.marca} ${o.modelo}`}
                                 onChange={(_, v) => {
                                     if (v) {
-                                        setNewSaida(p => ({
+                                        setNewSaida((p) => ({
                                             ...p,
                                             vehicle: v.id,
                                             kmSaida: v.quilometragem || 0,
                                             horimetroSaida:
-                                                v.horimetro !== undefined
-                                                    ? v.horimetro
-                                                    : v.quilometragem || 0,
+                                                v.horimetro !== undefined ? v.horimetro : v.quilometragem || 0,
                                         }));
                                         setInitialKm(v.quilometragem || 0);
                                     } else {
-                                        setNewSaida(p => ({
+                                        setNewSaida((p) => ({
                                             ...p,
                                             vehicle: "",
                                             kmSaida: 0,
@@ -533,69 +487,57 @@ export default function SaidaPage() {
                                         setInitialKm(0);
                                     }
                                 }}
-                                value={vehicles.find(v => v.id === newSaida.vehicle) || null}
-                                renderInput={params => (
-                                    <TextField {...params} label="Veículo (Placa)" />
-                                )}
+                                value={vehicles.find((v) => v.id === newSaida.vehicle) || null}
+                                renderInput={(params) => <TextField {...params} label="Veículo (Placa)" />}
                             />
                         </Grid>
 
-                        {/* Motorista (obrigatório) */}
+                        {/* motorista */}
                         <Grid item xs={12} sm={6}>
                             <Autocomplete
                                 options={motoristas}
-                                getOptionLabel={o => o.fullname}
+                                getOptionLabel={(o) => o.fullname}
                                 onChange={(_, v) =>
-                                    setNewSaida(p => ({ ...p, motorista1: v?.id || "" }))
+                                    setNewSaida((p) => ({ ...p, motorista1: v?.id || "" }))
                                 }
-                                value={motoristas.find(u => u.id === newSaida.motorista1) || null}
-                                renderInput={params => (
-                                    <TextField
-                                        {...params}
-                                        label="Motorista *"
-                                        required
-                                    />
-                                )}
+                                value={motoristas.find((u) => u.id === newSaida.motorista1) || null}
+                                renderInput={(params) => <TextField {...params} label="Motorista *" required />}
                             />
                         </Grid>
 
-                        {/* Departamento */}
+                        {/* departamento */}
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 label="Departamento"
                                 fullWidth
                                 value={newSaida.departamento}
-                                onChange={e =>
-                                    setNewSaida({ ...newSaida, departamento: e.target.value })
-                                }
+                                onChange={(e) => setNewSaida({ ...newSaida, departamento: e.target.value })}
                             />
                         </Grid>
 
-                        {/* Semi‑reboque */}
+                        {/* semi-reboque */}
                         <Grid item xs={12} sm={6}>
                             <TextField
-                                label="Semi‑reboque"
+                                label="Semi-reboque"
                                 fullWidth
                                 value={newSaida.semiReboque}
-                                onChange={e =>
-                                    setNewSaida({ ...newSaida, semiReboque: e.target.value })
-                                }
+                                onChange={(e) => setNewSaida({ ...newSaida, semiReboque: e.target.value })}
                             />
                         </Grid>
 
-                        {/* Placa do Semi */}
+                        {/* placa semi */}
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 label="Placa do Semi"
                                 fullWidth
                                 value={newSaida.placaSemiReboque}
-                                onChange={e =>
+                                onChange={(e) =>
                                     setNewSaida({ ...newSaida, placaSemiReboque: e.target.value })
                                 }
                             />
                         </Grid>
 
-                        {/* KM Saída (obrigatório) */}
+                        {/* km */}
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 label="KM Saída *"
@@ -603,16 +545,14 @@ export default function SaidaPage() {
                                 fullWidth
                                 required
                                 value={newSaida.kmSaida}
-                                onChange={e => {
+                                onChange={(e) => {
                                     const km = +e.target.value;
-                                    if (km >= initialKm) {
-                                        setNewSaida({ ...newSaida, kmSaida: km });
-                                    }
+                                    if (km >= initialKm) setNewSaida({ ...newSaida, kmSaida: km });
                                 }}
                             />
                         </Grid>
 
-                        {/* Data/Hora de Saída */}
+                        {/* data/hora */}
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 required
@@ -621,52 +561,46 @@ export default function SaidaPage() {
                                 fullWidth
                                 InputLabelProps={{ shrink: true }}
                                 value={newSaida.dataSaida}
-                                onChange={e =>
-                                    setNewSaida({ ...newSaida, dataSaida: e.target.value })
-                                }
+                                onChange={(e) => setNewSaida({ ...newSaida, dataSaida: e.target.value })}
                             />
                         </Grid>
 
-                        {/* Horímetro */}
+                        {/* horímetro */}
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 label="Horímetro"
                                 type="number"
                                 fullWidth
                                 value={newSaida.horimetroSaida}
-                                onChange={e =>
+                                onChange={(e) =>
                                     setNewSaida({ ...newSaida, horimetroSaida: e.target.value })
                                 }
                             />
                         </Grid>
 
-                        {/* Motivo (obrigatório) */}
+                        {/* motivo */}
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 label="Motivo *"
                                 fullWidth
                                 required
                                 value={newSaida.motivoSaida}
-                                onChange={e =>
-                                    setNewSaida({ ...newSaida, motivoSaida: e.target.value })
-                                }
+                                onChange={(e) => setNewSaida({ ...newSaida, motivoSaida: e.target.value })}
                             />
                         </Grid>
 
-                        {/* Destino (obrigatório) */}
+                        {/* destino */}
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 label="Destino *"
                                 fullWidth
                                 required
                                 value={newSaida.destino}
-                                onChange={e =>
-                                    setNewSaida({ ...newSaida, destino: e.target.value })
-                                }
+                                onChange={(e) => setNewSaida({ ...newSaida, destino: e.target.value })}
                             />
                         </Grid>
 
-                        {/* Observações */}
+                        {/* observações */}
                         <Grid item xs={12}>
                             <TextField
                                 label="Observações"
@@ -674,17 +608,17 @@ export default function SaidaPage() {
                                 multiline
                                 minRows={2}
                                 value={newSaida.observacoesSaida}
-                                onChange={e =>
+                                onChange={(e) =>
                                     setNewSaida({ ...newSaida, observacoesSaida: e.target.value })
                                 }
                             />
                         </Grid>
 
-                        {/* Anexos (só no create) */}
+                        {/* anexos */}
                         {!isEditing && (
                             <Grid item xs={12}>
                                 <Typography variant="subtitle2">
-                                    Anexos <span style={{ color: "red" }}>*</span>
+                                    Anexos <span style={{ color: "red" }}>*</span>
                                 </Typography>
                                 <TextField
                                     type="file"
@@ -695,31 +629,16 @@ export default function SaidaPage() {
                         )}
                     </Grid>
                 </DialogContent>
-
-
                 <DialogActions>
-                    <Button onClick={handleClose}>Cancelar</Button>
-                    <Button
-                        variant="contained"
-                        onClick={handleSave}
-                        disabled={isSaving}
-                    >
-                        {isSaving
-                            ? "Salvando..."
-                            : isEditing
-                                ? "Atualizar"
-                                : "Salvar"}
+                    <Button onClick={() => setOpenDialog(false)}>Cancelar</Button>
+                    <Button variant="contained" onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? "Salvando..." : isEditing ? "Atualizar" : "Salvar"}
                     </Button>
-
                 </DialogActions>
             </Dialog>
 
-            {/* ──────────── DIALOG ASSINATURA ──────────── */}
-            <Dialog
-                open={openSignature}
-                onClose={() => setOpenSignature(false)}
-                fullScreen={fullScreen}
-            >
+            {/* ───────────── DIALOG ASSINATURA ───────────── */}
+            <Dialog open={openSignature} onClose={() => setOpenSignature(false)} fullScreen={fullScreen}>
                 <DialogTitle>Assinatura do Motorista</DialogTitle>
                 <DialogContent dividers>
                     <Typography sx={{ mb: 2 }}>Por favor, assine abaixo:</Typography>
@@ -737,27 +656,15 @@ export default function SaidaPage() {
                     </Button>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setOpenSignature(false)}>
-                        Cancelar
-                    </Button>
-                    <Button
-                        variant="contained"
-                        onClick={handleConfirmSignature}
-                        disabled={isSaving}
-                    >
+                    <Button onClick={() => setOpenSignature(false)}>Cancelar</Button>
+                    <Button variant="contained" onClick={handleConfirmSignature} disabled={isSaving}>
                         {isSaving ? "Salvando..." : "Confirmar"}
                     </Button>
                 </DialogActions>
-
             </Dialog>
 
-            {/* ──────────── DIALOG DETALHES ──────────── */}
-            <Dialog
-                open={openDetails}
-                onClose={() => setOpenDetails(false)}
-                fullWidth
-                maxWidth="md"
-            >
+            {/* ───────────── DIALOG DETALHES ───────────── */}
+            <Dialog open={openDetails} onClose={() => setOpenDetails(false)} fullWidth maxWidth="md">
                 {detailsData && (
                     <Box
                         sx={{
@@ -794,79 +701,35 @@ export default function SaidaPage() {
                                 <Grid item xs={12} md={6}>
                                     <Paper variant="outlined" sx={{ p: 2 }}>
                                         <SectionTitle icon={<InfoIcon />} text="Informações" />
-                                        <InfoRow
-                                            label="Motorista"
-                                            value={detailsData.motorista?.fullname}
-                                        />
-                                        <InfoRow
-                                            label="KM Saída"
-                                            value={detailsData.km_saida}
-                                        />
-                                        <InfoRow
-                                            label="Horímetro"
-                                            value={detailsData.horimetro_saida}
-                                        />
-                                        <InfoRow
-                                            label="Motivo"
-                                            value={detailsData.motivo_saida}
-                                        />
-                                        <InfoRow
-                                            label="Destino"
-                                            value={detailsData.destino}
-                                        />
+                                        <InfoRow label="Motorista" value={detailsData.motorista?.fullname} />
+                                        <InfoRow label="KM Saída" value={detailsData.km_saida} />
+                                        <InfoRow label="Horímetro" value={detailsData.horimetro_saida} />
+                                        <InfoRow label="Motivo" value={detailsData.motivo_saida} />
+                                        <InfoRow label="Destino" value={detailsData.destino} />
                                     </Paper>
                                 </Grid>
                                 <Grid item xs={12} md={6}>
                                     <Paper variant="outlined" sx={{ p: 2 }}>
                                         <SectionTitle icon={<BusinessIcon />} text="Empresa" />
-                                        <InfoRow
-                                            label="Empresa"
-                                            value={detailsData.empresa}
-                                        />
-                                        <InfoRow
-                                            label="Departamento"
-                                            value={detailsData.departamento}
-                                        />
-                                        <InfoRow
-                                            label="Semi‑reboque"
-                                            value={detailsData.semi_reboque}
-                                        />
-                                        <InfoRow
-                                            label="Placa Semi"
-                                            value={detailsData.placa_semi_reboque}
-                                        />
-                                        <InfoRow
-                                            label="Criado por"
-                                            value={detailsData.criado_por_nome}
-                                        />
+                                        <InfoRow label="Empresa" value={detailsData.empresa} />
+                                        <InfoRow label="Departamento" value={detailsData.departamento} />
+                                        <InfoRow label="Semi-reboque" value={detailsData.semi_reboque} />
+                                        <InfoRow label="Placa Semi" value={detailsData.placa_semi_reboque} />
+                                        <InfoRow label="Criado por" value={detailsData.criado_por_nome} />
                                     </Paper>
                                 </Grid>
                             </Grid>
 
                             {detailsData.observacoes_saida && (
-                                <Paper
-                                    variant="outlined"
-                                    sx={{ p: 2, mt: 3, bgcolor: "grey.50" }}
-                                >
-                                    <SectionTitle
-                                        icon={<ChatBubbleOutlineIcon />}
-                                        text="Observações"
-                                    />
-                                    <Typography whiteSpace="pre-wrap">
-                                        {detailsData.observacoes_saida}
-                                    </Typography>
+                                <Paper variant="outlined" sx={{ p: 2, mt: 3, bgcolor: "grey.50" }}>
+                                    <SectionTitle icon={<ChatBubbleOutlineIcon />} text="Observações" />
+                                    <Typography whiteSpace="pre-wrap">{detailsData.observacoes_saida}</Typography>
                                 </Paper>
                             )}
 
                             {detailsData.assinatura_saida && (
-                                <Paper
-                                    variant="outlined"
-                                    sx={{ p: 2, mt: 3, textAlign: "center" }}
-                                >
-                                    <SectionTitle
-                                        icon={<GestureIcon />}
-                                        text="Assinatura do Motorista"
-                                    />
+                                <Paper variant="outlined" sx={{ p: 2, mt: 3, textAlign: "center" }}>
+                                    <SectionTitle icon={<GestureIcon />} text="Assinatura do Motorista" />
                                     <Box
                                         component="img"
                                         src={detailsData.assinatura_saida}
@@ -909,13 +772,8 @@ export default function SaidaPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* ──────────── MODAL ANEXO GRANDE ──────────── */}
-            <Dialog
-                open={attachmentModal.open}
-                onClose={handleCloseAttachment}
-                maxWidth="lg"
-                fullWidth
-            >
+            {/* ───────────── MODAL ANEXO GRANDE ───────────── */}
+            <Dialog open={attachmentModal.open} onClose={handleCloseAttachment} maxWidth="lg" fullWidth>
                 {attachmentModal.file && (
                     <>
                         <DialogTitle>{attachmentModal.file.nome_arquivo}</DialogTitle>
@@ -934,8 +792,6 @@ export default function SaidaPage() {
                                 />
                             )}
                         </DialogContent>
-
-
                     </>
                 )}
             </Dialog>
