@@ -142,7 +142,7 @@ function Layout() {
                   <ListItemIcon sx={{ color: "inherit" }}>
                     <FaClipboardCheck />
                   </ListItemIcon>
-                  <ListItemText primary="Checklist (Portaria)" />
+                  <ListItemText primary="Controle de portaria" />
                   {openChecklist ? <ExpandLess /> : <ExpandMore />}
                 </ListItemButton>
               </ListItem>
