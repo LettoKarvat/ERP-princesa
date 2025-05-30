@@ -352,7 +352,7 @@ function Layout() {
           color="success"
           fullWidth
           component="a"
-          href="https://wa.me/5547996601626"
+          href="https://chat.whatsapp.com/GyfebFkUpvE6SFHj1skkzB"
           target="_blank"
           rel="noopener noreferrer"
           sx={{
