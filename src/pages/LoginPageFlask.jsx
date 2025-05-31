@@ -12,7 +12,7 @@ import {
   Alert,
   Paper,
 } from "@mui/material";
-import api from "../services/api";
+import api from "../services/apiFlask";
 
 // validação com Yup
 const schema = yup.object({

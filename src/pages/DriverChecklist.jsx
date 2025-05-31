@@ -25,27 +25,27 @@ import SignatureCanvas from 'react-signature-canvas';
 import api from '../services/api';
 
 const checklistItems = [
-    { code: 1, description: "CRLV do veículo está ok?" },
-    { code: 2, description: "CNH está ok?" },
-    { code: 3, description: "Está uniformizado?" },
-    { code: 4, description: "Certificado de Cronotacógrafo está ok?" },
-    { code: 5, description: "Condições Gerais: Lataria, Cabine, Baú." },
-    { code: 6, description: "AET está ok?" },
-    { code: 7, description: "Exame Toxicológico está em dia?" },
-    { code: 8, description: "Condições gerais internas: bancada, tapete, forros, bancos." },
-    { code: 9, description: "Condições de Rodagem: Pneus, Rodas, Pressão de Ar." },
-    { code: 10, description: "Sistema de Freios: nível de fluido, altura do pedal." },
-    { code: 11, description: "Sistema de Arrefecimento: nível de água e temperatura." },
-    { code: 12, description: "Sistema de Alimentação: Bomba injetora, combustível." },
-    { code: 13, description: "Sistema Elétrico: Painel, iluminação, bateria." },
-    { code: 14, description: "Sistema Trator: (Diferencial) Eixo Cardan." },
-    { code: 15, description: "Sistema Câmbio: Engate marchas, folgas, ruídos." },
-    { code: 16, description: "Parte do motor: vazamentos, ruídos, fumaça." },
-    { code: 17, description: "Embreagem: Altura do Pedal, Estressamento." },
-    { code: 18, description: "Tacógrafo: marcação, hora, agulha, está conforme." },
-    { code: 19, description: "Carrinho de entrega está ok?" },
-    { code: 20, description: "Itens de segurança: macaco, triângulo, chave de roda." },
-    { code: 21, description: "Possui EPI necessário?" },
+    { code: 1, description: "CRLV atualizado" },
+    { code: 2, description: "CNH atualizada" },
+    { code: 3, description: "Motorista e ajudantes uniformizados" },
+    { code: 4, description: "Certificado de cronotacógrafo atualizado" },
+    { code: 5, description: "Exame toxicológico atualizado" },
+    { code: 6, description: "Macaco, triângulo e chave de roda" },
+    { code: 7, description: "Cinto de segurança e extintor de incêndio" },
+    { code: 8, description: "Funcionamento do limpador de para-brisa e abastecimento de água" },
+    { code: 9, description: "Nível de combustível e bomba injetora" },
+    { code: 10, description: "Nível de água do radiador e temperatura" },
+    { code: 11, description: "Nível do óleo lubrificante e fluido de freio" },
+    { code: 12, description: "Sistema elétrico, luzes do painel e bateria" },
+    { code: 13, description: "Condição dos pneus, rodas e calibração" },
+    { code: 14, description: "Condição geral da cabine, do baú e da lataria" },
+    { code: 15, description: "Espelhos retrovisores e buzina" },
+    { code: 16, description: "Faróis altos/baixos, pisca-alerta, luz de ré, sonorizador, seta, luz de freio e lanternas traseiras" },
+    { code: 17, description: "Faixas refletivas e luzes laterais, portas e janelas" },
+    { code: 18, description: "Funcionamento do tacógrafo" },
+    { code: 19, description: "Motor sem vazamento, ruídos ou fumaça" },
+    { code: 20, description: "Carrinho de entrega" },
+    // **Não há item 21 aqui**
 ];
 
 function DriverChecklist() {
@@ -129,13 +129,17 @@ function DriverChecklist() {
     };
 
     const handleSubmit = () => {
-        // Verifica se todos os itens foram respondidos
-        const anyEmptyAnswer = answers.some((ans) => ans.answer === '');
-        if (anyEmptyAnswer) {
-            showSnackbar('error', 'Responda todos os itens antes de enviar.');
-            return;
-        }
-        // Verifica se os itens marcados como "nao" possuem pelo menos um anexo
+        // ————————————————————————————
+        // REMOVA ou COMENTE a validação “todos os itens respondidos”
+        // Antes, havia isso:
+        // const anyEmptyAnswer = answers.some((ans) => ans.answer === '');
+        // if (anyEmptyAnswer) {
+        //     showSnackbar('error', 'Responda todos os itens antes de enviar.');
+        //     return;
+        // }
+        // ————————————————————————————
+
+        // Verifica se os itens marcados como "não" possuem pelo menos um anexo
         const nonCompliantWithoutAttachment = answers.some(
             (ans) => ans.answer === 'nao' && (!ans.attachments || ans.attachments.length === 0)
         );
@@ -143,6 +147,7 @@ function DriverChecklist() {
             showSnackbar('error', 'Todos os itens marcados como "Não" devem ter pelo menos um anexo.');
             return;
         }
+
         // Verifica se a placa foi informada
         if (!plateInput.trim()) {
             showSnackbar('error', 'Informe a placa do veículo.');
@@ -171,6 +176,9 @@ function DriverChecklist() {
     // Função para salvar a assinatura (no mobile, por exemplo)
     const handleSaveSignature = () => {
         if (signatureRef.current && !signatureRef.current.isEmpty()) {
+            // Atenção: se você usar getTrimmedCanvas() e der erro de “trim-canvas”,
+            // troque por getCanvas(), assim:
+            // const data = signatureRef.current.getCanvas().toDataURL('image/png');
             const data = signatureRef.current.getTrimmedCanvas().toDataURL('image/png');
             setSavedSignature(data);
             showSnackbar('success', 'Assinatura salva.');
