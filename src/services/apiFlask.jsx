@@ -7,7 +7,7 @@ const api = axios.create({
     "https://832f-206-84-60-250.ngrok-free.app",
   headers: {
     "Content-Type": "application/json",
-    //"ngrok-skip-browser-warning": "true",
+    "ngrok-skip-browser-warning": "true",
   },
   withCredentials: false, // só true se usar cookies
 });
