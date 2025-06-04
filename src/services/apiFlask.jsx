@@ -4,7 +4,7 @@ import axios from "axios";
 const api = axios.create({
   baseURL:
     import.meta.env.VITE_FLASK_URL ||
-    "http://127.0.0.1:5000",
+    "https://832f-206-84-60-250.ngrok-free.app",
   headers: {
     "Content-Type": "application/json",
     //"ngrok-skip-browser-warning": "true",
