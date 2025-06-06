@@ -1,687 +1,327 @@
-// src/pages/DecendialChecklistsList.jsx
-import { useState, useEffect, useRef } from "react";
+// src/pages/DecendialChecklist.jsx
+import React, { useState, useEffect, useRef } from 'react';
 import {
-    Box,
-    Typography,
-    Paper,
-    Button,
-    CircularProgress,
-    Snackbar,
-    Alert,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    TextField,
-    InputAdornment
-} from "@mui/material";
-import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
-import PersonIcon from "@mui/icons-material/Person";
-import EventIcon from "@mui/icons-material/Event";
-import SignatureCanvas from "react-signature-canvas";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
-import api from "../services/apiFlask";
+    Box, Typography, Paper, TextField, FormControl, FormLabel, RadioGroup,
+    FormControlLabel, Radio, Button, Dialog, DialogTitle, DialogContent,
+    DialogActions, Snackbar, Alert, Backdrop, CircularProgress,
+} from '@mui/material';
+import { Autocomplete } from '@mui/material';
+import SignatureCanvas from 'react-signature-canvas';
+import api from '../services/apiFlask';
+import { DECENDIAL_ITEMS } from '../constants/DecendialItems';
 
-/* ───── tabela código → descrição (idem ao diário) ───── */
-const ITEMS = [
-    { code: 1, description: "CRLV atualizado" },
-    { code: 2, description: "CNH atualizada" },
-    { code: 3, description: "Motorista e ajudantes uniformizados" },
-    { code: 4, description: "Certificado de cronotacógrafo atualizado" },
-    { code: 5, description: "Exame toxicológico atualizado" },
-    { code: 6, description: "Macaco, triângulo e chave de roda" },
-    { code: 7, description: "Cinto de segurança e extintor de incêndio" },
-    { code: 8, description: "Funcionamento do limpador de para-brisa e água" },
-    { code: 9, description: "Nível de combustível e bomba injetora" },
-    { code: 10, description: "Nível de água do radiador e temperatura" },
-    { code: 11, description: "Nível do óleo lubrificante e fluido de freio" },
-    { code: 12, description: "Sistema elétrico, luzes do painel e bateria" },
-    { code: 13, description: "Condição dos pneus, rodas e calibração" },
-    { code: 14, description: "Condição geral da cabine, baú e lataria" },
-    { code: 15, description: "Espelhos retrovisores e buzina" },
-    { code: 16, description: "Faróis, pisca, luz de ré, seta, freio e lanternas" },
-    { code: 17, description: "Faixas refletivas, luzes laterais, portas e janelas" },
-    { code: 18, description: "Funcionamento do tacógrafo" },
-    { code: 19, description: "Motor sem vazamento, ruídos ou fumaça" },
-    { code: 20, description: "Carrinho de entrega" },
-];
+// Estado inicial: mapeia DECENDIAL_ITEMS para obter { code, answer: '', obs: '', attachments: [] }
+const makeAnswerArray = items =>
+    items.map(it => ({ code: it.code, answer: '', obs: '', attachments: [] }));
 
-const desc = (c) => ITEMS.find((i) => i.code === c)?.description || `Item ${c}`;
+export default function DecendialChecklist() {
+    /* ───── estados principais ───── */
+    const [vehicles, setVehicles] = useState([]);
+    const [answers, setAnswers] = useState(makeAnswerArray(DECENDIAL_ITEMS));
+    const [plateInput, setPlateInput] = useState('');
+    const [selectedVehicle, setSelectedVehicle] = useState(null);
 
-/* ───── chamadas API (filtrando somente decendial) ───── */
-const allChecklists = () =>
-    api.get("/inspection/checklists?decendial=1").then((r) => r.data);
-
-const oneChecklist = async (id) => {
-    const { data } = await api.get(`/inspection/checklists/${id}`);
-    return data;
-};
-
-const assignSecondSign = async (id, signatureBase64) => {
-    await api.post(
-        `/inspection/checklists/${id}/second-signature`,
-        { signature: signatureBase64 }
-    );
-};
-
-/* ───── componente ───── */
-export default function DecendialChecklistsList() {
-    const [rows, setRows] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [qPlaca, setQPlaca] = useState("");
-    const [qMot, setQMot] = useState("");
-    const [qDate, setQDate] = useState("");
-
-    const [dlgOpen, setDlgOpen] = useState(false);
-    const [sel, setSel] = useState(null);
-    const [loadingDet, setLoadingDet] = useState(false);
-
-    const [sn, setSn] = useState({ open: false, msg: "", sev: "info" });
-    const role = localStorage.getItem("role") || "";
-
-    // estados e ref para segunda assinatura
-    const [signModalOpen, setSignModalOpen] = useState(false);
+    /* assinatura & ui */
+    const [openSignModal, setOpenSignModal] = useState(false);
     const signatureRef = useRef(null);
-    const [savedSecondSignature, setSavedSecondSignature] = useState(null);
+    const [savedSignature, setSavedSignature] = useState(null);
+    const [loading, setLoading] = useState(false);
 
-    /* -------- carregamento inicial (agora só decendial) -------- */
+    const [snackbarOpen, setSnackbarOpen] = useState(false);
+    const [snackbarMessage, setSnackbarMessage] = useState('');
+    const [snackbarSeverity, setSnackbarSeverity] = useState('info');
+    const showSnackbar = (sev, msg) => {
+        setSnackbarSeverity(sev);
+        setSnackbarMessage(msg);
+        setSnackbarOpen(true);
+    };
+
+    /* ───── carrega veículos uma vez ───── */
     useEffect(() => {
-        load();
+        (async () => {
+            try {
+                const { data } = await api.get('/vehicles');
+                setVehicles(data || []);
+            } catch (err) {
+                console.error(err);
+                showSnackbar('error', 'Falha ao carregar veículos.');
+            }
+        })();
     }, []);
 
-    const load = async () => {
+    /* ───── helpers de resposta ───── */
+    const handleAnswerChange = (code, field, value) =>
+        setAnswers(prev => prev.map(a => (a.code === code ? { ...a, [field]: value } : a)));
+    const handleItemFileChange = (code, files) =>
+        handleAnswerChange(code, 'attachments', files);
+
+    /* ───── upload de anexos (FormData) ───── */
+    const uploadAttachments = async answersArr => {
+        const result = {};
+        for (const ans of answersArr) {
+            if (ans.answer === 'nao' && ans.attachments.length) {
+                result[ans.code] = [];
+                for (const file of ans.attachments) {
+                    const fd = new FormData();
+                    fd.append('file', file);
+                    fd.append('itemCode', ans.code);
+
+                    const { data } = await api.post(
+                        '/inspection/attachments/tmp',
+                        fd,
+                        { headers: { 'Content-Type': 'multipart/form-data' } }
+                    );
+
+                    if (data?.status !== 'success')
+                        throw new Error(`Falha no upload de ${file.name}`);
+
+                    result[ans.code].push({
+                        attachmentId: data.attachmentId,
+                        fileName: data.fileName,
+                    });
+                }
+            }
+        }
+        return result;
+    };
+
+    /* ───── submit passo 1 ───── */
+    const handleSubmit = () => {
+        // faz as mesmas checagens do DriverChecklist:
+        if (answers.some(a => a.answer === ''))
+            return showSnackbar('error', 'Responda todos os itens.');
+        if (answers.some(a => a.answer === 'nao' && a.attachments.length === 0))
+            return showSnackbar('error', 'Itens "Não" precisam de anexo.');
+        if (!plateInput.trim())
+            return showSnackbar('error', 'Informe a placa.');
+        setOpenSignModal(true);
+    };
+
+    /* ───── assinatura ───── */
+    const handleSaveSignature = () => {
+        if (signatureRef.current?.isEmpty())
+            return showSnackbar('error', 'Assine antes de salvar.');
+        setSavedSignature(
+            signatureRef.current.getTrimmedCanvas().toDataURL('image/png')
+        );
+        showSnackbar('success', 'Assinatura salva.');
+    };
+    const handleClearSignature = () => {
+        signatureRef.current?.clear();
+        setSavedSignature(null);
+    };
+
+    /* ───── submit passo 2 ───── */
+    const handleConfirmSignature = async () => {
+        if (!savedSignature)
+            return showSnackbar('error', 'Salve a assinatura antes de confirmar.');
         setLoading(true);
         try {
-            const data = await allChecklists();
-            setRows(data);
-        } catch {
-            setSn({ open: true, sev: "error", msg: "Falha ao carregar." });
+            const tmpIds = await uploadAttachments(answers);
+            const placa = selectedVehicle?.placa || plateInput.trim();
+
+            // **inclui isDecendial: true no payload**
+            const payload = {
+                empresa: 'DECENDIAL – FROTA',
+                placa,
+                signature: savedSignature,
+                items: answers.map(a => ({
+                    code: a.code,
+                    answer: a.answer,
+                    obs: a.obs,
+                    attachments: tmpIds[a.code] || [],
+                })),
+                isDecendial: true
+            };
+
+            const { data } = await api.post('/inspection/submit', payload);
+            if (data?.status !== 'success')
+                throw new Error('Falha no envio do checklist decendial.');
+
+            showSnackbar('success', 'Checklist Decendial enviado!');
+            // limpa tudo
+            setPlateInput('');
+            setSelectedVehicle(null);
+            setAnswers(makeAnswerArray(DECENDIAL_ITEMS));
+        } catch (err) {
+            console.error(err);
+            showSnackbar('error', err.message || 'Erro ao enviar checklist decendial.');
         } finally {
             setLoading(false);
+            setOpenSignModal(false);
+            setSavedSignature(null);
         }
     };
 
-    /* -------- abrir detalhes -------- */
-    const open = async (id) => {
-        setLoadingDet(true);
-        try {
-            const detail = await oneChecklist(id);
-
-            // buscar base64 dos anexos
-            await Promise.all(
-                detail.items.map(async (item) => {
-                    if (Array.isArray(item.attachments)) {
-                        await Promise.all(
-                            item.attachments.map(async (att) => {
-                                try {
-                                    const secureUrl = att.url.startsWith("http://")
-                                        ? att.url.replace(/^http:\/\//, "https://")
-                                        : att.url;
-                                    const resp = await api.get(secureUrl);
-                                    att.dataUrl = resp.data.data;
-                                } catch {
-                                    att.dataUrl = null;
-                                }
-                            })
-                        );
-                    }
-                })
-            );
-
-            setSel(detail);
-            setDlgOpen(true);
-        } catch {
-            setSn({ open: true, sev: "error", msg: "Falha ao detalhar." });
-        } finally {
-            setLoadingDet(false);
-        }
-    };
-
-    /* -------- abrir modal de segunda assinatura -------- */
-    const handleSecondSignClick = () => {
-        if (!sel) return;
-        setSavedSecondSignature(null);
-        setSignModalOpen(true);
-    };
-
-    /* -------- salvar desenho da segunda assinatura -------- */
-    const handleSaveSecondSignature = () => {
-        if (signatureRef.current.isEmpty()) {
-            setSn({ open: true, sev: "error", msg: "Assine antes de salvar." });
-            return;
-        }
-        const base64 = signatureRef.current
-            .getTrimmedCanvas()
-            .toDataURL("image/png");
-        setSavedSecondSignature(base64);
-        setSn({ open: true, sev: "success", msg: "Assinatura salva." });
-    };
-
-    /* -------- confirmar segunda assinatura -------- */
-    const handleConfirmSecondSignature = async () => {
-        if (!savedSecondSignature) {
-            setSn({
-                open: true,
-                sev: "error",
-                msg: "Salve a assinatura antes de confirmar.",
-            });
-            return;
-        }
-        setLoadingDet(true);
-        try {
-            await assignSecondSign(sel.objectId, savedSecondSignature);
-            const updatedFull = await oneChecklist(sel.objectId);
-
-            // recarregar base64 dos anexos
-            await Promise.all(
-                updatedFull.items.map(async (item) => {
-                    if (Array.isArray(item.attachments)) {
-                        await Promise.all(
-                            item.attachments.map(async (att) => {
-                                try {
-                                    const secureUrl = att.url.startsWith("http://")
-                                        ? att.url.replace(/^http:\/\//, "https://")
-                                        : att.url;
-                                    const resp = await api.get(secureUrl);
-                                    att.dataUrl = resp.data.data;
-                                } catch {
-                                    att.dataUrl = null;
-                                }
-                            })
-                        );
-                    }
-                })
-            );
-
-            setSel(updatedFull);
-            setSignModalOpen(false);
-            setSn({ open: true, sev: "success", msg: "2ª assinatura aplicada." });
-            load(); // recarrega lista (ainda só decendial)
-        } catch {
-            setSn({
-                open: true,
-                sev: "error",
-                msg: "Falha ao atribuir 2ª assinatura.",
-            });
-        } finally {
-            setLoadingDet(false);
-        }
-    };
-
-    /* -------- delete (opcional) -------- */
-    const del = async (id) => {
-        if (!window.confirm("Apagar checklist?")) return;
-        try {
-            await api.delete(`/inspection/checklists/${id}`);
-            load();
-        } catch {
-            setSn({ open: true, sev: "error", msg: "Falha ao deletar." });
-        }
-    };
-
-    /* -------- filtros locais -------- */
-    const list = rows.filter((r) => {
-        // motorista só vê seus próprios (se aplicável)
-        if (role === "motorista") {
-            const myName = (localStorage.getItem("fullname") || "").toLowerCase();
-            if ((r.motorista || "").toLowerCase() !== myName) return false;
-        }
-        const okPl =
-            !qPlaca || (r.placa || "").toLowerCase().includes(qPlaca.toLowerCase());
-        const okMo =
-            !qMot || (r.motorista || "").toLowerCase().includes(qMot.toLowerCase());
-        const okDt =
-            !qDate || (r.createdAt && r.createdAt.slice(0, 10) === qDate);
-        return okPl && okMo && okDt;
-    });
-
-    /* -------- PDF (idem ao diário) -------- */
-    const pdf = () => {
-        if (!sel) return;
-        const doc = new jsPDF("p", "pt");
-        doc.setFontSize(14).text("Checklist Decendial de Inspeção", 40, 40);
-        doc.setFontSize(10);
-        doc.text(`Placa: ${sel.placa}`, 40, 60);
-        doc.text(`Motorista: ${sel.motorista}`, 40, 75);
-        doc.text(
-            `Data: ${new Date(sel.createdAt).toLocaleString("pt-BR")}`,
-            40,
-            90
-        );
-
-        autoTable(doc, {
-            startY: 110,
-            head: [["Item", "Resposta", "Observações"]],
-            body: sel.items.map((it) => [
-                desc(it.code),
-                it.answer,
-                it.obs || "-",
-            ]),
-            didParseCell: ({ section, column, cell }) => {
-                if (section === "body" && column.index === 1) {
-                    cell.styles.fillColor =
-                        cell.raw === "sim"
-                            ? [204, 255, 204]
-                            : [255, 204, 204];
-                }
-            },
-        });
-
-        let y = doc.lastAutoTable.finalY + 20;
-
-        // inserir primeira assinatura
-        if (sel.signature) {
-            if (y + 80 > doc.internal.pageSize.height - 40) {
-                doc.addPage();
-                y = 40;
-            }
-            doc.setFontSize(12).text("Assinatura Motorista:", 40, y);
-            doc.addImage(sel.signature, "PNG", 40, y + 10, 150, 60);
-            y += 80;
-        }
-
-        // inserir segunda assinatura ou placeholder com borda
-        if (!sel.secondSignature) {
-            if (y + 50 > doc.internal.pageSize.height - 40) {
-                doc.addPage();
-                y = 40;
-            }
-            doc.setDrawColor(255, 193, 7); // amarelo
-            doc.setLineWidth(1.5);
-            doc.rect(38, y - 2, 154, 64);
-            doc.setFontSize(12).text("Sem 2ª assinatura", 44, y + 30);
-            y += 80;
-        } else {
-            if (y + 80 > doc.internal.pageSize.height - 40) {
-                doc.addPage();
-                y = 40;
-            }
-            doc.setFontSize(12).text("2ª Assinatura (Revisor):", 40, y);
-            doc.setDrawColor(76, 175, 80); // verde
-            doc.setLineWidth(1.5);
-            doc.rect(38, y + 2, 154, 64);
-            doc.addImage(sel.secondSignature, "PNG", 40, y + 10, 150, 60);
-            y += 80;
-        }
-
-        doc.save("checklist-decendial.pdf");
-    };
-
-    /* -------- UI -------- */
-    if (loading)
-        return (
-            <Box sx={{ p: 2, textAlign: "center" }}>
-                <CircularProgress />
-            </Box>
-        );
-
+    /* ───── UI ───── */
     return (
         <Box sx={{ p: 2 }}>
             <Typography variant="h5" sx={{ mb: 2 }}>
-                Checklists Decendiais
+                Checklist Decendial
             </Typography>
 
-            {/* filtros */}
-            <Box sx={{ mb: 2, display: "flex", gap: 2 }}>
-                <TextField
-                    placeholder="Placa"
-                    value={qPlaca}
-                    onChange={(e) => setQPlaca(e.target.value)}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <DirectionsCarIcon />
-                            </InputAdornment>
-                        ),
-                    }}
-                />
-                <TextField
-                    placeholder="Motorista"
-                    value={qMot}
-                    onChange={(e) => setQMot(e.target.value)}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <PersonIcon />
-                            </InputAdornment>
-                        ),
-                    }}
-                />
-                <TextField
-                    type="date"
-                    value={qDate}
-                    onChange={(e) => setQDate(e.target.value)}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <EventIcon />
-                            </InputAdornment>
-                        ),
-                    }}
-                />
-            </Box>
+            <Paper sx={{ p: 2, mb: 2 }}>
+                <Typography variant="body1" fontWeight="bold">
+                    Empresa: 298 - DISTRIBUIDORA PRINCESA
+                </Typography>
+                <Typography variant="body2">
+                    Relação de Itens de Inspeção Décendial
+                </Typography>
+            </Paper>
 
-            {/* lista (já só decendial) */}
-            {list.length === 0 ? (
-                <Typography>Nenhum checklist decendial.</Typography>
-            ) : (
-                list.map((r) => {
-                    // se não tiver secondSignature → borda amarela; caso contrário, verde
-                    const needsReview = !r.secondSignature;
-                    return (
-                        <Paper
-                            key={r.objectId}
-                            sx={{
-                                p: 2,
-                                mb: 2,
-                                border: `2px solid ${needsReview ? "#FFC107" : "#4CAF50"
-                                    }`,
-                            }}
-                        >
-                            <Typography fontWeight="bold">
-                                Placa: {r.placa}
-                            </Typography>
-                            <Typography>Motorista: {r.motorista}</Typography>
-                            <Typography>
-                                Criado em:{" "}
-                                {new Date(r.createdAt).toLocaleString("pt-BR")}
-                            </Typography>
-                            <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
-                                <Button
-                                    variant="contained"
-                                    onClick={() => open(r.objectId)}
-                                >
-                                    Detalhes
-                                </Button>
-                                {role === "admin" && (
-                                    <Button
-                                        variant="outlined"
-                                        color="error"
-                                        onClick={() => del(r.objectId)}
-                                    >
-                                        Deletar
-                                    </Button>
-                                )}
-                            </Box>
-                        </Paper>
-                    );
-                })
-            )}
+            {/* placa/autocomplete */}
+            <Autocomplete
+                freeSolo
+                value={selectedVehicle || plateInput}
+                options={vehicles}
+                getOptionLabel={opt =>
+                    typeof opt === 'string'
+                        ? opt
+                        : opt?.placa
+                            ? `${opt.placa} – ${opt.marca || ''} ${opt.modelo || ''}`
+                            : ''
+                }
+                onInputChange={(_, v) => { setPlateInput(v); setSelectedVehicle(null); }}
+                onChange={(_, n) => {
+                    if (typeof n === 'string' || !n) {
+                        setSelectedVehicle(null);
+                        setPlateInput(n || '');
+                    } else {
+                        setSelectedVehicle(n);
+                        setPlateInput(n.placa);
+                    }
+                }}
+                renderInput={p => (
+                    <TextField {...p} label="Placa do Veículo" sx={{ mb: 2 }} />
+                )}
+            />
 
-            {/* detalhes */}
-            <Dialog
-                open={dlgOpen}
-                onClose={() => setDlgOpen(false)}
-                fullWidth
-                maxWidth="md"
-            >
-                <DialogTitle>Detalhes do Checklist Decendial</DialogTitle>
-                <DialogContent dividers>
-                    {loadingDet && <CircularProgress />}
-                    {!loadingDet && sel && (
-                        <Box
-                            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
-                        >
-                            <Typography fontWeight="bold">
-                                Placa: {sel.placa}
-                            </Typography>
-                            <Typography>Motorista: {sel.motorista}</Typography>
-                            <Typography>
-                                Criado em:{" "}
-                                {new Date(sel.createdAt).toLocaleString("pt-BR")}
-                            </Typography>
+            {/* aqui percorremos DECENDIAL_ITEMS em vez de CHECKLIST_ITEMS */}
+            {DECENDIAL_ITEMS.map(item => {
+                const ans = answers.find(a => a.code === item.code);
+                const bg = ans.answer === 'sim'
+                    ? '#e0ffe0'
+                    : ans.answer === 'nao'
+                        ? '#ffe0e0'
+                        : 'inherit';
 
-                            {sel.items.map((it) => (
-                                <Box
-                                    key={it.code}
-                                    sx={{
-                                        pb: 1,
-                                        mb: 1,
-                                        borderBottom: "1px solid #ccc",
-                                    }}
-                                >
-                                    <Typography fontWeight="bold">
-                                        {desc(it.code)}
-                                    </Typography>
-                                    <Typography
-                                        sx={{
-                                            color:
-                                                it.answer === "sim"
-                                                    ? "green"
-                                                    : "red",
-                                        }}
-                                    >
-                                        Resposta: {it.answer}
-                                    </Typography>
-                                    <Typography>
-                                        Observações: {it.obs || "-"}
-                                    </Typography>
+                return (
+                    <Paper key={item.code} sx={{ p: 2, mb: 2, backgroundColor: bg }}>
+                        <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                            {item.code}. {item.description}
+                        </Typography>
 
-                                    {(it.attachments || []).length > 0 && (
-                                        <Box
-                                            sx={{
-                                                mt: 1,
-                                                display: "flex",
-                                                flexWrap: "wrap",
-                                                gap: 1,
-                                            }}
-                                        >
-                                            {it.attachments.map((a) =>
-                                                a.dataUrl ? (
-                                                    <img
-                                                        key={a.attachmentId}
-                                                        src={a.dataUrl}
-                                                        alt="Anexo"
-                                                        style={{
-                                                            border: "1px solid #ccc",
-                                                            maxWidth: 200,
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <Box
-                                                        key={a.attachmentId}
-                                                        sx={{
-                                                            width: 200,
-                                                            height: 150,
-                                                            display: "flex",
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
-                                                            border: "1px solid #ccc",
-                                                            bgcolor: "#f5f5f5",
-                                                        }}
-                                                    >
-                                                        <Typography
-                                                            variant="caption"
-                                                            color="textSecondary"
-                                                        >
-                                                            Não foi possível carregar
-                                                        </Typography>
-                                                    </Box>
-                                                )
-                                            )}
-                                        </Box>
-                                    )}
-                                </Box>
-                            ))}
+                        <FormControl>
+                            <FormLabel>Resposta</FormLabel>
+                            <RadioGroup
+                                row value={ans.answer}
+                                onChange={e => handleAnswerChange(item.code, 'answer', e.target.value)}
+                            >
+                                <FormControlLabel
+                                    value="sim"
+                                    label="Sim"
+                                    control={<Radio sx={{ '&.Mui-checked': { color: 'green' } }} />}
+                                />
+                                <FormControlLabel
+                                    value="nao"
+                                    label="Não"
+                                    control={<Radio sx={{ '&.Mui-checked': { color: 'red' } }} />}
+                                />
+                            </RadioGroup>
+                        </FormControl>
 
-                            {/* primeira assinatura */}
-                            <Box>
-                                <Typography variant="subtitle2" sx={{ mt: 2 }}>
-                                    Assinatura Motorista:
+                        <TextField
+                            label="Observações"
+                            fullWidth
+                            multiline
+                            minRows={2}
+                            sx={{ mt: 2 }}
+                            value={ans.obs}
+                            onChange={e => handleAnswerChange(item.code, 'obs', e.target.value)}
+                        />
+
+                        {/* se for “não”, habilita upload de anexos (igual ao DriverChecklist) */}
+                        {ans.answer === 'nao' && (
+                            <Box sx={{ mt: 2 }}>
+                                <Typography variant="body2" sx={{ mb: 1 }}>
+                                    Anexos obrigatórios:
                                 </Typography>
-                                {sel.signature ? (
-                                    <img
-                                        src={sel.signature}
-                                        alt="Assinatura"
-                                        style={{
-                                            border: "1px solid #ccc",
-                                            maxWidth: 300,
-                                        }}
-                                    />
-                                ) : (
-                                    <Box
-                                        sx={{
-                                            width: 300,
-                                            height: 60,
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            border: "1px dashed #ccc",
-                                            bgcolor: "#f5f5f5",
-                                        }}
-                                    >
-                                        <Typography
-                                            variant="caption"
-                                            color="textSecondary"
-                                        >
-                                            Sem assinatura
-                                        </Typography>
-                                    </Box>
+                                <input
+                                    type="file"
+                                    multiple
+                                    onChange={e => handleItemFileChange(item.code, Array.from(e.target.files || []))}
+                                />
+                                {!!ans.attachments.length && (
+                                    <Typography variant="body2" sx={{ mt: 1 }}>
+                                        {ans.attachments.map(f => f.name).join(', ')}
+                                    </Typography>
                                 )}
                             </Box>
+                        )}
+                    </Paper>
+                );
+            })}
 
-                            {/* segunda assinatura */}
-                            <Box>
-                                <Typography variant="subtitle2" sx={{ mt: 2 }}>
-                                    2ª Assinatura (Revisor):
-                                </Typography>
-                                {sel.secondSignature ? (
-                                    <Box
-                                        sx={{
-                                            boxShadow: "0 0 8px 2px rgba(76,175,80,0.6)",
-                                            display: "inline-block",
-                                        }}
-                                    >
-                                        <img
-                                            src={sel.secondSignature}
-                                            alt="2ª Assinatura"
-                                            style={{
-                                                border: "1px solid #ccc",
-                                                maxWidth: 300,
-                                            }}
-                                        />
-                                    </Box>
-                                ) : (
-                                    <Box
-                                        sx={{
-                                            boxShadow: "0 0 8px 2px rgba(255,193,7,0.6)",
-                                            width: 300,
-                                            height: 60,
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            border: "1px dashed #ccc",
-                                            bgcolor: "#fff59d",
-                                        }}
-                                    >
-                                        <Typography
-                                            variant="caption"
-                                            color="textSecondary"
-                                        >
-                                            Aguardando 2ª assinatura
-                                        </Typography>
-                                    </Box>
-                                )}
-                            </Box>
+            <Button variant="contained" fullWidth sx={{ mt: 2 }} onClick={handleSubmit}>
+                Enviar Checklist Decendial
+            </Button>
 
-                            {/* botão de revisar e assinar (admins) */}
-                            {role === "admin" && !sel.secondSignature && (
-                                <Button
-                                    variant="contained"
-                                    color="secondary"
-                                    onClick={handleSecondSignClick}
-                                    disabled={loadingDet}
-                                    sx={{ mt: 2 }}
-                                >
-                                    Criar 2ª Assinatura
-                                </Button>
-                            )}
-                        </Box>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    <Button
-                        variant="contained"
-                        onClick={pdf}
-                        disabled={!sel || loadingDet}
-                    >
-                        Gerar PDF
-                    </Button>
-                    <Button onClick={() => setDlgOpen(false)}>Fechar</Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* modal para desenhar segunda assinatura */}
+            {/* modal assinatura */}
             <Dialog
-                open={signModalOpen}
-                onClose={() => setSignModalOpen(false)}
-                disableEscapeKeyDown={loadingDet}
+                open={openSignModal}
+                onClose={(e, r) => {
+                    if (loading || r === 'backdropClick') return;
+                    setOpenSignModal(false);
+                    setSavedSignature(null);
+                }}
+                disableEscapeKeyDown={loading}
                 maxWidth="sm"
                 fullWidth
             >
-                <DialogTitle>Desenhar 2ª Assinatura</DialogTitle>
+                <DialogTitle>Assinatura</DialogTitle>
                 <DialogContent dividers>
-                    <Box sx={{ border: "1px solid #ccc", height: 200, mb: 2 }}>
+                    <Typography sx={{ mb: 1 }}>Assine abaixo:</Typography>
+                    <Box sx={{ border: '1px solid #ccc', height: 200, mb: 2 }}>
                         <SignatureCanvas
                             ref={signatureRef}
                             penColor="black"
-                            canvasProps={{
-                                width: 500,
-                                height: 200,
-                                style: { background: "#fff" },
-                            }}
+                            canvasProps={{ width: 500, height: 200, style: { background: '#fff' } }}
                         />
                     </Box>
-                    <Box
-                        sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}
-                    >
-                        <Button
-                            onClick={() => signatureRef.current.clear()}
-                            disabled={loadingDet}
-                        >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Button onClick={handleClearSignature} variant="outlined" disabled={loading}>
                             Limpar
                         </Button>
-                        <Button
-                            onClick={handleSaveSecondSignature}
-                            variant="outlined"
-                            disabled={loadingDet}
-                        >
+                        <Button onClick={handleSaveSignature} variant="outlined" disabled={loading}>
                             Salvar
                         </Button>
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button
-                        onClick={() => setSignModalOpen(false)}
-                        disabled={loadingDet}
-                    >
+                    <Button onClick={() => setOpenSignModal(false)} disabled={loading}>
                         Cancelar
                     </Button>
-                    <Button
-                        variant="contained"
-                        onClick={handleConfirmSecondSignature}
-                        disabled={!savedSecondSignature || loadingDet}
-                    >
+                    <Button variant="contained" onClick={handleConfirmSignature} disabled={loading}>
                         Confirmar
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* snackbar */}
+            {/* snackbar + backdrop */}
             <Snackbar
-                open={sn.open}
-                autoHideDuration={3000}
-                anchorOrigin={{ vertical: "top", horizontal: "center" }}
-                onClose={() => setSn((s) => ({ ...s, open: false }))}
+                open={snackbarOpen}
+                autoHideDuration={4000}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                onClose={() => setSnackbarOpen(false)}
             >
-                <Alert
-                    severity={sn.sev}
-                    onClose={() => setSn((s) => ({ ...s, open: false }))}
-                >
-                    {sn.msg}
+                <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={{ width: '100%' }}>
+                    {snackbarMessage}
                 </Alert>
             </Snackbar>
+
+            <Backdrop sx={{ color: '#fff', zIndex: t => t.zIndex.drawer + 1 }} open={loading}>
+                <CircularProgress color="inherit" />
+            </Backdrop>
         </Box>
     );
 }
