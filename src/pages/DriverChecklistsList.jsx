@@ -118,7 +118,7 @@ export default function DriverChecklistsList() {
         return okPl && okMo && okDt;
     });
 
-    /* -------- PDF (sem imagens remotas para evitar CORS) -------- */
+    /* -------- PDF (incluindo imagens em base64) -------- */
     const pdf = () => {
         if (!sel) return;
         const doc = new jsPDF("p", "pt");
@@ -133,15 +133,50 @@ export default function DriverChecklistsList() {
             head: [["Item", "Resposta", "Observações"]],
             body: sel.items.map(it => [desc(it.code), it.answer, it.obs || "-"]),
             didParseCell: ({ section, column, cell }) => {
-                if (section === "body" && column.index === 1)
-                    cell.styles.fillColor = cell.raw === "sim" ? [204, 255, 204] : [255, 204, 204];
+                if (section === "body" && column.index === 1) {
+                    cell.styles.fillColor = cell.raw === "sim"
+                        ? [204, 255, 204] : [255, 204, 204];
+                }
             }
         });
 
-        // A assinatura continua embutida se existir
+        // Após a tabela, inserir imagens dos attachments em base64
+        let y = doc.lastAutoTable.finalY + 20;
+        sel.items.forEach((it) => {
+            if (Array.isArray(it.attachments) && it.attachments.length) {
+                // Título do item
+                doc.setFontSize(12);
+                doc.text(`Item: ${desc(it.code)}`, 40, y);
+                y += 16;
+
+                it.attachments.forEach((att) => {
+                    if (!att.dataUrl) return;
+                    // Ajusta largura/altura para caber na página (100px de largura)
+                    const imgProps = doc.getImageProperties(att.dataUrl);
+                    const ratio = imgProps.width / imgProps.height;
+                    const imgWidth = 100;
+                    const imgHeight = imgWidth / ratio;
+
+                    // Se ultrapassar página, adiciona nova página
+                    if (y + imgHeight > doc.internal.pageSize.height - 40) {
+                        doc.addPage();
+                        y = 40;
+                    }
+
+                    doc.addImage(att.dataUrl, "JPEG", 40, y, imgWidth, imgHeight);
+                    y += imgHeight + 10;
+                });
+                y += 10;
+            }
+        });
+
+        // Inserir assinatura, se existir
         if (sel.signature) {
-            const y = doc.lastAutoTable.finalY + 30;
-            doc.text("Assinatura:", 40, y);
+            if (y + 80 > doc.internal.pageSize.height - 40) {
+                doc.addPage();
+                y = 40;
+            }
+            doc.setFontSize(12).text("Assinatura:", 40, y);
             doc.addImage(sel.signature, "PNG", 40, y + 10, 150, 60);
         }
 
