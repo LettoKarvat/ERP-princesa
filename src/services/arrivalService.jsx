@@ -1,4 +1,4 @@
-import api from "./apiflask";
+import api from "./apiFlask";
 
 /* ───────── util ───────── */
 export const fileToBase64 = (file) =>

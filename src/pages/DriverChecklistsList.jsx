@@ -36,23 +36,10 @@ const ITEMS = [
 ];
 const desc = (c) => ITEMS.find((i) => i.code === c)?.description || `Item ${c}`;
 
-/* URLs do ngrok precisam do parâmetro para pular o banner */
-const skipNgrok = (url = "") =>
-    url.includes("ngrok-skip-browser-warning")
-        ? url
-        : `${url}${url.includes("?") ? "&" : "?"}ngrok-skip-browser-warning=true`;
-
 /* chamadas ---------------------------------------------------- */
 const allChecklists = () => api.get("/inspection/checklists").then((r) => r.data);
 const oneChecklist = async (id) => {
     const { data } = await api.get(`/inspection/checklists/${id}`);
-    /* vacina todos os attachments contra o banner */
-    data.items?.forEach((it) => {
-        it.attachments = (it.attachments || []).map((a) => ({
-            ...a,
-            url: skipNgrok(a.url),
-        }));
-    });
     return data;
 };
 
@@ -85,7 +72,25 @@ export default function DriverChecklistsList() {
         setLoadingDet(true);
         try {
             const detail = await oneChecklist(id);
-            console.log("Anexos recebidos:", detail.items.flatMap(i => i.attachments));
+
+            // para cada attachment, buscar o JSON e extrair o data URL
+            await Promise.all(
+                detail.items.map(async (item) => {
+                    if (Array.isArray(item.attachments)) {
+                        await Promise.all(
+                            item.attachments.map(async (att) => {
+                                try {
+                                    const resp = await api.get(att.url);
+                                    att.dataUrl = resp.data.data; // data: "data:<mime>;base64,<conteúdo>"
+                                } catch {
+                                    att.dataUrl = null;
+                                }
+                            })
+                        );
+                    }
+                })
+            );
+
             setSel(detail);
             setDlgOpen(true);
         } catch {
@@ -128,7 +133,7 @@ export default function DriverChecklistsList() {
             }
         });
 
-        /* (imagens remotas removidas para evitar CORS e corromper o PDF) */
+        /* imagens não incluídas para evitar CORS */
 
         if (sel.signature) {
             const y = doc.lastAutoTable.finalY + 30;
@@ -149,25 +154,38 @@ export default function DriverChecklistsList() {
 
             {/* filtros */}
             <Box sx={{ mb: 2, display: "flex", gap: 2 }}>
-                <TextField placeholder="Placa" value={qPlaca} onChange={e => setQPlaca(e.target.value)}
+                <TextField
+                    placeholder="Placa"
+                    value={qPlaca}
+                    onChange={e => setQPlaca(e.target.value)}
                     InputProps={{
                         startAdornment:
                             <InputAdornment position="start"><DirectionsCarIcon /></InputAdornment>
-                    }} />
-                <TextField placeholder="Motorista" value={qMot} onChange={e => setQMot(e.target.value)}
+                    }}
+                />
+                <TextField
+                    placeholder="Motorista"
+                    value={qMot}
+                    onChange={e => setQMot(e.target.value)}
                     InputProps={{
                         startAdornment:
                             <InputAdornment position="start"><PersonIcon /></InputAdornment>
-                    }} />
-                <TextField type="date" value={qDate} onChange={e => setQDate(e.target.value)}
+                    }}
+                />
+                <TextField
+                    type="date"
+                    value={qDate}
+                    onChange={e => setQDate(e.target.value)}
                     InputProps={{
                         startAdornment:
                             <InputAdornment position="start"><EventIcon /></InputAdornment>
-                    }} />
+                    }}
+                />
             </Box>
 
             {/* lista */}
-            {list.length === 0 ? <Typography>Nenhum checklist.</Typography>
+            {list.length === 0
+                ? <Typography>Nenhum checklist.</Typography>
                 : list.map(r => (
                     <Paper key={r.objectId} sx={{ p: 2, mb: 2 }}>
                         <Typography fontWeight="bold">Placa: {r.placa}</Typography>
@@ -203,8 +221,25 @@ export default function DriverChecklistsList() {
                                     {(it.attachments || []).length > 0 && (
                                         <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
                                             {it.attachments.map(a => (
-                                                <img key={a.attachmentId} src={a.url}
-                                                    alt="Anexo" style={{ border: "1px solid #ccc", maxWidth: 200 }} />
+                                                a.dataUrl
+                                                    ? <img
+                                                        key={a.attachmentId}
+                                                        src={a.dataUrl}
+                                                        alt="Anexo"
+                                                        style={{ border: "1px solid #ccc", maxWidth: 200 }}
+                                                    />
+                                                    : <Box
+                                                        key={a.attachmentId}
+                                                        sx={{
+                                                            width: 200, height: 150,
+                                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                                            border: "1px solid #ccc", bgcolor: "#f5f5f5"
+                                                        }}
+                                                    >
+                                                        <Typography variant="caption" color="textSecondary">
+                                                            Não foi possível carregar
+                                                        </Typography>
+                                                    </Box>
                                             ))}
                                         </Box>
                                     )}
@@ -214,8 +249,11 @@ export default function DriverChecklistsList() {
                             {sel.signature && (
                                 <Box>
                                     <Typography variant="subtitle2" sx={{ mt: 2 }}>Assinatura:</Typography>
-                                    <img src={sel.signature} alt="Assinatura"
-                                        style={{ border: "1px solid #ccc", maxWidth: 300 }} />
+                                    <img
+                                        src={sel.signature}
+                                        alt="Assinatura"
+                                        style={{ border: "1px solid #ccc", maxWidth: 300 }}
+                                    />
                                 </Box>
                             )}
                         </Box>
@@ -228,9 +266,12 @@ export default function DriverChecklistsList() {
             </Dialog>
 
             {/* snackbar */}
-            <Snackbar open={sn.open} autoHideDuration={3000}
+            <Snackbar
+                open={sn.open}
+                autoHideDuration={3000}
                 anchorOrigin={{ vertical: "top", horizontal: "center" }}
-                onClose={() => setSn(s => ({ ...s, open: false }))}>
+                onClose={() => setSn(s => ({ ...s, open: false }))}
+            >
                 <Alert severity={sn.sev} onClose={() => setSn(s => ({ ...s, open: false }))}>
                     {sn.msg}
                 </Alert>
