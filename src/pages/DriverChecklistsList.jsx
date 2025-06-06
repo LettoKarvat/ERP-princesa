@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     Box, Typography, Paper, Button, CircularProgress, Snackbar, Alert,
     Dialog, DialogTitle, DialogContent, DialogActions,
@@ -7,6 +7,7 @@ import {
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 import PersonIcon from "@mui/icons-material/Person";
 import EventIcon from "@mui/icons-material/Event";
+import SignatureCanvas from "react-signature-canvas";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import api from "../services/apiFlask";
@@ -42,6 +43,12 @@ const oneChecklist = async (id) => {
     const { data } = await api.get(`/inspection/checklists/${id}`);
     return data;
 };
+const assignSecondSign = async (id, signatureBase64) => {
+    await api.post(
+        `/inspection/checklists/${id}/second-signature`,
+        { signature: signatureBase64 }
+    );
+};
 
 /* componente -------------------------------------------------- */
 export default function DriverChecklistsList() {
@@ -58,13 +65,23 @@ export default function DriverChecklistsList() {
     const [sn, setSn] = useState({ open: false, msg: "", sev: "info" });
     const role = localStorage.getItem("role") || "";
 
+    // estados e ref para segunda assinatura
+    const [signModalOpen, setSignModalOpen] = useState(false);
+    const signatureRef = useRef(null);
+    const [savedSecondSignature, setSavedSecondSignature] = useState(null);
+
     /* -------- carregamento inicial -------- */
     useEffect(() => { load(); }, []);
     const load = async () => {
         setLoading(true);
-        try { setRows(await allChecklists()); }
-        catch { setSn({ open: true, sev: "error", msg: "Falha ao carregar." }); }
-        finally { setLoading(false); }
+        try {
+            const data = await allChecklists();
+            setRows(data);
+        } catch {
+            setSn({ open: true, sev: "error", msg: "Falha ao carregar." });
+        } finally {
+            setLoading(false);
+        }
     };
 
     /* -------- detalhes -------- */
@@ -73,20 +90,18 @@ export default function DriverChecklistsList() {
         try {
             const detail = await oneChecklist(id);
 
-            // Para cada item, buscar o JSON que contém o base64,
-            // garantindo uso de HTTPS para evitar preflight redirecionando.
+            // buscar base64 de cada attachment
             await Promise.all(
                 detail.items.map(async (item) => {
                     if (Array.isArray(item.attachments)) {
                         await Promise.all(
                             item.attachments.map(async (att) => {
                                 try {
-                                    // força HTTPS (caso venha HTTP)
                                     const secureUrl = att.url.startsWith("http://")
                                         ? att.url.replace(/^http:\/\//, "https://")
                                         : att.url;
                                     const resp = await api.get(secureUrl);
-                                    att.dataUrl = resp.data.data; // resp.data.data = "data:<mime>;base64,<conteúdo>"
+                                    att.dataUrl = resp.data.data;
                                 } catch {
                                     att.dataUrl = null;
                                 }
@@ -100,14 +115,79 @@ export default function DriverChecklistsList() {
             setDlgOpen(true);
         } catch {
             setSn({ open: true, sev: "error", msg: "Falha ao detalhar." });
-        } finally { setLoadingDet(false); }
+        } finally {
+            setLoadingDet(false);
+        }
+    };
+
+    /* -------- abrir modal de segunda assinatura -------- */
+    const handleSecondSignClick = () => {
+        if (!sel) return;
+        setSavedSecondSignature(null);
+        setSignModalOpen(true);
+    };
+
+    /* -------- salvar desenho da segunda assinatura -------- */
+    const handleSaveSecondSignature = () => {
+        if (signatureRef.current.isEmpty()) {
+            setSn({ open: true, sev: "error", msg: "Assine antes de salvar." });
+            return;
+        }
+        const base64 = signatureRef.current.getTrimmedCanvas().toDataURL("image/png");
+        setSavedSecondSignature(base64);
+        setSn({ open: true, sev: "success", msg: "Assinatura salva." });
+    };
+
+    /* -------- confirmar segunda assinatura -------- */
+    const handleConfirmSecondSignature = async () => {
+        if (!savedSecondSignature) {
+            setSn({ open: true, sev: "error", msg: "Salve a assinatura antes de confirmar." });
+            return;
+        }
+        setLoadingDet(true);
+        try {
+            await assignSecondSign(sel.objectId, savedSecondSignature);
+            const updatedFull = await oneChecklist(sel.objectId);
+            await Promise.all(
+                updatedFull.items.map(async (item) => {
+                    if (Array.isArray(item.attachments)) {
+                        await Promise.all(
+                            item.attachments.map(async (att) => {
+                                try {
+                                    const secureUrl = att.url.startsWith("http://")
+                                        ? att.url.replace(/^http:\/\//, "https://")
+                                        : att.url;
+                                    const resp = await api.get(secureUrl);
+                                    att.dataUrl = resp.data.data;
+                                } catch {
+                                    att.dataUrl = null;
+                                }
+                            })
+                        );
+                    }
+                })
+            );
+            setSel(updatedFull);
+            setSignModalOpen(false);
+            setSn({ open: true, sev: "success", msg: "Segunda assinatura aplicada." });
+            // também recarrega a lista para atualizar cor de card
+            load();
+        } catch {
+            setSn({ open: true, sev: "error", msg: "Falha ao atribuir segunda assinatura." });
+        } finally {
+            setLoadingDet(false);
+        }
     };
 
     /* -------- delete (opcional) -------- */
     const del = async (id) => {
         if (!window.confirm("Apagar checklist?")) return;
-        try { await api.delete(`/inspection/checklists/${id}`); load(); }
-        catch { setSn({ open: true, sev: "error", msg: "Falha ao deletar." }); }
+        try {
+            await api.delete(`/inspection/checklists/${id}`);
+            load();
+        } catch {
+            setSn({ open: true, sev: "error", msg: "Falha ao deletar." });
+        }
     };
 
     /* -------- filtros -------- */
@@ -118,7 +198,7 @@ export default function DriverChecklistsList() {
         return okPl && okMo && okDt;
     });
 
-    /* -------- PDF (incluindo imagens em base64) -------- */
+    /* -------- PDF (com duas assinaturas e borda colorida) -------- */
     const pdf = () => {
         if (!sel) return;
         const doc = new jsPDF("p", "pt");
@@ -140,44 +220,41 @@ export default function DriverChecklistsList() {
             }
         });
 
-        // Após a tabela, inserir imagens dos attachments em base64
         let y = doc.lastAutoTable.finalY + 20;
-        sel.items.forEach((it) => {
-            if (Array.isArray(it.attachments) && it.attachments.length) {
-                // Título do item
-                doc.setFontSize(12);
-                doc.text(`Item: ${desc(it.code)}`, 40, y);
-                y += 16;
 
-                it.attachments.forEach((att) => {
-                    if (!att.dataUrl) return;
-                    // Ajusta largura/altura para caber na página (100px de largura)
-                    const imgProps = doc.getImageProperties(att.dataUrl);
-                    const ratio = imgProps.width / imgProps.height;
-                    const imgWidth = 100;
-                    const imgHeight = imgWidth / ratio;
-
-                    // Se ultrapassar página, adiciona nova página
-                    if (y + imgHeight > doc.internal.pageSize.height - 40) {
-                        doc.addPage();
-                        y = 40;
-                    }
-
-                    doc.addImage(att.dataUrl, "JPEG", 40, y, imgWidth, imgHeight);
-                    y += imgHeight + 10;
-                });
-                y += 10;
-            }
-        });
-
-        // Inserir assinatura, se existir
+        // inserir primeira assinatura
         if (sel.signature) {
             if (y + 80 > doc.internal.pageSize.height - 40) {
                 doc.addPage();
                 y = 40;
             }
-            doc.setFontSize(12).text("Assinatura:", 40, y);
+            doc.setFontSize(12).text("Assinatura Motorista:", 40, y);
             doc.addImage(sel.signature, "PNG", 40, y + 10, 150, 60);
+            y += 80;
+        }
+
+        // inserir segunda assinatura ou placeholder com borda
+        if (!sel.secondSignature) {
+            if (y + 50 > doc.internal.pageSize.height - 40) {
+                doc.addPage();
+                y = 40;
+            }
+            doc.setDrawColor(255, 193, 7);
+            doc.setLineWidth(1.5);
+            doc.rect(38, y - 2, 154, 64);
+            doc.setFontSize(12).text("Sem 2ª assinatura", 44, y + 30);
+            y += 80;
+        } else {
+            if (y + 80 > doc.internal.pageSize.height - 40) {
+                doc.addPage();
+                y = 40;
+            }
+            doc.setFontSize(12).text("2ª Assinatura (Revisor):", 40, y);
+            doc.setDrawColor(76, 175, 80);
+            doc.setLineWidth(1.5);
+            doc.rect(38, y + 2, 154, 64);
+            doc.addImage(sel.secondSignature, "PNG", 40, y + 10, 150, 60);
+            y += 80;
         }
 
         doc.save("checklist.pdf");
@@ -225,18 +302,41 @@ export default function DriverChecklistsList() {
             {/* lista */}
             {list.length === 0
                 ? <Typography>Nenhum checklist.</Typography>
-                : list.map(r => (
-                    <Paper key={r.objectId} sx={{ p: 2, mb: 2 }}>
-                        <Typography fontWeight="bold">Placa: {r.placa}</Typography>
-                        <Typography>Motorista: {r.motorista}</Typography>
-                        <Typography>Criado em: {new Date(r.createdAt).toLocaleString("pt-BR")}</Typography>
-                        <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
-                            <Button variant="contained" onClick={() => open(r.objectId)}>Detalhes</Button>
-                            {role === "admin" &&
-                                <Button variant="outlined" color="error" onClick={() => del(r.objectId)}>Deletar</Button>}
-                        </Box>
-                    </Paper>
-                ))}
+                : list.map(r => {
+                    // se não tiver secondSignature, borda amarela (precisa revisar); caso contrário, borda verde
+                    const needsReview = !r.secondSignature;
+                    return (
+                        <Paper
+                            key={r.objectId}
+                            sx={{
+                                p: 2,
+                                mb: 2,
+                                border: `2px solid ${needsReview ? "#FFC107" : "#4CAF50"}`,
+                            }}
+                        >
+                            <Typography fontWeight="bold">Placa: {r.placa}</Typography>
+                            <Typography>Motorista: {r.motorista}</Typography>
+                            <Typography>
+                                Criado em: {new Date(r.createdAt).toLocaleString("pt-BR")}
+                            </Typography>
+                            <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
+                                <Button variant="contained" onClick={() => open(r.objectId)}>
+                                    Detalhes
+                                </Button>
+                                {role === "admin" && (
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        onClick={() => del(r.objectId)}
+                                    >
+                                        Deletar
+                                    </Button>
+                                )}
+                            </Box>
+                        </Paper>
+                    );
+                })
+            }
 
             {/* detalhes */}
             <Dialog open={dlgOpen} onClose={() => setDlgOpen(false)} fullWidth maxWidth="md">
@@ -247,7 +347,9 @@ export default function DriverChecklistsList() {
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                             <Typography fontWeight="bold">Placa: {sel.placa}</Typography>
                             <Typography>Motorista: {sel.motorista}</Typography>
-                            <Typography>Criado em: {new Date(sel.createdAt).toLocaleString("pt-BR")}</Typography>
+                            <Typography>
+                                Criado em: {new Date(sel.createdAt).toLocaleString("pt-BR")}
+                            </Typography>
 
                             {sel.items.map(it => (
                                 <Box key={it.code} sx={{ pb: 1, mb: 1, borderBottom: "1px solid #ccc" }}>
@@ -285,22 +387,123 @@ export default function DriverChecklistsList() {
                                 </Box>
                             ))}
 
-                            {sel.signature && (
-                                <Box>
-                                    <Typography variant="subtitle2" sx={{ mt: 2 }}>Assinatura:</Typography>
-                                    <img
+                            {/* primeira assinatura */}
+                            <Box>
+                                <Typography variant="subtitle2" sx={{ mt: 2 }}>
+                                    Assinatura Motorista:
+                                </Typography>
+                                {sel.signature
+                                    ? <img
                                         src={sel.signature}
                                         alt="Assinatura"
                                         style={{ border: "1px solid #ccc", maxWidth: 300 }}
                                     />
-                                </Box>
+                                    : <Box
+                                        sx={{
+                                            width: 300, height: 60,
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            border: "1px dashed #ccc", bgcolor: "#f5f5f5"
+                                        }}
+                                    >
+                                        <Typography variant="caption" color="textSecondary">
+                                            Sem assinatura
+                                        </Typography>
+                                    </Box>
+                                }
+                            </Box>
+
+                            {/* segunda assinatura */}
+                            <Box>
+                                <Typography variant="subtitle2" sx={{ mt: 2 }}>
+                                    2ª Assinatura (Revisor):
+                                </Typography>
+                                {sel.secondSignature
+                                    ? <Box
+                                        sx={{
+                                            boxShadow: "0 0 8px 2px rgba(76,175,80,0.6)",
+                                            display: "inline-block"
+                                        }}
+                                    >
+                                        <img
+                                            src={sel.secondSignature}
+                                            alt="2ª Assinatura"
+                                            style={{ border: "1px solid #ccc", maxWidth: 300 }}
+                                        />
+                                    </Box>
+                                    : <Box
+                                        sx={{
+                                            boxShadow: "0 0 8px 2px rgba(255,193,7,0.6)",
+                                            width: 300, height: 60,
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            border: "1px dashed #ccc", bgcolor: "#fff59d"
+                                        }}
+                                    >
+                                        <Typography variant="caption" color="textSecondary">
+                                            Aguardando 2ª assinatura
+                                        </Typography>
+                                    </Box>
+                                }
+                            </Box>
+
+                            {/* botão de revisar e assinar (para admins) */}
+                            {role === "admin" && !sel.secondSignature && (
+                                <Button
+                                    variant="contained"
+                                    color="secondary"
+                                    onClick={handleSecondSignClick}
+                                    disabled={loadingDet}
+                                >
+                                    Criar 2ª Assinatura
+                                </Button>
                             )}
                         </Box>
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="contained" onClick={pdf} disabled={!sel || loadingDet}>Gerar PDF</Button>
+                    <Button variant="contained" onClick={pdf} disabled={!sel || loadingDet}>
+                        Gerar PDF
+                    </Button>
                     <Button onClick={() => setDlgOpen(false)}>Fechar</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* modal para desenhar segunda assinatura */}
+            <Dialog
+                open={signModalOpen}
+                onClose={() => setSignModalOpen(false)}
+                disableEscapeKeyDown={loadingDet}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>Desenhar 2ª Assinatura</DialogTitle>
+                <DialogContent dividers>
+                    <Box sx={{ border: "1px solid #ccc", height: 200, mb: 2 }}>
+                        <SignatureCanvas
+                            ref={signatureRef}
+                            penColor="black"
+                            canvasProps={{ width: 500, height: 200, style: { background: "#fff" } }}
+                        />
+                    </Box>
+                    <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
+                        <Button onClick={() => signatureRef.current.clear()} disabled={loadingDet}>
+                            Limpar
+                        </Button>
+                        <Button onClick={handleSaveSecondSignature} variant="outlined" disabled={loadingDet}>
+                            Salvar
+                        </Button>
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setSignModalOpen(false)} disabled={loadingDet}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmSecondSignature}
+                        disabled={!savedSecondSignature || loadingDet}
+                    >
+                        Confirmar
+                    </Button>
                 </DialogActions>
             </Dialog>
 
