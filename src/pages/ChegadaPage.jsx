@@ -44,7 +44,7 @@ import {
 import Autocomplete from "@mui/material/Autocomplete";
 import SignatureCanvas from "react-signature-canvas";
 
-import api from "../services/apiflask";
+import api from "../services/apiFlask";
 import {
     getSaidasEmTransito,
     getAllArrivals,
