@@ -17,8 +17,9 @@ import {
   useMediaQuery,
   useTheme,
   Collapse,
+  Divider,
 } from "@mui/material";
-import { NavLink, useNavigate, Outlet } from "react-router-dom";
+import { NavLink, useNavigate, Outlet, useLocation } from "react-router-dom";
 import {
   FaHome,
   FaClipboardCheck,
@@ -48,18 +49,21 @@ const listItemButtonStyle = {
 
 function Layout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const role = localStorage.getItem("role") || "";
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
 
+  // estado para abrir/fechar Drawer no mobile
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [openChecklist, setOpenChecklist] = useState(false);
-  const [openPartsReplacement, setOpenPartsReplacement] = useState(false);
-  const [openRefueling, setOpenRefueling] = useState(false);
+  const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
-  };
+  // Rotas colapsáveis
+  const [openPortaria, setOpenPortaria] = useState(false);
+  const [openAbastecimento, setOpenAbastecimento] = useState(false);
+  const [openTrocaPecas, setOpenTrocaPecas] = useState(false);
+  const [openDriverDiario, setOpenDriverDiario] = useState(false);
+  const [openDriverDecendial, setOpenDriverDecendial] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem("sessionToken");
@@ -67,6 +71,7 @@ function Layout() {
     localStorage.removeItem("fullname");
     navigate("/login");
   };
+
   const drawerContent = (
     <Box
       sx={{
@@ -97,15 +102,18 @@ function Layout() {
         </Typography>
       </Box>
 
+      <Divider />
+
       <Box component="nav" sx={{ flex: 1 }}>
         <List>
-          {/* Dashboard -> Só admin */}
+          {/* Dashboard -> só admin */}
           {role === "admin" && (
             <ListItem disablePadding>
               <ListItemButton
                 component={NavLink}
                 to="/dashboard"
                 sx={listItemButtonStyle}
+                selected={location.pathname === "/dashboard"}
               >
                 <ListItemIcon sx={{ color: "inherit" }}>
                   <FaHome />
@@ -122,6 +130,7 @@ function Layout() {
                 component={NavLink}
                 to="/vehicles"
                 sx={listItemButtonStyle}
+                selected={location.pathname === "/vehicles"}
               >
                 <ListItemIcon sx={{ color: "inherit" }}>
                   <FaCog />
@@ -131,29 +140,29 @@ function Layout() {
             </ListItem>
           )}
 
-          {/* Checklist (Portaria) -> admin, portaria, manutencao */}
+          {/* Controle de Portaria -> admin, portaria, manutencao */}
           {["admin", "portaria", "manutencao"].includes(role) && (
             <>
               <ListItem disablePadding>
                 <ListItemButton
-                  onClick={() => setOpenChecklist(!openChecklist)}
+                  onClick={() => setOpenPortaria(!openPortaria)}
                   sx={listItemButtonStyle}
                 >
                   <ListItemIcon sx={{ color: "inherit" }}>
                     <FaClipboardCheck />
                   </ListItemIcon>
-                  <ListItemText primary="Controle de portaria" />
-                  {openChecklist ? <ExpandLess /> : <ExpandMore />}
+                  <ListItemText primary="Controle de Portaria" />
+                  {openPortaria ? <ExpandLess /> : <ExpandMore />}
                 </ListItemButton>
               </ListItem>
-              <Collapse in={openChecklist} timeout="auto" unmountOnExit>
+              <Collapse in={openPortaria} timeout="auto" unmountOnExit>
                 <List component="div" disablePadding>
-
                   <ListItem disablePadding>
                     <ListItemButton
                       component={NavLink}
                       to="/portaria/saida"
                       sx={{ pl: 4, ...listItemButtonStyle }}
+                      selected={location.pathname === "/portaria/saida"}
                     >
                       <ListItemText primary="Saída" />
                     </ListItemButton>
@@ -163,6 +172,7 @@ function Layout() {
                       component={NavLink}
                       to="/portaria/chegada"
                       sx={{ pl: 4, ...listItemButtonStyle }}
+                      selected={location.pathname === "/portaria/chegada"}
                     >
                       <ListItemText primary="Chegada" />
                     </ListItemButton>
@@ -179,6 +189,7 @@ function Layout() {
                 component={NavLink}
                 to="/consumption"
                 sx={listItemButtonStyle}
+                selected={location.pathname === "/consumption"}
               >
                 <ListItemIcon sx={{ color: "inherit" }}>
                   <FaChartBar />
@@ -193,23 +204,24 @@ function Layout() {
             <>
               <ListItem disablePadding>
                 <ListItemButton
-                  onClick={() => setOpenRefueling(!openRefueling)}
+                  onClick={() => setOpenAbastecimento(!openAbastecimento)}
                   sx={listItemButtonStyle}
                 >
                   <ListItemIcon sx={{ color: "inherit" }}>
-                    <FaClipboardCheck />
+                    <FaGasPump />
                   </ListItemIcon>
                   <ListItemText primary="Abastecimento" />
-                  {openRefueling ? <ExpandLess /> : <ExpandMore />}
+                  {openAbastecimento ? <ExpandLess /> : <ExpandMore />}
                 </ListItemButton>
               </ListItem>
-              <Collapse in={openRefueling} timeout="auto" unmountOnExit>
+              <Collapse in={openAbastecimento} timeout="auto" unmountOnExit>
                 <List component="div" disablePadding>
                   <ListItem disablePadding>
                     <ListItemButton
                       component={NavLink}
                       to="/refueling"
                       sx={{ pl: 4, ...listItemButtonStyle }}
+                      selected={location.pathname === "/refueling"}
                     >
                       <ListItemText primary="Abastecimentos" />
                     </ListItemButton>
@@ -219,6 +231,7 @@ function Layout() {
                       component={NavLink}
                       to="/refueling/report"
                       sx={{ pl: 4, ...listItemButtonStyle }}
+                      selected={location.pathname === "/refueling/report"}
                     >
                       <ListItemText primary="Relatórios" />
                     </ListItemButton>
@@ -233,23 +246,26 @@ function Layout() {
             <>
               <ListItem disablePadding>
                 <ListItemButton
-                  onClick={() => setOpenPartsReplacement(!openPartsReplacement)}
+                  onClick={() => setOpenTrocaPecas(!openTrocaPecas)}
                   sx={listItemButtonStyle}
                 >
                   <ListItemIcon sx={{ color: "inherit" }}>
                     <FaClipboardCheck />
                   </ListItemIcon>
-                  <ListItemText primary="Troca de peças" />
-                  {openPartsReplacement ? <ExpandLess /> : <ExpandMore />}
+                  <ListItemText primary="Troca de Peças" />
+                  {openTrocaPecas ? <ExpandLess /> : <ExpandMore />}
                 </ListItemButton>
               </ListItem>
-              <Collapse in={openPartsReplacement} timeout="auto" unmountOnExit>
+              <Collapse in={openTrocaPecas} timeout="auto" unmountOnExit>
                 <List component="div" disablePadding>
                   <ListItem disablePadding>
                     <ListItemButton
                       component={NavLink}
                       to="/parts-replacement/maintenance"
                       sx={{ pl: 4, ...listItemButtonStyle }}
+                      selected={
+                        location.pathname === "/parts-replacement/maintenance"
+                      }
                     >
                       <ListItemText primary="Manutenção" />
                     </ListItemButton>
@@ -259,6 +275,7 @@ function Layout() {
                       component={NavLink}
                       to="/parts-replacement/report"
                       sx={{ pl: 4, ...listItemButtonStyle }}
+                      selected={location.pathname === "/parts-replacement/report"}
                     >
                       <ListItemText primary="Relatórios" />
                     </ListItemButton>
@@ -275,6 +292,7 @@ function Layout() {
                 component={NavLink}
                 to="/tire-replacement"
                 sx={listItemButtonStyle}
+                selected={location.pathname === "/tire-replacement"}
               >
                 <ListItemIcon sx={{ color: "inherit" }}>
                   <PiTireLight size={24} />
@@ -291,6 +309,7 @@ function Layout() {
                 component={NavLink}
                 to="/user-management"
                 sx={listItemButtonStyle}
+                selected={location.pathname === "/user-management"}
               >
                 <ListItemIcon sx={{ color: "inherit" }}>
                   <FaUsers />
@@ -300,38 +319,91 @@ function Layout() {
             </ListItem>
           )}
 
-          {/* Checklists do motorista -> admin, motorista, manutencao */}
+          {/* Checklists do Motorista -> agrupar em dois: Diário e Decendial */}
           {["admin", "motorista", "manutencao"].includes(role) && (
             <>
+              {/* Agrupamento Diário */}
               <ListItem disablePadding>
                 <ListItemButton
-                  component={NavLink}
-                  to="/driver-checklist"
+                  onClick={() => setOpenDriverDiario(!openDriverDiario)}
                   sx={listItemButtonStyle}
                 >
                   <ListItemIcon sx={{ color: "inherit" }}>
                     <FaClipboardCheck />
                   </ListItemIcon>
-                  <ListItemText primary="Criar Checklist (Caminhão/Motorista)" />
+                  <ListItemText primary="Checklist Diário" />
+                  {openDriverDiario ? <ExpandLess /> : <ExpandMore />}
                 </ListItemButton>
               </ListItem>
+              <Collapse in={openDriverDiario} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      component={NavLink}
+                      to="/driver-checklist"
+                      sx={{ pl: 4, ...listItemButtonStyle }}
+                      selected={location.pathname === "/driver-checklist"}
+                    >
+                      <ListItemText primary="Criar checklist" />
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      component={NavLink}
+                      to="/driver-checklists"
+                      sx={{ pl: 4, ...listItemButtonStyle }}
+                      selected={location.pathname === "/driver-checklists"}
+                    >
+                      <ListItemText primary="Meus checklists" />
+                    </ListItemButton>
+                  </ListItem>
+                </List>
+              </Collapse>
+
+
+
+              {/* Agrupamento Decendial */}
               <ListItem disablePadding>
                 <ListItemButton
-                  component={NavLink}
-                  to="/driver-checklists"
+                  onClick={() => setOpenDriverDecendial(!openDriverDecendial)}
                   sx={listItemButtonStyle}
                 >
                   <ListItemIcon sx={{ color: "inherit" }}>
                     <FaClipboardCheck />
                   </ListItemIcon>
-                  <ListItemText primary="Meus Checklists" />
+                  <ListItemText primary="Checklist Decendial" />
+                  {openDriverDecendial ? <ExpandLess /> : <ExpandMore />}
                 </ListItemButton>
               </ListItem>
+              <Collapse in={openDriverDecendial} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      component={NavLink}
+                      to="/driver-checklist-decendial"
+                      sx={{ pl: 4, ...listItemButtonStyle }}
+                      selected={location.pathname === "/driver-checklist-decendial"}
+                    >
+                      <ListItemText primary="Criar checklist" />
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton
+                      component={NavLink}
+                      to="/driver-checklists-decendial"
+                      sx={{ pl: 4, ...listItemButtonStyle }}
+                      selected={location.pathname === "/driver-checklists-decendial"}
+                    >
+                      <ListItemText primary="Meus checklists" />
+                    </ListItemButton>
+                  </ListItem>
+                </List>
+              </Collapse>
             </>
           )}
 
           {/* Sair (para todos) */}
-          <ListItem disablePadding>
+          <ListItem disablePadding sx={{ mt: 1 }}>
             <ListItemButton onClick={handleLogout} sx={listItemButtonStyle}>
               <ListItemIcon sx={{ color: "inherit" }}>
                 <FaSignOutAlt style={{ color: "red" }} />

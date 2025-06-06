@@ -53,7 +53,9 @@ export default function DriverChecklist() {
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [snackbarSeverity, setSnackbarSeverity] = useState('info');
     const showSnackbar = (sev, msg) => {
-        setSnackbarSeverity(sev); setSnackbarMessage(msg); setSnackbarOpen(true);
+        setSnackbarSeverity(sev);
+        setSnackbarMessage(msg);
+        setSnackbarOpen(true);
     };
 
     /* ───── carrega veículos uma vez ───── */
@@ -139,6 +141,7 @@ export default function DriverChecklist() {
             const tmpIds = await uploadAttachments(answers);
             const placa = selectedVehicle?.placa || plateInput.trim();
 
+            // Adiciona “isDecendial: false” para informar que é checklist diário
             const payload = {
                 empresa: '298 - DISTRIBUIDORA PRINCESA',
                 placa,
@@ -149,6 +152,7 @@ export default function DriverChecklist() {
                     obs: a.obs,
                     attachments: tmpIds[a.code] || [],
                 })),
+                isDecendial: false
             };
 
             const { data } = await api.post('/inspection/submit', payload);
@@ -156,7 +160,8 @@ export default function DriverChecklist() {
                 throw new Error('Falha no envio do checklist.');
 
             showSnackbar('success', 'Checklist enviado!');
-            setPlateInput(''); setSelectedVehicle(null);
+            setPlateInput('');
+            setSelectedVehicle(null);
             setAnswers(makeAnswerArray(CHECKLIST_ITEMS));
         } catch (err) {
             console.error(err);
@@ -197,8 +202,13 @@ export default function DriverChecklist() {
                             : ''}
                 onInputChange={(_, v) => { setPlateInput(v); setSelectedVehicle(null); }}
                 onChange={(_, n) => {
-                    if (typeof n === 'string' || !n) { setSelectedVehicle(null); setPlateInput(n || ''); }
-                    else { setSelectedVehicle(n); setPlateInput(n.placa); }
+                    if (typeof n === 'string' || !n) {
+                        setSelectedVehicle(null);
+                        setPlateInput(n || '');
+                    } else {
+                        setSelectedVehicle(n);
+                        setPlateInput(n.placa);
+                    }
                 }}
                 renderInput={p => (
                     <TextField {...p} label="Placa do Veículo" sx={{ mb: 2 }} />

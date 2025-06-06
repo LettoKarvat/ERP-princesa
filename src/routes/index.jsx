@@ -10,6 +10,8 @@ import Layout from "../components/Layout";
 import UserManagement from "../pages/UserManagement";
 import DriverChecklist from "../pages/DriverChecklist";
 import DriverChecklistsList from "../pages/DriverChecklistsList";
+import DecendialChecklist from "../pages/DecendialChecklist";            // <<< nova import
+import DecendialChecklistsList from "../pages/DecendialChecklistsList";  // <<< se você tiver uma listagem específica
 import ChegadaPage from "../pages/ChegadaPage";
 import SaidaPage from "../pages/SaidaPage";
 import PartsReplacementReport from "../pages/PartsReplacementReport";
@@ -18,7 +20,7 @@ import RefuelingsReport from "../pages/RefuelingsReport";
 
 /* ────────────── guards ────────────── */
 const PrivateRoute = ({ children }) => {
-  const token = localStorage.getItem("token");          // ← agora “token”
+  const token = localStorage.getItem("token");
   return token ? children : <Navigate to="/login" replace />;
 };
 
@@ -34,12 +36,21 @@ const AdminRoute = ({ children }) => {
 /* ───────── redireciona conforme papel ───────── */
 function RoleBasedRedirect() {
   const role = localStorage.getItem("role");
+
   switch (role) {
-    case "admin": return <Navigate to="/dashboard" replace />;
-    case "manutencao": return <Navigate to="/vehicles" replace />;
-    case "portaria": return <Navigate to="/portaria/chegada" replace />;
-    case "abastecimento": return <Navigate to="/refueling" replace />;
-    default: return <Navigate to="/login" replace />;
+    case "admin":
+      return <Navigate to="/dashboard" replace />;
+    case "manutencao":
+      return <Navigate to="/vehicles" replace />;
+    case "portaria":
+      return <Navigate to="/portaria/chegada" replace />;
+    case "abastecimento":
+      return <Navigate to="/refueling" replace />;
+    case "motorista":
+      // por padrão, leva o motorista para a lista de checklists diários
+      return <Navigate to="/driver-checklists" replace />;
+    default:
+      return <Navigate to="/login" replace />;
   }
 }
 
@@ -47,10 +58,10 @@ function RoleBasedRedirect() {
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* pública */}
+      {/* rota pública */}
       <Route path="/login" element={<LoginPage />} />
 
-      {/* privadas */}
+      {/* todas as outras só podem ser acessadas com token (PrivateRoute) */}
       <Route
         path="/"
         element={
@@ -59,9 +70,10 @@ export default function AppRoutes() {
           </PrivateRoute>
         }
       >
+        {/* rota raiz redireciona conforme papel */}
         <Route index element={<RoleBasedRedirect />} />
 
-        {/* somente admin */}
+        {/* ——————————— ADMINISTRADOR ——————————— */}
         <Route
           path="dashboard"
           element={
@@ -71,16 +83,6 @@ export default function AppRoutes() {
           }
         />
 
-        {/* rotas comuns autenticadas */}
-        <Route path="vehicles" element={<VehicleList />} />
-        <Route path="consumption" element={<ConsumptionControl />} />
-        <Route path="tire-replacement" element={<TireManagement />} />
-        <Route path="parts-replacement/report" element={<PartsReplacementReport />} />
-        <Route path="parts-replacement/maintenance" element={<PartsReplacementMaintenance />} />
-        <Route path="refueling" element={<Refueling />} />
-        <Route path="refueling/report" element={<RefuelingsReport />} />
-
-        {/* user management (admin) */}
         <Route
           path="user-management"
           element={
@@ -90,11 +92,29 @@ export default function AppRoutes() {
           }
         />
 
-        {/* Checklists motorista */}
+        {/* ————— rotas comuns a quem estiver logado ————— */}
+        <Route path="vehicles" element={<VehicleList />} />
+        <Route path="consumption" element={<ConsumptionControl />} />
+        <Route path="tire-replacement" element={<TireManagement />} />
+        <Route path="parts-replacement/report" element={<PartsReplacementReport />} />
+        <Route path="parts-replacement/maintenance" element={<PartsReplacementMaintenance />} />
+        <Route path="refueling" element={<Refueling />} />
+        <Route path="refueling/report" element={<RefuelingsReport />} />
+
+        {/* ————— CHECKLISTS MOTORISTA ————— */}
+        {/* Página de cadastro do checklist diário */}
         <Route path="driver-checklist" element={<DriverChecklist />} />
+
+        {/* Página que lista todos os checklists diários (admin vê todos; motorista vê só os seus) */}
         <Route path="driver-checklists" element={<DriverChecklistsList />} />
 
-        {/* Checklists portaria */}
+        {/* Página de cadastro do checklist decendial */}
+        <Route path="driver-checklist-decendial" element={<DecendialChecklist />} />
+
+        {/* Página que lista todos os checklists decendiais */}
+        <Route path="driver-checklists-decendial" element={<DecendialChecklistsList />} />
+
+        {/* ————— CHECKLISTS PORTARIA ————— */}
         <Route path="portaria">
           <Route path="chegada" element={<ChegadaPage />} />
           <Route path="saida" element={<SaidaPage />} />

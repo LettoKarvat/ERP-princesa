@@ -1,9 +1,19 @@
-// src/pages/DriverChecklistsList.jsx
+// src/pages/DecendialChecklistsList.jsx
 import { useState, useEffect, useRef } from "react";
 import {
-    Box, Typography, Paper, Button, CircularProgress, Snackbar, Alert,
-    Dialog, DialogTitle, DialogContent, DialogActions,
-    TextField, InputAdornment
+    Box,
+    Typography,
+    Paper,
+    Button,
+    CircularProgress,
+    Snackbar,
+    Alert,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    InputAdornment
 } from "@mui/material";
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 import PersonIcon from "@mui/icons-material/Person";
@@ -13,7 +23,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import api from "../services/apiFlask";
 
-/* ───── tabela código → descrição ───── */
+/* ───── tabela código → descrição (idem ao diário) ───── */
 const ITEMS = [
     { code: 1, description: "CRLV atualizado" },
     { code: 2, description: "CNH atualizada" },
@@ -36,12 +46,12 @@ const ITEMS = [
     { code: 19, description: "Motor sem vazamento, ruídos ou fumaça" },
     { code: 20, description: "Carrinho de entrega" },
 ];
+
 const desc = (c) => ITEMS.find((i) => i.code === c)?.description || `Item ${c}`;
 
-/* chamadas ---------------------------------------------------- */
-// agora só busca isDecendial = false (diários)
+/* ───── chamadas API (filtrando somente decendial) ───── */
 const allChecklists = () =>
-    api.get("/inspection/checklists?decendial=0").then((r) => r.data);
+    api.get("/inspection/checklists?decendial=1").then((r) => r.data);
 
 const oneChecklist = async (id) => {
     const { data } = await api.get(`/inspection/checklists/${id}`);
@@ -55,8 +65,8 @@ const assignSecondSign = async (id, signatureBase64) => {
     );
 };
 
-/* componente -------------------------------------------------- */
-export default function DriverChecklistsList() {
+/* ───── componente ───── */
+export default function DecendialChecklistsList() {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const [qPlaca, setQPlaca] = useState("");
@@ -69,16 +79,17 @@ export default function DriverChecklistsList() {
 
     const [sn, setSn] = useState({ open: false, msg: "", sev: "info" });
     const role = localStorage.getItem("role") || "";
-    const userFullName = (localStorage.getItem("fullname") || "").toLowerCase();
-    const isDriver = role === "motorista";
 
     // estados e ref para segunda assinatura
     const [signModalOpen, setSignModalOpen] = useState(false);
     const signatureRef = useRef(null);
     const [savedSecondSignature, setSavedSecondSignature] = useState(null);
 
-    /* -------- carregamento inicial (apenas diários) -------- */
-    useEffect(() => { load(); }, []);
+    /* -------- carregamento inicial (agora só decendial) -------- */
+    useEffect(() => {
+        load();
+    }, []);
+
     const load = async () => {
         setLoading(true);
         try {
@@ -91,13 +102,13 @@ export default function DriverChecklistsList() {
         }
     };
 
-    /* -------- detalhes -------- */
+    /* -------- abrir detalhes -------- */
     const open = async (id) => {
         setLoadingDet(true);
         try {
             const detail = await oneChecklist(id);
 
-            // buscar base64 de cada attachment
+            // buscar base64 dos anexos
             await Promise.all(
                 detail.items.map(async (item) => {
                     if (Array.isArray(item.attachments)) {
@@ -140,7 +151,9 @@ export default function DriverChecklistsList() {
             setSn({ open: true, sev: "error", msg: "Assine antes de salvar." });
             return;
         }
-        const base64 = signatureRef.current.getTrimmedCanvas().toDataURL("image/png");
+        const base64 = signatureRef.current
+            .getTrimmedCanvas()
+            .toDataURL("image/png");
         setSavedSecondSignature(base64);
         setSn({ open: true, sev: "success", msg: "Assinatura salva." });
     };
@@ -148,13 +161,19 @@ export default function DriverChecklistsList() {
     /* -------- confirmar segunda assinatura -------- */
     const handleConfirmSecondSignature = async () => {
         if (!savedSecondSignature) {
-            setSn({ open: true, sev: "error", msg: "Salve a assinatura antes de confirmar." });
+            setSn({
+                open: true,
+                sev: "error",
+                msg: "Salve a assinatura antes de confirmar.",
+            });
             return;
         }
         setLoadingDet(true);
         try {
             await assignSecondSign(sel.objectId, savedSecondSignature);
             const updatedFull = await oneChecklist(sel.objectId);
+
+            // recarregar base64 dos anexos
             await Promise.all(
                 updatedFull.items.map(async (item) => {
                     if (Array.isArray(item.attachments)) {
@@ -174,12 +193,17 @@ export default function DriverChecklistsList() {
                     }
                 })
             );
+
             setSel(updatedFull);
             setSignModalOpen(false);
-            setSn({ open: true, sev: "success", msg: "Segunda assinatura aplicada." });
-            load();
+            setSn({ open: true, sev: "success", msg: "2ª assinatura aplicada." });
+            load(); // recarrega lista (ainda só decendial)
         } catch {
-            setSn({ open: true, sev: "error", msg: "Falha ao atribuir segunda assinatura." });
+            setSn({
+                open: true,
+                sev: "error",
+                msg: "Falha ao atribuir 2ª assinatura.",
+            });
         } finally {
             setLoadingDet(false);
         }
@@ -196,44 +220,57 @@ export default function DriverChecklistsList() {
         }
     };
 
-    /* -------- filtros -------- */
-    const list = rows.filter(r => {
-        // 1) motorista vê só os próprios
-        if (isDriver) {
-            if ((r.motorista || "").toLowerCase() !== userFullName) return false;
+    /* -------- filtros locais -------- */
+    const list = rows.filter((r) => {
+        // motorista só vê seus próprios (se aplicável)
+        if (role === "motorista") {
+            const myName = (localStorage.getItem("fullname") || "").toLowerCase();
+            if ((r.motorista || "").toLowerCase() !== myName) return false;
         }
-        // 2) filtros locais
-        const okPl = !qPlaca || (r.placa || "").toLowerCase().includes(qPlaca.toLowerCase());
-        const okMo = !qMot || (r.motorista || "").toLowerCase().includes(qMot.toLowerCase());
-        const okDt = !qDate || (r.createdAt && r.createdAt.slice(0, 10) === qDate);
+        const okPl =
+            !qPlaca || (r.placa || "").toLowerCase().includes(qPlaca.toLowerCase());
+        const okMo =
+            !qMot || (r.motorista || "").toLowerCase().includes(qMot.toLowerCase());
+        const okDt =
+            !qDate || (r.createdAt && r.createdAt.slice(0, 10) === qDate);
         return okPl && okMo && okDt;
     });
 
-    /* -------- gerar PDF -------- */
+    /* -------- PDF (idem ao diário) -------- */
     const pdf = () => {
         if (!sel) return;
         const doc = new jsPDF("p", "pt");
-        doc.setFontSize(14).text("Checklist de Inspeção", 40, 40);
+        doc.setFontSize(14).text("Checklist Decendial de Inspeção", 40, 40);
         doc.setFontSize(10);
         doc.text(`Placa: ${sel.placa}`, 40, 60);
         doc.text(`Motorista: ${sel.motorista}`, 40, 75);
-        doc.text(`Data: ${new Date(sel.createdAt).toLocaleString("pt-BR")}`, 40, 90);
+        doc.text(
+            `Data: ${new Date(sel.createdAt).toLocaleString("pt-BR")}`,
+            40,
+            90
+        );
 
         autoTable(doc, {
             startY: 110,
             head: [["Item", "Resposta", "Observações"]],
-            body: sel.items.map(it => [desc(it.code), it.answer, it.obs || "-"]),
+            body: sel.items.map((it) => [
+                desc(it.code),
+                it.answer,
+                it.obs || "-",
+            ]),
             didParseCell: ({ section, column, cell }) => {
                 if (section === "body" && column.index === 1) {
-                    cell.styles.fillColor = cell.raw === "sim"
-                        ? [204, 255, 204] : [255, 204, 204];
+                    cell.styles.fillColor =
+                        cell.raw === "sim"
+                            ? [204, 255, 204]
+                            : [255, 204, 204];
                 }
-            }
+            },
         });
 
         let y = doc.lastAutoTable.finalY + 20;
 
-        // primeira assinatura
+        // inserir primeira assinatura
         if (sel.signature) {
             if (y + 80 > doc.internal.pageSize.height - 40) {
                 doc.addPage();
@@ -244,13 +281,13 @@ export default function DriverChecklistsList() {
             y += 80;
         }
 
-        // segunda assinatura ou placeholder
+        // inserir segunda assinatura ou placeholder com borda
         if (!sel.secondSignature) {
             if (y + 50 > doc.internal.pageSize.height - 40) {
                 doc.addPage();
                 y = 40;
             }
-            doc.setDrawColor(255, 193, 7);
+            doc.setDrawColor(255, 193, 7); // amarelo
             doc.setLineWidth(1.5);
             doc.rect(38, y - 2, 154, 64);
             doc.setFontSize(12).text("Sem 2ª assinatura", 44, y + 30);
@@ -261,64 +298,76 @@ export default function DriverChecklistsList() {
                 y = 40;
             }
             doc.setFontSize(12).text("2ª Assinatura (Revisor):", 40, y);
-            doc.setDrawColor(76, 175, 80);
+            doc.setDrawColor(76, 175, 80); // verde
             doc.setLineWidth(1.5);
             doc.rect(38, y + 2, 154, 64);
             doc.addImage(sel.secondSignature, "PNG", 40, y + 10, 150, 60);
             y += 80;
         }
 
-        doc.save("checklist.pdf");
+        doc.save("checklist-decendial.pdf");
     };
 
     /* -------- UI -------- */
-    if (loading) {
+    if (loading)
         return (
             <Box sx={{ p: 2, textAlign: "center" }}>
                 <CircularProgress />
             </Box>
         );
-    }
 
     return (
         <Box sx={{ p: 2 }}>
-            <Typography variant="h5" sx={{ mb: 2 }}>Checklists</Typography>
+            <Typography variant="h5" sx={{ mb: 2 }}>
+                Checklists Decendiais
+            </Typography>
 
             {/* filtros */}
             <Box sx={{ mb: 2, display: "flex", gap: 2 }}>
                 <TextField
                     placeholder="Placa"
                     value={qPlaca}
-                    onChange={e => setQPlaca(e.target.value)}
+                    onChange={(e) => setQPlaca(e.target.value)}
                     InputProps={{
-                        startAdornment:
-                            <InputAdornment position="start"><DirectionsCarIcon /></InputAdornment>
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <DirectionsCarIcon />
+                            </InputAdornment>
+                        ),
                     }}
                 />
                 <TextField
                     placeholder="Motorista"
                     value={qMot}
-                    onChange={e => setQMot(e.target.value)}
+                    onChange={(e) => setQMot(e.target.value)}
                     InputProps={{
-                        startAdornment:
-                            <InputAdornment position="start"><PersonIcon /></InputAdornment>
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <PersonIcon />
+                            </InputAdornment>
+                        ),
                     }}
                 />
                 <TextField
                     type="date"
                     value={qDate}
-                    onChange={e => setQDate(e.target.value)}
+                    onChange={(e) => setQDate(e.target.value)}
                     InputProps={{
-                        startAdornment:
-                            <InputAdornment position="start"><EventIcon /></InputAdornment>
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <EventIcon />
+                            </InputAdornment>
+                        ),
                     }}
                 />
             </Box>
 
-            {/* lista (somente diários) */}
-            {list.length === 0
-                ? <Typography>Nenhum checklist.</Typography>
-                : list.map(r => {
+            {/* lista (já só decendial) */}
+            {list.length === 0 ? (
+                <Typography>Nenhum checklist decendial.</Typography>
+            ) : (
+                list.map((r) => {
+                    // se não tiver secondSignature → borda amarela; caso contrário, verde
                     const needsReview = !r.secondSignature;
                     return (
                         <Paper
@@ -326,16 +375,23 @@ export default function DriverChecklistsList() {
                             sx={{
                                 p: 2,
                                 mb: 2,
-                                border: `2px solid ${needsReview ? "#FFC107" : "#4CAF50"}`,
+                                border: `2px solid ${needsReview ? "#FFC107" : "#4CAF50"
+                                    }`,
                             }}
                         >
-                            <Typography fontWeight="bold">Placa: {r.placa}</Typography>
+                            <Typography fontWeight="bold">
+                                Placa: {r.placa}
+                            </Typography>
                             <Typography>Motorista: {r.motorista}</Typography>
                             <Typography>
-                                Criado em: {new Date(r.createdAt).toLocaleString("pt-BR")}
+                                Criado em:{" "}
+                                {new Date(r.createdAt).toLocaleString("pt-BR")}
                             </Typography>
                             <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
-                                <Button variant="contained" onClick={() => open(r.objectId)}>
+                                <Button
+                                    variant="contained"
+                                    onClick={() => open(r.objectId)}
+                                >
                                     Detalhes
                                 </Button>
                                 {role === "admin" && (
@@ -351,52 +407,99 @@ export default function DriverChecklistsList() {
                         </Paper>
                     );
                 })
-            }
+            )}
 
             {/* detalhes */}
-            <Dialog open={dlgOpen} onClose={() => setDlgOpen(false)} fullWidth maxWidth="md">
-                <DialogTitle>Detalhes do Checklist</DialogTitle>
+            <Dialog
+                open={dlgOpen}
+                onClose={() => setDlgOpen(false)}
+                fullWidth
+                maxWidth="md"
+            >
+                <DialogTitle>Detalhes do Checklist Decendial</DialogTitle>
                 <DialogContent dividers>
                     {loadingDet && <CircularProgress />}
                     {!loadingDet && sel && (
-                        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <Typography fontWeight="bold">Placa: {sel.placa}</Typography>
+                        <Box
+                            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+                        >
+                            <Typography fontWeight="bold">
+                                Placa: {sel.placa}
+                            </Typography>
                             <Typography>Motorista: {sel.motorista}</Typography>
                             <Typography>
-                                Criado em: {new Date(sel.createdAt).toLocaleString("pt-BR")}
+                                Criado em:{" "}
+                                {new Date(sel.createdAt).toLocaleString("pt-BR")}
                             </Typography>
 
-                            {sel.items.map(it => (
-                                <Box key={it.code} sx={{ pb: 1, mb: 1, borderBottom: "1px solid #ccc" }}>
-                                    <Typography fontWeight="bold">{desc(it.code)}</Typography>
-                                    <Typography sx={{ color: it.answer === "sim" ? "green" : "red" }}>
+                            {sel.items.map((it) => (
+                                <Box
+                                    key={it.code}
+                                    sx={{
+                                        pb: 1,
+                                        mb: 1,
+                                        borderBottom: "1px solid #ccc",
+                                    }}
+                                >
+                                    <Typography fontWeight="bold">
+                                        {desc(it.code)}
+                                    </Typography>
+                                    <Typography
+                                        sx={{
+                                            color:
+                                                it.answer === "sim"
+                                                    ? "green"
+                                                    : "red",
+                                        }}
+                                    >
                                         Resposta: {it.answer}
                                     </Typography>
-                                    <Typography>Observações: {it.obs || "-"}</Typography>
+                                    <Typography>
+                                        Observações: {it.obs || "-"}
+                                    </Typography>
 
                                     {(it.attachments || []).length > 0 && (
-                                        <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
-                                            {it.attachments.map(a => (
-                                                a.dataUrl
-                                                    ? <img
+                                        <Box
+                                            sx={{
+                                                mt: 1,
+                                                display: "flex",
+                                                flexWrap: "wrap",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            {it.attachments.map((a) =>
+                                                a.dataUrl ? (
+                                                    <img
                                                         key={a.attachmentId}
                                                         src={a.dataUrl}
                                                         alt="Anexo"
-                                                        style={{ border: "1px solid #ccc", maxWidth: 200 }}
+                                                        style={{
+                                                            border: "1px solid #ccc",
+                                                            maxWidth: 200,
+                                                        }}
                                                     />
-                                                    : <Box
+                                                ) : (
+                                                    <Box
                                                         key={a.attachmentId}
                                                         sx={{
-                                                            width: 200, height: 150,
-                                                            display: "flex", alignItems: "center", justifyContent: "center",
-                                                            border: "1px solid #ccc", bgcolor: "#f5f5f5"
+                                                            width: 200,
+                                                            height: 150,
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            border: "1px solid #ccc",
+                                                            bgcolor: "#f5f5f5",
                                                         }}
                                                     >
-                                                        <Typography variant="caption" color="textSecondary">
+                                                        <Typography
+                                                            variant="caption"
+                                                            color="textSecondary"
+                                                        >
                                                             Não foi possível carregar
                                                         </Typography>
                                                     </Box>
-                                            ))}
+                                                )
+                                            )}
                                         </Box>
                                     )}
                                 </Box>
@@ -407,24 +510,35 @@ export default function DriverChecklistsList() {
                                 <Typography variant="subtitle2" sx={{ mt: 2 }}>
                                     Assinatura Motorista:
                                 </Typography>
-                                {sel.signature
-                                    ? <img
+                                {sel.signature ? (
+                                    <img
                                         src={sel.signature}
                                         alt="Assinatura"
-                                        style={{ border: "1px solid #ccc", maxWidth: 300 }}
+                                        style={{
+                                            border: "1px solid #ccc",
+                                            maxWidth: 300,
+                                        }}
                                     />
-                                    : <Box
+                                ) : (
+                                    <Box
                                         sx={{
-                                            width: 300, height: 60,
-                                            display: "flex", alignItems: "center", justifyContent: "center",
-                                            border: "1px dashed #ccc", bgcolor: "#f5f5f5"
+                                            width: 300,
+                                            height: 60,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            border: "1px dashed #ccc",
+                                            bgcolor: "#f5f5f5",
                                         }}
                                     >
-                                        <Typography variant="caption" color="textSecondary">
+                                        <Typography
+                                            variant="caption"
+                                            color="textSecondary"
+                                        >
                                             Sem assinatura
                                         </Typography>
                                     </Box>
-                                }
+                                )}
                             </Box>
 
                             {/* segunda assinatura */}
@@ -432,41 +546,53 @@ export default function DriverChecklistsList() {
                                 <Typography variant="subtitle2" sx={{ mt: 2 }}>
                                     2ª Assinatura (Revisor):
                                 </Typography>
-                                {sel.secondSignature
-                                    ? <Box
+                                {sel.secondSignature ? (
+                                    <Box
                                         sx={{
                                             boxShadow: "0 0 8px 2px rgba(76,175,80,0.6)",
-                                            display: "inline-block"
+                                            display: "inline-block",
                                         }}
                                     >
                                         <img
                                             src={sel.secondSignature}
                                             alt="2ª Assinatura"
-                                            style={{ border: "1px solid #ccc", maxWidth: 300 }}
+                                            style={{
+                                                border: "1px solid #ccc",
+                                                maxWidth: 300,
+                                            }}
                                         />
                                     </Box>
-                                    : <Box
+                                ) : (
+                                    <Box
                                         sx={{
                                             boxShadow: "0 0 8px 2px rgba(255,193,7,0.6)",
-                                            width: 300, height: 60,
-                                            display: "flex", alignItems: "center", justifyContent: "center",
-                                            border: "1px dashed #ccc", bgcolor: "#fff59d"
+                                            width: 300,
+                                            height: 60,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            border: "1px dashed #ccc",
+                                            bgcolor: "#fff59d",
                                         }}
                                     >
-                                        <Typography variant="caption" color="textSecondary">
+                                        <Typography
+                                            variant="caption"
+                                            color="textSecondary"
+                                        >
                                             Aguardando 2ª assinatura
                                         </Typography>
                                     </Box>
-                                }
+                                )}
                             </Box>
 
-                            {/* botão de revisar e assinar (para admins) */}
+                            {/* botão de revisar e assinar (admins) */}
                             {role === "admin" && !sel.secondSignature && (
                                 <Button
                                     variant="contained"
                                     color="secondary"
                                     onClick={handleSecondSignClick}
                                     disabled={loadingDet}
+                                    sx={{ mt: 2 }}
                                 >
                                     Criar 2ª Assinatura
                                 </Button>
@@ -475,7 +601,11 @@ export default function DriverChecklistsList() {
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="contained" onClick={pdf} disabled={!sel || loadingDet}>
+                    <Button
+                        variant="contained"
+                        onClick={pdf}
+                        disabled={!sel || loadingDet}
+                    >
                         Gerar PDF
                     </Button>
                     <Button onClick={() => setDlgOpen(false)}>Fechar</Button>
@@ -496,20 +626,36 @@ export default function DriverChecklistsList() {
                         <SignatureCanvas
                             ref={signatureRef}
                             penColor="black"
-                            canvasProps={{ width: 500, height: 200, style: { background: "#fff" } }}
+                            canvasProps={{
+                                width: 500,
+                                height: 200,
+                                style: { background: "#fff" },
+                            }}
                         />
                     </Box>
-                    <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
-                        <Button onClick={() => signatureRef.current.clear()} disabled={loadingDet}>
+                    <Box
+                        sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}
+                    >
+                        <Button
+                            onClick={() => signatureRef.current.clear()}
+                            disabled={loadingDet}
+                        >
                             Limpar
                         </Button>
-                        <Button onClick={handleSaveSecondSignature} variant="outlined" disabled={loadingDet}>
+                        <Button
+                            onClick={handleSaveSecondSignature}
+                            variant="outlined"
+                            disabled={loadingDet}
+                        >
                             Salvar
                         </Button>
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setSignModalOpen(false)} disabled={loadingDet}>
+                    <Button
+                        onClick={() => setSignModalOpen(false)}
+                        disabled={loadingDet}
+                    >
                         Cancelar
                     </Button>
                     <Button
@@ -527,9 +673,12 @@ export default function DriverChecklistsList() {
                 open={sn.open}
                 autoHideDuration={3000}
                 anchorOrigin={{ vertical: "top", horizontal: "center" }}
-                onClose={() => setSn(s => ({ ...s, open: false }))}
+                onClose={() => setSn((s) => ({ ...s, open: false }))}
             >
-                <Alert severity={sn.sev} onClose={() => setSn(s => ({ ...s, open: false }))}>
+                <Alert
+                    severity={sn.sev}
+                    onClose={() => setSn((s) => ({ ...s, open: false }))}
+                >
                     {sn.msg}
                 </Alert>
             </Snackbar>
