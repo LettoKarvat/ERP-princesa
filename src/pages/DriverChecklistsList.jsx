@@ -73,15 +73,20 @@ export default function DriverChecklistsList() {
         try {
             const detail = await oneChecklist(id);
 
-            // para cada attachment, buscar o JSON e extrair o data URL
+            // Para cada item, buscar o JSON que contém o base64,
+            // garantindo uso de HTTPS para evitar preflight redirecionando.
             await Promise.all(
                 detail.items.map(async (item) => {
                     if (Array.isArray(item.attachments)) {
                         await Promise.all(
                             item.attachments.map(async (att) => {
                                 try {
-                                    const resp = await api.get(att.url);
-                                    att.dataUrl = resp.data.data; // data: "data:<mime>;base64,<conteúdo>"
+                                    // força HTTPS (caso venha HTTP)
+                                    const secureUrl = att.url.startsWith("http://")
+                                        ? att.url.replace(/^http:\/\//, "https://")
+                                        : att.url;
+                                    const resp = await api.get(secureUrl);
+                                    att.dataUrl = resp.data.data; // resp.data.data = "data:<mime>;base64,<conteúdo>"
                                 } catch {
                                     att.dataUrl = null;
                                 }
@@ -133,8 +138,7 @@ export default function DriverChecklistsList() {
             }
         });
 
-        /* imagens não incluídas para evitar CORS */
-
+        // A assinatura continua embutida se existir
         if (sel.signature) {
             const y = doc.lastAutoTable.finalY + 30;
             doc.text("Assinatura:", 40, y);

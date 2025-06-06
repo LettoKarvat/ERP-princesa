@@ -81,7 +81,7 @@ export default function UserManagement() {
     // ---------------------------
     const loadUsers = async () => {
         try {
-            // Chama GET /users no Flask
+            // Chama GET /users no Flask (retorna só is_active=true)
             const response = await api.get("/users");
             setUsers(response.data);
         } catch (err) {
@@ -121,9 +121,9 @@ export default function UserManagement() {
             };
 
             if (role === "admin") {
-                payload.username = email.trim().toLowerCase();
+                payload.email = email.trim().toLowerCase();
             } else {
-                payload.username = matricula.trim();
+                payload.matricula = matricula.trim();
             }
 
             // Chama POST /users para criar usuário no Flask
@@ -152,7 +152,7 @@ export default function UserManagement() {
             setRole("");
         } catch (err) {
             console.error("Erro ao criar usuário:", err);
-            setError(err.response?.data?.message || "Erro na criação do usuário");
+            setError(err.response?.data?.error || "Erro na criação do usuário");
         }
     };
 
@@ -161,7 +161,8 @@ export default function UserManagement() {
     // ---------------------------
     const handleCopy = () => {
         if (createdUser) {
-            const creds = `Nome: ${createdUser.fullname}\n` +
+            const creds =
+                `Nome: ${createdUser.fullname}\n` +
                 `Usuário: ${createdUser.username}\n` +
                 `Tipo: ${createdUser.role}\n` +
                 `Senha: ${createdUser.password}`;
@@ -241,9 +242,9 @@ export default function UserManagement() {
             }
 
             if (editRole === "admin") {
-                payload.username = editEmail.trim().toLowerCase();
+                payload.email = editEmail.trim().toLowerCase();
             } else {
-                payload.username = editMatricula.trim();
+                payload.matricula = editMatricula.trim();
             }
 
             // Chama PUT /users/:id para atualizar usuário no Flask
@@ -253,7 +254,7 @@ export default function UserManagement() {
             loadUsers();
         } catch (err) {
             console.error("Erro ao editar usuário:", err);
-            alert(err.response?.data?.message || "Erro ao editar usuário.");
+            alert(err.response?.data?.error || "Erro ao editar usuário.");
         }
     };
 
@@ -285,15 +286,15 @@ export default function UserManagement() {
             loadUsers();
         } catch (err) {
             console.error("Erro ao excluir usuário:", err);
-            alert(err.response?.data?.message || "Erro ao excluir usuário.");
+            alert(err.response?.data?.error || "Erro ao excluir usuário.");
         }
     };
 
     // ---------------------------
-    // FILTRO DE BUSCA
+    // FILTRO DE USUÁRIOS ATIVOS E BUSCA
     // ---------------------------
-    const filteredUsers = users.filter((u) => {
-        // O identificador (username) já é email ou matrícula
+    const activeUsers = users.filter((u) => u.is_active);
+    const filteredUsers = activeUsers.filter((u) => {
         const identifierValue = u.username || "";
         const lowerSearch = searchTerm.toLowerCase();
         const matchesFullname = u.fullname.toLowerCase().includes(lowerSearch);
@@ -406,7 +407,7 @@ export default function UserManagement() {
 
             {/* LISTA DE USUÁRIOS */}
             <Typography variant="h6" sx={{ mb: 2 }}>
-                Usuários Cadastrados
+                Usuários Ativos
             </Typography>
 
             {filteredUsers.map((u) => (
@@ -473,11 +474,7 @@ export default function UserManagement() {
                     )}
                 </DialogContent>
                 <DialogActions sx={{ bgcolor: "#f0f4ff" }}>
-                    <Button
-                        onClick={handleCopy}
-                        variant="contained"
-                        sx={{ bgcolor: "#1976d2" }}
-                    >
+                    <Button onClick={handleCopy} variant="contained" sx={{ bgcolor: "#1976d2" }}>
                         Copiar Credenciais
                     </Button>
                     <Button onClick={handleCloseCredModal}>Fechar</Button>
