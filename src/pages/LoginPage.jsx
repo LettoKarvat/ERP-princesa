@@ -1,151 +1,105 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
-import * as yup from 'yup';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
 import {
-  Container,
-  Box,
-  TextField,
-  Button,
-  Typography,
-  Alert,
-  Paper,
-} from '@mui/material';
-import api from '../services/api'; // Axios config que chama o Back4App
+  Container, Box, TextField, Button,
+  Typography, Alert, Paper,
+} from "@mui/material";
+import api from "../services/apiFlask";
 
-// Validação com Yup
-// Agora não validamos como "email" especificamente, pois pode ser matrícula ou email.
+/* validação */
 const schema = yup.object({
-  username: yup.string().required('Informe seu usuário (E-mail ou Matrícula)'),
-  password: yup.string().required('Senha é obrigatória'),
+  username: yup.string().required("Informe seu usuário"),
+  password: yup.string().required("Senha é obrigatória"),
 });
 
-function LoginPage() {
-  const navigate = useNavigate();
-  const [error, setError] = useState('');
+/* rota inicial conforme papel */
+const roleToRoute = {
+  admin: "/dashboard",
+  abastecimento: "/refueling",
+  manutencao: "/parts-replacement/maintenance",
+  motorista: "/driver-checklists",
+  portaria: "/checklist",
+};
 
-  // react-hook-form com yup
+export default function LoginPage() {
+  const navigate = useNavigate();
+  const [error, setError] = useState("");
+
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm({
-    resolver: yupResolver(schema),
-  });
+  } = useForm({ resolver: yupResolver(schema) });
 
-  // Mapeamento de roles -> rotas padrão
-  const roleToRoute = {
-    admin: '/dashboard',
-    abastecimento: '/refueling',
-    manutencao: '/parts-replacement/maintenance',
-    motorista: '/driver-checklists', // <-- Agora aponta para /driver-checklists
-    portaria: '/portaria/saida',
-  };
-
-
-  const onSubmit = async (data) => {
+  /* ───────── submit ───────── */
+  const onSubmit = async ({ username, password }) => {
+    setError("");
     try {
-      // Faz a chamada à Cloud Function "login", agora passando "username" em vez de "email"
-      const response = await api.post('/functions/login', {
-        username: data.username.trim(), // Pode ser matricula ou email
-        password: data.password,
+      const res = await api.post("/auth/login", {
+        username: username.trim().toLowerCase(),
+        password: password.trim(),
       });
 
-      // Se deu certo, retorna { result: { user: {...} } }
-      if (response.data.result && response.data.result.user) {
-        const { token, role, fullname } = response.data.result.user;
+      /* back responde: { access_token, user:{ id, fullname, role } } */
+      const { access_token, user } = res.data;
 
-        // Guarda no localStorage para identificar a sessão
-        localStorage.setItem('sessionToken', token);
-        localStorage.setItem('role', role);
-        localStorage.setItem('fullname', fullname);
+      /* grava token e dados */
+      localStorage.setItem("token", access_token);
+      localStorage.setItem("role", user.role);
+      localStorage.setItem("fullname", user.fullname);
 
-        // Verifica se a role está mapeada
-        const defaultRoute = roleToRoute[role];
-        if (defaultRoute) {
-          navigate(defaultRoute);
-        } else {
-          setError('Permissão inválida. Contate o suporte.');
-        }
-      } else {
-        throw new Error('Login falhou. Verifique suas credenciais.');
-      }
+      navigate(roleToRoute[user.role] || "/");
     } catch (err) {
-      console.error('Erro no login:', err);
-      setError('Credenciais inválidas. Tente novamente.');
+      console.error(err);
+      setError("Usuário ou senha inválidos.");
     }
   };
 
+  /* ───────── UI ───────── */
   return (
     <Container component="main" maxWidth="xs">
       <Box
         sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
+          mt: 8,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
         }}
       >
-        <Paper
-          elevation={3}
-          sx={{
-            padding: 4,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            width: '100%',
-          }}
-        >
-          <Typography component="h1" variant="h5">
-            Painel Princesa
-          </Typography>
+        <Paper elevation={3} sx={{ p: 4, width: "100%", textAlign: "center" }}>
+          <Typography variant="h5">Painel Princesa</Typography>
 
           {error && (
-            <Alert severity="error" sx={{ width: '100%', mt: 2 }}>
+            <Alert severity="error" sx={{ mt: 2 }}>
               {error}
             </Alert>
           )}
 
-          <Box
-            component="form"
-            onSubmit={handleSubmit(onSubmit)}
-            sx={{ mt: 1, width: '100%' }}
-          >
-            {/* Campo de Usuário (pode ser E-mail ou Matrícula) */}
+          <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 1 }}>
             <TextField
-              margin="normal"
-              required
               fullWidth
-              id="username"
-              label="Usuário (E-mail ou Matrícula)"
-              autoComplete="username"
-              autoFocus
-              {...register('username')}
+              label="Usuário"
+              {...register("username")}
               error={!!errors.username}
               helperText={errors.username?.message}
+              margin="normal"
+              autoFocus
             />
 
-            {/* Campo de Senha */}
             <TextField
-              margin="normal"
-              required
               fullWidth
               label="Senha"
               type="password"
-              id="password"
-              autoComplete="current-password"
-              {...register('password')}
+              {...register("password")}
               error={!!errors.password}
               helperText={errors.password?.message}
+              margin="normal"
             />
 
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2 }}
-            >
+            <Button type="submit" fullWidth variant="contained" sx={{ mt: 3 }}>
               Entrar
             </Button>
           </Box>
@@ -154,5 +108,3 @@ function LoginPage() {
     </Container>
   );
 }
-
-export default LoginPage;

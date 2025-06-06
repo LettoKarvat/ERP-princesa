@@ -1,570 +1,238 @@
-// src/pages/DriverChecklistsList.jsx
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
-    Box,
-    Typography,
-    Paper,
-    Button,
-    CircularProgress,
-    Snackbar,
-    Alert,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    TextField,
-    InputAdornment
-} from '@mui/material';
+    Box, Typography, Paper, Button, CircularProgress, Snackbar, Alert,
+    Dialog, DialogTitle, DialogContent, DialogActions,
+    TextField, InputAdornment
+} from "@mui/material";
+import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
+import PersonIcon from "@mui/icons-material/Person";
+import EventIcon from "@mui/icons-material/Event";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import api from "../services/apiFlask";
 
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
-import PersonIcon from '@mui/icons-material/Person';
-import EventIcon from '@mui/icons-material/Event';
-
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-
-import api from '../services/api';
-
-// -------------------------------------
-// Tabela de referência: código -> descrição dos itens
-// -------------------------------------
-const checklistItems = [
-    { code: 1, description: "CRLV do veículo está ok?" },
-    { code: 2, description: "CNH está ok?" },
-    { code: 3, description: "Está uniformizado?" },
-    { code: 4, description: "Certificado de Cronotacógrafo está ok?" },
-    { code: 5, description: "Condições Gerais: Lataria, Cabine, Baú." },
-    { code: 6, description: "AET está ok?" },
-    { code: 7, description: "Exame Toxicológico está em dia?" },
-    { code: 8, description: "Condições gerais internas: bancada, tapete, forros, bancos." },
-    { code: 9, description: "Condições de Rodagem: Pneus, Rodas, Pressão de Ar." },
-    { code: 10, description: "Sistema de Freios: nível de fluido, altura do pedal." },
-    { code: 11, description: "Sistema de Arrefecimento: nível de água e temperatura." },
-    { code: 12, description: "Sistema de Alimentação: Bomba injetora, combustível." },
-    { code: 13, description: "Sistema Elétrico: Painel, iluminação, bateria." },
-    { code: 14, description: "Sistema Trator: (Diferencial) Eixo Cardan." },
-    { code: 15, description: "Sistema Câmbio: Engate marchas, folgas, ruídos." },
-    { code: 16, description: "Parte do motor: vazamentos, ruídos, fumaça." },
-    { code: 17, description: "Embreagem: Altura do Pedal, Estressamento." },
-    { code: 18, description: "Tacógrafo: marcação, hora, agulha, está conforme." },
-    { code: 19, description: "Carrinho de entrega está ok?" },
-    { code: 20, description: "Itens de segurança: macaco, triângulo, chave de roda." },
-    { code: 21, description: "Possui EPI necessário?" },
+/* ───── tabela código → descrição ───── */
+const ITEMS = [
+    { code: 1, description: "CRLV atualizado" },
+    { code: 2, description: "CNH atualizada" },
+    { code: 3, description: "Motorista e ajudantes uniformizados" },
+    { code: 4, description: "Certificado de cronotacógrafo atualizado" },
+    { code: 5, description: "Exame toxicológico atualizado" },
+    { code: 6, description: "Macaco, triângulo e chave de roda" },
+    { code: 7, description: "Cinto de segurança e extintor de incêndio" },
+    { code: 8, description: "Funcionamento do limpador de para-brisa e água" },
+    { code: 9, description: "Nível de combustível e bomba injetora" },
+    { code: 10, description: "Nível de água do radiador e temperatura" },
+    { code: 11, description: "Nível do óleo lubrificante e fluido de freio" },
+    { code: 12, description: "Sistema elétrico, luzes do painel e bateria" },
+    { code: 13, description: "Condição dos pneus, rodas e calibração" },
+    { code: 14, description: "Condição geral da cabine, baú e lataria" },
+    { code: 15, description: "Espelhos retrovisores e buzina" },
+    { code: 16, description: "Faróis, pisca, luz de ré, seta, freio e lanternas" },
+    { code: 17, description: "Faixas refletivas, luzes laterais, portas e janelas" },
+    { code: 18, description: "Funcionamento do tacógrafo" },
+    { code: 19, description: "Motor sem vazamento, ruídos ou fumaça" },
+    { code: 20, description: "Carrinho de entrega" },
 ];
+const desc = (c) => ITEMS.find((i) => i.code === c)?.description || `Item ${c}`;
 
+/* URLs do ngrok precisam do parâmetro para pular o banner */
+const skipNgrok = (url = "") =>
+    url.includes("ngrok-skip-browser-warning")
+        ? url
+        : `${url}${url.includes("?") ? "&" : "?"}ngrok-skip-browser-warning=true`;
 
-function getDescriptionByCode(code) {
-    const found = checklistItems.find((item) => item.code === code);
-    return found ? found.description : `Item ${code}`;
-}
+/* chamadas ---------------------------------------------------- */
+const allChecklists = () => api.get("/inspection/checklists").then((r) => r.data);
+const oneChecklist = async (id) => {
+    const { data } = await api.get(`/inspection/checklists/${id}`);
+    /* vacina todos os attachments contra o banner */
+    data.items?.forEach((it) => {
+        it.attachments = (it.attachments || []).map((a) => ({
+            ...a,
+            url: skipNgrok(a.url),
+        }));
+    });
+    return data;
+};
 
-// ----------- Funções de acesso ao backend -----------
-async function fetchAllChecklists(sessionToken) {
-    const resp = await api.post(
-        '/functions/getAllChecklists',
-        {},
-        { headers: { 'X-Parse-Session-Token': sessionToken } }
-    );
-    return resp.data.result || [];
-}
-
-async function fetchChecklistById(checklistId, sessionToken) {
-    const resp = await api.post(
-        '/functions/getChecklistById',
-        { checklistId },
-        { headers: { 'X-Parse-Session-Token': sessionToken } }
-    );
-    return resp.data.result;
-}
-
-// ----------------------------------------------------
+/* componente -------------------------------------------------- */
 export default function DriverChecklistsList() {
-    const [checklists, setChecklists] = useState([]);
+    const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [qPlaca, setQPlaca] = useState("");
+    const [qMot, setQMot] = useState("");
+    const [qDate, setQDate] = useState("");
 
-    // Campos de busca
-    const [searchPlate, setSearchPlate] = useState('');
-    const [searchMotorista, setSearchMotorista] = useState('');
-    const [searchDate, setSearchDate] = useState('');
+    const [dlgOpen, setDlgOpen] = useState(false);
+    const [sel, setSel] = useState(null);
+    const [loadingDet, setLoadingDet] = useState(false);
 
-    const [detailsOpen, setDetailsOpen] = useState(false);
-    const [selectedChecklist, setSelectedChecklist] = useState(null);
-    const [loadingDetails, setLoadingDetails] = useState(false);
+    const [sn, setSn] = useState({ open: false, msg: "", sev: "info" });
+    const role = localStorage.getItem("role") || "";
 
-    const [snackbarOpen, setSnackbarOpen] = useState(false);
-    const [snackbarMessage, setSnackbarMessage] = useState('');
-    const [snackbarSeverity, setSnackbarSeverity] = useState('info');
-
-    const [userRole, setUserRole] = useState('');
-
-    useEffect(() => {
-        const storedRole = localStorage.getItem('role');
-        if (storedRole) setUserRole(storedRole);
-        loadChecklists();
-    }, []);
-
-    const loadChecklists = async () => {
+    /* -------- carregamento inicial -------- */
+    useEffect(() => { load(); }, []);
+    const load = async () => {
         setLoading(true);
+        try { setRows(await allChecklists()); }
+        catch { setSn({ open: true, sev: "error", msg: "Falha ao carregar." }); }
+        finally { setLoading(false); }
+    };
+
+    /* -------- detalhes -------- */
+    const open = async (id) => {
+        setLoadingDet(true);
         try {
-            const sessionToken = localStorage.getItem('sessionToken');
-            // Tanto admin quanto manutencao usam getAllChecklists:
-            // (Motorista, se quisesse ver só os dele, chamaria outra function.)
-            const data = await fetchAllChecklists(sessionToken);
-            setChecklists(data);
-        } catch (error) {
-            console.error('Erro ao buscar checklists:', error);
-            showSnackbar('error', 'Falha ao carregar checklists.');
-        } finally {
-            setLoading(false);
-        }
+            const detail = await oneChecklist(id);
+            console.log("Anexos recebidos:", detail.items.flatMap(i => i.attachments));
+            setSel(detail);
+            setDlgOpen(true);
+        } catch {
+            setSn({ open: true, sev: "error", msg: "Falha ao detalhar." });
+        } finally { setLoadingDet(false); }
     };
 
-    // Deletar (somente admin)
-    const handleDeleteChecklist = async (objectId) => {
-        const confirmDelete = window.confirm('Tem certeza que deseja deletar este checklist?');
-        if (!confirmDelete) return;
-
-        setLoading(true);
-        try {
-            const sessionToken = localStorage.getItem('sessionToken');
-            await api.post(
-                '/functions/softDeleteChecklist',
-                { checklistId: objectId },
-                { headers: { 'X-Parse-Session-Token': sessionToken } }
-            );
-            showSnackbar('success', 'Checklist deletado com sucesso.');
-            loadChecklists();
-        } catch (error) {
-            console.error('Erro ao deletar checklist:', error);
-            showSnackbar('error', 'Falha ao deletar checklist.');
-        } finally {
-            setLoading(false);
-        }
+    /* -------- delete (opcional) -------- */
+    const del = async (id) => {
+        if (!window.confirm("Apagar checklist?")) return;
+        try { await api.delete(`/inspection/checklists/${id}`); load(); }
+        catch { setSn({ open: true, sev: "error", msg: "Falha ao deletar." }); }
     };
 
-    const handleOpenDetails = async (checklistId) => {
-        setLoadingDetails(true);
-        try {
-            const sessionToken = localStorage.getItem('sessionToken');
-            const detail = await fetchChecklistById(checklistId, sessionToken);
-            setSelectedChecklist(detail);
-            setDetailsOpen(true);
-        } catch (error) {
-            console.error('Erro ao buscar detalhes do checklist:', error);
-            showSnackbar('error', 'Falha ao carregar detalhes do checklist.');
-        } finally {
-            setLoadingDetails(false);
-        }
-    };
-
-    const handleCloseDetails = () => {
-        setDetailsOpen(false);
-        setSelectedChecklist(null);
-    };
-
-    const showSnackbar = (severity, message) => {
-        setSnackbarSeverity(severity);
-        setSnackbarMessage(message);
-        setSnackbarOpen(true);
-    };
-
-    const handleCloseSnackbar = () => {
-        setSnackbarOpen(false);
-    };
-
-    // Filtra localmente
-    const filteredChecklists = checklists.filter((ch) => {
-        if (searchPlate && !ch.placa?.toLowerCase().includes(searchPlate.toLowerCase())) {
-            return false;
-        }
-        if (searchMotorista && !ch.userFullname?.toLowerCase().includes(searchMotorista.toLowerCase())) {
-            return false;
-        }
-        if (searchDate) {
-            const cDateIso = ch.createdAt?.iso;
-            if (!cDateIso) return false;
-            const cDate = new Date(cDateIso);
-            const sDate = new Date(searchDate);
-            if (
-                cDate.getDate() !== sDate.getDate() ||
-                cDate.getMonth() !== sDate.getMonth() ||
-                cDate.getFullYear() !== sDate.getFullYear()
-            ) {
-                return false;
-            }
-        }
-        return true;
+    /* -------- filtros -------- */
+    const list = rows.filter(r => {
+        const okPl = !qPlaca || (r.placa || "").toLowerCase().includes(qPlaca.toLowerCase());
+        const okMo = !qMot || (r.motorista || "").toLowerCase().includes(qMot.toLowerCase());
+        const okDt = !qDate || (r.createdAt && r.createdAt.slice(0, 10) === qDate);
+        return okPl && okMo && okDt;
     });
 
-    const handleGeneratePDF = () => {
-        if (!selectedChecklist) return;
-        try {
-            const doc = new jsPDF('p', 'pt');
-            doc.setFontSize(14);
-            doc.text('Checklist de Inspeção', 40, 40);
+    /* -------- PDF (sem imagens remotas para evitar CORS) -------- */
+    const pdf = () => {
+        if (!sel) return;
+        const doc = new jsPDF("p", "pt");
+        doc.setFontSize(14).text("Checklist de Inspeção", 40, 40);
+        doc.setFontSize(10);
+        doc.text(`Placa: ${sel.placa}`, 40, 60);
+        doc.text(`Motorista: ${sel.motorista}`, 40, 75);
+        doc.text(`Data: ${new Date(sel.createdAt).toLocaleString("pt-BR")}`, 40, 90);
 
-            doc.setFontSize(10);
-            const placa = selectedChecklist.placa || '';
-            const motorista = selectedChecklist.userFullname || '';
-            doc.text(`Placa: ${placa}`, 40, 60);
-            doc.text(`Motorista: ${motorista}`, 40, 75);
-
-            const createdAtIso = selectedChecklist.createdAt?.iso;
-            const createdStr = createdAtIso
-                ? new Date(createdAtIso).toLocaleString('pt-BR')
-                : 'Data inválida';
-            doc.text(`Data: ${createdStr}`, 40, 90);
-
-            let startY = 110;
-            const rows = selectedChecklist.items.map((it) => {
-                const desc = getDescriptionByCode(it.code);
-                return [desc, it.answer, it.obs || ''];
-            });
-
-            autoTable(doc, {
-                startY,
-                head: [['Item', 'Resposta', 'Observações']],
-                body: rows,
-                didParseCell: (data) => {
-                    if (data.section === 'body' && data.column.index === 1) {
-                        const ans = data.cell.raw;
-                        if (ans === 'sim') {
-                            data.cell.styles.fillColor = [204, 255, 204];
-                        } else if (ans === 'nao') {
-                            data.cell.styles.fillColor = [255, 204, 204];
-                        }
-                    }
-                },
-            });
-
-            const tableState = doc.lastAutoTable;
-            let currentY = tableState.finalY + 20;
-
-            // Assinatura
-            if (selectedChecklist.signature) {
-                if (currentY + 80 > 720) {
-                    doc.addPage();
-                    currentY = 50;
-                }
-                doc.text('Assinatura:', 40, currentY);
-                doc.addImage(selectedChecklist.signature, 'PNG', 40, currentY + 10, 150, 60);
-                currentY += 80;
+        autoTable(doc, {
+            startY: 110,
+            head: [["Item", "Resposta", "Observações"]],
+            body: sel.items.map(it => [desc(it.code), it.answer, it.obs || "-"]),
+            didParseCell: ({ section, column, cell }) => {
+                if (section === "body" && column.index === 1)
+                    cell.styles.fillColor = cell.raw === "sim" ? [204, 255, 204] : [255, 204, 204];
             }
+        });
 
-            // Anexos
-            const allAttachments = selectedChecklist.attachments || [];
-            if (allAttachments.length > 0) {
-                const spaceNeeded = 50;
-                if (currentY + spaceNeeded > 720) {
-                    doc.addPage();
-                    currentY = 50;
-                }
+        /* (imagens remotas removidas para evitar CORS e corromper o PDF) */
 
-                doc.setFontSize(12);
-                doc.setFont('helvetica', 'bold');
-                doc.text('Anexos:', 40, currentY);
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'normal');
-                currentY += 20;
-
-                // Agrupa por itemCode
-                const grouped = {};
-                allAttachments.forEach((att) => {
-                    const code = att.itemCode;
-                    if (!grouped[code]) grouped[code] = [];
-                    grouped[code].push(att);
-                });
-
-                for (const codeStr of Object.keys(grouped)) {
-                    const code = parseInt(codeStr, 10);
-                    const desc = getDescriptionByCode(code);
-                    const itemAtts = grouped[codeStr];
-
-                    if (currentY + 60 > 720) {
-                        doc.addPage();
-                        currentY = 50;
-                    }
-                    doc.setTextColor(0, 0, 150);
-                    doc.text(`Item ${code} - ${desc}`, 40, currentY);
-                    doc.setTextColor(0, 0, 0);
-                    currentY += 15;
-
-                    let xPos = 40;
-                    const imageWidth = 150;
-                    const imageHeight = 100;
-                    const gapX = 30;
-                    const gapY = 20;
-                    let colIndex = 0;
-
-                    itemAtts.forEach((att) => {
-                        if (currentY + imageHeight > 720) {
-                            doc.addPage();
-                            currentY = 50;
-                            xPos = 40;
-                            colIndex = 0;
-                        }
-                        doc.addImage(att.fileBase64, 'JPEG', xPos, currentY, imageWidth, imageHeight);
-                        colIndex++;
-                        if (colIndex === 2) {
-                            xPos = 40;
-                            currentY += imageHeight + gapY;
-                            colIndex = 0;
-                        } else {
-                            xPos += imageWidth + gapX;
-                        }
-                    });
-
-                    if (colIndex === 1) {
-                        colIndex = 0;
-                        xPos = 40;
-                        currentY += imageHeight + gapY;
-                    }
-                    currentY += 10;
-                }
-            }
-
-            doc.save('checklist.pdf');
-            showSnackbar('success', 'PDF gerado com sucesso!');
-        } catch (err) {
-            console.error('Erro ao gerar PDF:', err);
-            showSnackbar('error', 'Falha ao gerar PDF.');
+        if (sel.signature) {
+            const y = doc.lastAutoTable.finalY + 30;
+            doc.text("Assinatura:", 40, y);
+            doc.addImage(sel.signature, "PNG", 40, y + 10, 150, 60);
         }
+
+        doc.save("checklist.pdf");
     };
 
-    if (loading) {
-        return (
-            <Box sx={{ p: 2, textAlign: 'center' }}>
-                <CircularProgress />
-            </Box>
-        );
-    }
+    /* -------- UI -------- */
+    if (loading)
+        return <Box sx={{ p: 2, textAlign: "center" }}><CircularProgress /></Box>;
 
     return (
         <Box sx={{ p: 2 }}>
-            <Typography variant="h5" sx={{ mb: 2 }}>
-                Checklists
-            </Typography>
+            <Typography variant="h5" sx={{ mb: 2 }}>Checklists</Typography>
 
-            {/* Campos de busca */}
-            <Box sx={{ mb: 2, display: 'flex', gap: 2 }}>
-                <TextField
-                    variant="outlined"
-                    value={searchPlate}
-                    onChange={(e) => setSearchPlate(e.target.value)}
+            {/* filtros */}
+            <Box sx={{ mb: 2, display: "flex", gap: 2 }}>
+                <TextField placeholder="Placa" value={qPlaca} onChange={e => setQPlaca(e.target.value)}
                     InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <DirectionsCarIcon />
-                            </InputAdornment>
-                        ),
-                    }}
-                    placeholder="Placa"
-                />
-                <TextField
-                    variant="outlined"
-                    value={searchMotorista}
-                    onChange={(e) => setSearchMotorista(e.target.value)}
+                        startAdornment:
+                            <InputAdornment position="start"><DirectionsCarIcon /></InputAdornment>
+                    }} />
+                <TextField placeholder="Motorista" value={qMot} onChange={e => setQMot(e.target.value)}
                     InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <PersonIcon />
-                            </InputAdornment>
-                        ),
-                    }}
-                    placeholder="Motorista"
-                />
-                <TextField
-                    type="date"
-                    variant="outlined"
-                    value={searchDate}
-                    onChange={(e) => setSearchDate(e.target.value)}
+                        startAdornment:
+                            <InputAdornment position="start"><PersonIcon /></InputAdornment>
+                    }} />
+                <TextField type="date" value={qDate} onChange={e => setQDate(e.target.value)}
                     InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <EventIcon />
-                            </InputAdornment>
-                        ),
-                    }}
-                />
+                        startAdornment:
+                            <InputAdornment position="start"><EventIcon /></InputAdornment>
+                    }} />
             </Box>
 
-            {/* Lista Filtrada */}
-            {filteredChecklists.length === 0 ? (
-                <Typography variant="h6">Nenhum checklist encontrado.</Typography>
-            ) : (
-                filteredChecklists.map((ch) => {
-                    const isoDate = ch.createdAt?.iso;
-                    const createdStr = isoDate
-                        ? new Date(isoDate).toLocaleString('pt-BR')
-                        : 'Data inválida';
+            {/* lista */}
+            {list.length === 0 ? <Typography>Nenhum checklist.</Typography>
+                : list.map(r => (
+                    <Paper key={r.objectId} sx={{ p: 2, mb: 2 }}>
+                        <Typography fontWeight="bold">Placa: {r.placa}</Typography>
+                        <Typography>Motorista: {r.motorista}</Typography>
+                        <Typography>Criado em: {new Date(r.createdAt).toLocaleString("pt-BR")}</Typography>
+                        <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
+                            <Button variant="contained" onClick={() => open(r.objectId)}>Detalhes</Button>
+                            {role === "admin" &&
+                                <Button variant="outlined" color="error" onClick={() => del(r.objectId)}>Deletar</Button>}
+                        </Box>
+                    </Paper>
+                ))}
 
-                    return (
-                        <Paper
-                            key={ch.objectId}
-                            sx={{
-                                p: 2,
-                                mb: 2,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: 1,
-                            }}
-                        >
-                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                                Placa: {ch.placa || 'N/A'}
-                            </Typography>
-                            <Typography variant="body2">
-                                Motorista: {ch.userFullname || 'N/A'}
-                            </Typography>
-                            <Typography variant="body2">
-                                Criado em: {createdStr}
-                            </Typography>
-
-                            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                                <Button
-                                    variant="contained"
-                                    onClick={() => handleOpenDetails(ch.objectId)}
-                                >
-                                    Ver Detalhes
-                                </Button>
-
-                                {/* Botão de Deletar (somente ADMIN) */}
-                                {userRole === 'admin' && (
-                                    <Button
-                                        variant="outlined"
-                                        color="error"
-                                        onClick={() => handleDeleteChecklist(ch.objectId)}
-                                    >
-                                        Deletar
-                                    </Button>
-                                )}
-                            </Box>
-                        </Paper>
-                    );
-                })
-            )}
-
-            {/* Modal de Detalhes */}
-            <Dialog
-                open={detailsOpen}
-                onClose={handleCloseDetails}
-                fullWidth
-                maxWidth="md"
-            >
+            {/* detalhes */}
+            <Dialog open={dlgOpen} onClose={() => setDlgOpen(false)} fullWidth maxWidth="md">
                 <DialogTitle>Detalhes do Checklist</DialogTitle>
                 <DialogContent dividers>
-                    {loadingDetails && <CircularProgress />}
-                    {!loadingDetails && selectedChecklist && (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                                Placa: {selectedChecklist.placa}
-                            </Typography>
-                            <Typography variant="body2">
-                                Motorista: {selectedChecklist.userFullname}
-                            </Typography>
-                            <Typography variant="body2">
-                                {selectedChecklist.createdAt?.iso
-                                    ? `Criado em: ${new Date(selectedChecklist.createdAt.iso).toLocaleString('pt-BR')}`
-                                    : 'Data inválida'}
-                            </Typography>
+                    {loadingDet && <CircularProgress />}
+                    {!loadingDet && sel && (
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <Typography fontWeight="bold">Placa: {sel.placa}</Typography>
+                            <Typography>Motorista: {sel.motorista}</Typography>
+                            <Typography>Criado em: {new Date(sel.createdAt).toLocaleString("pt-BR")}</Typography>
 
-                            {selectedChecklist.items?.map((item, idx) => {
-                                const desc = getDescriptionByCode(item.code);
-                                const itemAttachments = selectedChecklist.attachments?.filter(
-                                    (att) => att.itemCode === item.code
-                                ) || [];
-                                return (
-                                    <Box
-                                        key={idx}
-                                        sx={{
-                                            mb: 2,
-                                            borderBottom: '1px solid #ccc',
-                                            pb: 1,
-                                        }}
-                                    >
-                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                                            {desc}
-                                        </Typography>
-                                        <Typography
-                                            variant="body2"
-                                            sx={{
-                                                color: item.answer === 'sim' ? 'green' : 'red',
-                                            }}
-                                        >
-                                            Resposta: {item.answer}
-                                        </Typography>
-                                        <Typography variant="body2">
-                                            Observações: {item.obs || '-'}
-                                        </Typography>
-                                        {itemAttachments.length > 0 && (
-                                            <Box
-                                                sx={{
-                                                    mt: 1,
-                                                    display: 'flex',
-                                                    flexWrap: 'wrap',
-                                                    gap: 1,
-                                                }}
-                                            >
-                                                {itemAttachments.map((att) => (
-                                                    <Box
-                                                        key={att.objectId}
-                                                        sx={{ textAlign: 'center' }}
-                                                    >
-                                                        <img
-                                                            src={att.fileBase64}
-                                                            alt="Anexo"
-                                                            style={{
-                                                                border: '1px solid #ccc',
-                                                                maxWidth: '200px',
-                                                            }}
-                                                        />
-                                                    </Box>
-                                                ))}
-                                            </Box>
-                                        )}
-                                    </Box>
-                                );
-                            })}
-
-                            {selectedChecklist.signature && (
-                                <Box>
-                                    <Typography variant="subtitle2" sx={{ mt: 2 }}>
-                                        Assinatura:
+                            {sel.items.map(it => (
+                                <Box key={it.code} sx={{ pb: 1, mb: 1, borderBottom: "1px solid #ccc" }}>
+                                    <Typography fontWeight="bold">{desc(it.code)}</Typography>
+                                    <Typography sx={{ color: it.answer === "sim" ? "green" : "red" }}>
+                                        Resposta: {it.answer}
                                     </Typography>
-                                    <img
-                                        src={selectedChecklist.signature}
-                                        alt="Assinatura"
-                                        style={{ border: '1px solid #ccc', maxWidth: '300px' }}
-                                    />
+                                    <Typography>Observações: {it.obs || "-"}</Typography>
+
+                                    {(it.attachments || []).length > 0 && (
+                                        <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
+                                            {it.attachments.map(a => (
+                                                <img key={a.attachmentId} src={a.url}
+                                                    alt="Anexo" style={{ border: "1px solid #ccc", maxWidth: 200 }} />
+                                            ))}
+                                        </Box>
+                                    )}
+                                </Box>
+                            ))}
+
+                            {sel.signature && (
+                                <Box>
+                                    <Typography variant="subtitle2" sx={{ mt: 2 }}>Assinatura:</Typography>
+                                    <img src={sel.signature} alt="Assinatura"
+                                        style={{ border: "1px solid #ccc", maxWidth: 300 }} />
                                 </Box>
                             )}
                         </Box>
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button
-                        variant="contained"
-                        onClick={handleGeneratePDF}
-                        disabled={!selectedChecklist || loadingDetails}
-                    >
-                        Gerar PDF
-                    </Button>
-                    <Button onClick={handleCloseDetails}>Fechar</Button>
+                    <Button variant="contained" onClick={pdf} disabled={!sel || loadingDet}>Gerar PDF</Button>
+                    <Button onClick={() => setDlgOpen(false)}>Fechar</Button>
                 </DialogActions>
             </Dialog>
 
-            <Snackbar
-                open={snackbarOpen}
-                autoHideDuration={3000}
-                onClose={handleCloseSnackbar}
-                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-            >
-                <Alert
-                    onClose={handleCloseSnackbar}
-                    severity={snackbarSeverity}
-                    sx={{ width: '100%' }}
-                >
-                    {snackbarMessage}
+            {/* snackbar */}
+            <Snackbar open={sn.open} autoHideDuration={3000}
+                anchorOrigin={{ vertical: "top", horizontal: "center" }}
+                onClose={() => setSn(s => ({ ...s, open: false }))}>
+                <Alert severity={sn.sev} onClose={() => setSn(s => ({ ...s, open: false }))}>
+                    {sn.msg}
                 </Alert>
             </Snackbar>
         </Box>

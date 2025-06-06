@@ -43,8 +43,8 @@ import {
 } from "@mui/icons-material";
 import Autocomplete from "@mui/material/Autocomplete";
 import SignatureCanvas from "react-signature-canvas";
-import axios from "axios";
 
+import api from "../services/apiflask";
 import {
     getSaidasEmTransito,
     getAllArrivals,
@@ -54,15 +54,6 @@ import {
     updateArrival,
     fileToBase64
 } from "../services/arrivalService";
-
-/* ───────────────────── Config Axios ───────────────────── */
-const api = axios.create({
-    baseURL: "https://18aa-206-84-60-250.ngrok-free.app",
-    headers: {
-        "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true"
-    }
-});
 
 /* ─────────────────── Funções utilitárias ────────────────── */
 const nowISO = () => {
@@ -505,7 +496,6 @@ export default function ChegadaPage() {
                             </Box>
                         )}
 
-                        {/* Demais campos */}
                         <TextField
                             fullWidth
                             size="small"

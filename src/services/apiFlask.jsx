@@ -1,4 +1,3 @@
-// services/apiFlask.jsx
 import axios from "axios";
 
 const api = axios.create({
@@ -9,15 +8,13 @@ const api = axios.create({
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
   },
-  withCredentials: false, // só true se usar cookies
+  withCredentials: false,           // ❌ não usamos mais cookies
 });
 
-/* acrescenta automaticamente o JWT salvo no login */
+/* ——— coloca o JWT em TODAS as requisições ——— */
 api.interceptors.request.use((config) => {
-  const jwt = localStorage.getItem("token"); // seu token Bearer
-  if (jwt) {
-    config.headers.Authorization = `Bearer ${jwt}`;
-  }
+  const jwt = localStorage.getItem("token");
+  if (jwt) config.headers.Authorization = `Bearer ${jwt}`;
   return config;
 });
 

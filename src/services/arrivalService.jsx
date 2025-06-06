@@ -1,14 +1,4 @@
-
-
-import axios from "axios";
-
-export const api = axios.create({
-    baseURL: import.meta.env.VITE_FLASK_URL || "https://18aa-206-84-60-250.ngrok-free.app",
-    headers: {
-        "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
-    },
-});
+import api from "./apiflask";
 
 /* ───────── util ───────── */
 export const fileToBase64 = (file) =>
