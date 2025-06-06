@@ -64,6 +64,8 @@ export default function DriverChecklistsList() {
 
     const [sn, setSn] = useState({ open: false, msg: "", sev: "info" });
     const role = localStorage.getItem("role") || "";
+    const userFullName = (localStorage.getItem("fullname") || "").toLowerCase();
+    const isDriver = role === "motorista";
 
     // estados e ref para segunda assinatura
     const [signModalOpen, setSignModalOpen] = useState(false);
@@ -192,6 +194,11 @@ export default function DriverChecklistsList() {
 
     /* -------- filtros -------- */
     const list = rows.filter(r => {
+        // 1) motorista vê só os próprios
+        if (isDriver) {
+            if ((r.motorista || "").toLowerCase() !== userFullName) return false;
+        }
+        // 2) filtros existentes
         const okPl = !qPlaca || (r.placa || "").toLowerCase().includes(qPlaca.toLowerCase());
         const okMo = !qMot || (r.motorista || "").toLowerCase().includes(qMot.toLowerCase());
         const okDt = !qDate || (r.createdAt && r.createdAt.slice(0, 10) === qDate);
