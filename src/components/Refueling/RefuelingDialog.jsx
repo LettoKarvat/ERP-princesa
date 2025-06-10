@@ -49,7 +49,6 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
 
   const isAdmin = userRole === "admin";
   const isCreating = selectedItem?.id === undefined;
-
   const isDisabled = !isAdmin && !isCreating;
 
   const {
@@ -62,77 +61,69 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
     formState: { errors },
   } = useForm();
 
-  const onSubmitReal = (data) => {
-    // Do something with the data
-    console.table(data);
-
-    onSubmit();
-  };
-
   const postValue = watch("post");
   const isInternal = postValue === "interno";
-
   const kmValue = watch("mileage");
 
   useEffect(() => {
-    !kmValue ? setKmLabel("Quilometragem atual") : setKmLabel("");
+    setKmLabel(kmValue ? "" : "Quilometragem atual");
   }, [kmValue]);
 
   useEffect(() => {
-    const getVehicles = async () => {
+    (async () => {
       try {
-        const vehiclesData = await getAllVeiculos();
-        setVehicles(vehiclesData);
-      } catch (error) {
-        console.error("Erro ao buscar veículos:", error);
+        setVehicles(await getAllVeiculos());
+      } catch (err) {
+        console.error("Erro ao buscar veículos:", err);
       }
-    };
-
-    getVehicles();
+    })();
   }, []);
 
   useEffect(() => {
+    if (!open) return;
     setTimeout(() => {
-      setValue("vehicle", selectedItem?.vehicle);
-      setValue("fuelType", selectedItem?.fuelType);
-      setValue("date", selectedItem?.date);
-      setValue("invoiceNumber", selectedItem?.invoiceNumber);
-      setValue("unitPrice", selectedItem?.unitPrice);
-      setValue("liters", selectedItem?.liters);
-      setValue("mileage", selectedItem?.mileage);
-      setValue("observation", selectedItem?.observation);
-      setValue("post", selectedItem?.post);
+      [
+        "vehicle",
+        "fuelType",
+        "date",
+        "invoiceNumber",
+        "unitPrice",
+        "liters",
+        "mileage",
+        "observation",
+        "post",
+        "pump",
+      ].forEach((field) => setValue(field, selectedItem?.[field]));
     });
-  }, [setValue, open]);
+  }, [open, selectedItem, setValue]);
 
   const handleClose = () => {
     setSelectedVehicle(null);
     reset();
-
     onClose();
   };
 
   const handleNumberField = (e, field) => {
-    let value = e.target.value;
-
-    // Permitir apenas números e ponto (para decimais)
-    value = value.replace(/[^0-9.]/g, "");
-
-    // Evitar múltiplos pontos seguidos
+    let value = e.target.value.replace(/[^0-9.]/g, "");
     const parts = value.split(".");
-    if (parts.length > 2) {
-      value = parts[0] + "." + parts.slice(1).join("");
-    }
-
+    if (parts.length > 2) value = parts[0] + "." + parts.slice(1).join("");
     setValue(field, value, { shouldValidate: true });
   };
 
   const handleFileChange = (e) => {
     if (!e.target.files) return;
+    const newFiles = Array.from(e.target.files);
+    setAttachments((prev) => {
+      const updated = [...prev, ...newFiles];
+      setValue("attachments", updated, { shouldValidate: true });
+      return updated;
+    });
+    e.target.value = "";
+  };
 
-    setAttachments((prev) => [...prev, ...Array.from(e.target.files)]);
-
-    setValue("attachments", attachments);
+  const onSubmitReal = (data) => {
+    console.table({ ...data, attachments });
+    onSubmit(data, attachments);
   };
 
   return (
@@ -152,29 +143,19 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             readOnly={isDisabled}
             value={selectedItem?.vehicle ?? selectedVehicle}
             onChange={(e, newValue) => {
-              if (typeof newValue === "string") {
-                setSelectedVehicle(null);
-              } else if (newValue && newValue.placa) {
-                setSelectedVehicle(newValue);
-              } else {
-                setSelectedVehicle(null);
-              }
-
+              setSelectedVehicle(typeof newValue === "string" ? null : newValue);
+              if (newValue?.quilometragem) setValue("mileage", newValue.quilometragem);
               setKmLabel("");
-              setValue("mileage", newValue?.quilometragem);
             }}
-            onInputChange={(event, newInputValue) => {
-              setSelectedVehicle(null);
-            }}
+            onInputChange={() => setSelectedVehicle(null)}
             options={vehicles}
-            getOptionLabel={(option) => {
-              if (typeof option === "string") return option;
-              return option.placa
-                ? `${option.placa} - ${option.marca || ""} ${
-                    option.modelo || ""
-                  }`
-                : "";
-            }}
+            getOptionLabel={(opt) =>
+              typeof opt === "string"
+                ? opt
+                : opt.placa
+                  ? `${opt.placa} - ${opt.marca || ""} ${opt.modelo || ""}`
+                  : ""
+            }
             renderInput={(params) => (
               <>
                 <TextField
@@ -186,45 +167,26 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                   })}
                   aria-describedby="vehicle"
                 />
-                {errors.vehicle && (
-                  <InputError>{errors.vehicle.message}</InputError>
-                )}
+                {errors.vehicle && <InputError>{errors.vehicle.message}</InputError>}
               </>
             )}
           />
 
           <FormControl className="col-span-2">
             <FormLabel component="legend">Combustível</FormLabel>
-
             <Controller
               name="fuelType"
               control={control}
               disabled={isDisabled}
               rules={{ required: "Selecione o tipo de combustível" }}
               render={({ field }) => (
-                <RadioGroup
-                  row
-                  {...field}
-                  value={field.value || ""}
-                  disabled={isDisabled}
-                >
-                  <FormControlLabel
-                    value="ARLA"
-                    control={<Radio />}
-                    label="ARLA"
-                  />
-                  <FormControlLabel
-                    value="DIESEL"
-                    control={<Radio />}
-                    label="DIESEL"
-                  />
+                <RadioGroup row {...field} value={field.value || ""}>
+                  <FormControlLabel value="ARLA" control={<Radio />} label="ARLA" />
+                  <FormControlLabel value="DIESEL" control={<Radio />} label="DIESEL" />
                 </RadioGroup>
               )}
             />
-
-            {errors.fuelType && (
-              <InputError>{errors.fuelType.message}</InputError>
-            )}
+            {errors.fuelType && <InputError>{errors.fuelType.message}</InputError>}
           </FormControl>
 
           <FormControl className="col-span-2">
@@ -234,33 +196,33 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             <Input
               type="datetime-local"
               readOnly={isDisabled}
-              {...register("date", {
-                required: "Insira a data do abastecimento",
-              })}
+              {...register("date", { required: "Insira a data do abastecimento" })}
               aria-describedby="date"
             />
             {errors.date && <InputError>{errors.date.message}</InputError>}
           </FormControl>
 
           <FormControl className="col-span-2">
-            <InputLabel htmlFor="post">Posto</InputLabel>
-
+            <InputLabel id="post-label">Posto</InputLabel>
             <Controller
               name="post"
-              disabled={isDisabled}
               control={control}
+              disabled={isDisabled}
               rules={{ required: "Selecione se o posto é interno ou externo" }}
               render={({ field }) => (
-                <Select {...field} value={field.value || ""}>
+                <Select
+                  {...field}
+                  labelId="post-label"
+                  id="post"
+                  label="Posto"
+                  value={field.value || ""}
+                >
                   <MenuItem value="interno">Interno</MenuItem>
                   <MenuItem value="externo">Externo</MenuItem>
                 </Select>
               )}
             />
-
-            {errors.post && (
-              <span className="text-red-500">{errors.post.message}</span>
-            )}
+            {errors.post && <InputError>{errors.post.message}</InputError>}
           </FormControl>
 
           {isInternal && (
@@ -268,9 +230,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               <InputLabel htmlFor="pump">Bomba</InputLabel>
               <Input
                 readOnly={isDisabled}
-                {...register("pump", {
-                  required: "Insira a bomba",
-                })}
+                {...register("pump", { required: "Insira a bomba" })}
                 aria-describedby="pump"
               />
               {errors.pump && <InputError>{errors.pump.message}</InputError>}
@@ -339,9 +299,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                 })}
                 aria-describedby="mileage"
               />
-              {errors.mileage && (
-                <InputError>{errors.mileage.message}</InputError>
-              )}
+              {errors.mileage && <InputError>{errors.mileage.message}</InputError>}
             </FormControl>
           </div>
 
@@ -356,29 +314,22 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
 
           <FormControl className="col-span-2">
             <label htmlFor="attachments">
-              <Button variant="contained" component="span">
+              <Button variant="contained" component="span" disabled={isDisabled}>
                 Adicionar Arquivos
               </Button>
             </label>
             <Input
-              readOnly={isDisabled}
-              accept="image/*,application/pdf"
-              style={{ display: "none" }}
               id="attachments"
-              multiple
               type="file"
-              {...register(
-                "attachments"
-                //   {
-                //   required: "Adicione pelo menos 1 anexo!",
-                // }
-              )}
+              style={{ display: "none" }}
               onChange={handleFileChange}
+              disabled={isDisabled}
+              inputProps={{
+                multiple: true,
+                accept: "image/*,application/pdf",
+              }}
             />
             <p className="mt-2">Necessário pelo menos 1</p>
-            {/* {errors.attachments && (
-              <InputError>{errors.attachments.message}</InputError>
-            )} */}
           </FormControl>
 
           {attachments.length > 0 && (
@@ -396,9 +347,9 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                         aria-label="remover"
                         onClick={() => {
                           if (isDisabled) return;
-                          const newAttachments = [...attachments];
-                          newAttachments.splice(index, 1);
-                          setAttachments(newAttachments);
+                          const updated = attachments.filter((_, i) => i !== index);
+                          setAttachments(updated);
+                          setValue("attachments", updated, { shouldValidate: true });
                         }}
                       >
                         <DeleteIcon fontSize="small" />
@@ -422,7 +373,11 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                     </ListItemIcon>
                     <ListItemText
                       primary={file.name || file}
-                      secondary={`${(file.size / 1024).toFixed(2)} KB`}
+                      secondary={
+                        typeof file === "string"
+                          ? ""
+                          : `${(file.size / 1024).toFixed(2)} KB`
+                      }
                     />
                   </ListItem>
                 ))}

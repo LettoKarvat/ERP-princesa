@@ -1,4 +1,5 @@
-import React, { useState, useRef } from "react";
+// src/pages/Refueling.jsx
+import React, { useState, useRef, useEffect } from "react";
 import {
   Button,
   Typography,
@@ -7,7 +8,6 @@ import {
   DialogContent,
   DialogActions,
   useMediaQuery,
-  Input,
   TextField,
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
@@ -15,43 +15,18 @@ import SignatureCanvas from "react-signature-canvas";
 import { useTheme } from "@mui/material/styles";
 import { RefuelingDialog } from "../components/Refueling/RefuelingDialog";
 import { RefuelingCard } from "../components/Refueling/RefuelingCard";
+import {
+  fetchRefuelings,
+  createRefueling,
+  updateRefueling,
+} from "../services/refuelingService";
 
 export default function Refueling() {
-  // Lista de abastecimentos salvos
-  const [refuelings, setRefuelings] = useState([
-    {
-      id: 1,
-      vehicle: "HHK1G29 - M. BENZ M. BENZ 710",
-      fuelType: "DIESEL",
-      date: "2022-11-03T00:00",
-      post: "interno",
-      pump: "B1",
-      invoiceNumber: "",
-      unitPrice: 0,
-      liters: 107,
-      mileage: 376918,
-      observation: "Tanque cheio",
-      signature: "", // Assinatura do motorista
-      attachments: [], // Anexos
-    },
-    {
-      id: 2,
-      vehicle: "OSY1H11 - M. BENZ M. BENZ ACELLO 815",
-      fuelType: "ARLA",
-      date: "2025-01-10T10:00",
-      post: "externo",
-      pump: "HAHA",
-      invoiceNumber: "NF-123",
-      unitPrice: 4.5,
-      liters: 20,
-      mileage: 42000,
-      observation: "",
-      signature: "",
-      attachments: [],
-    },
-  ]);
-
-  const initialRefueling = {
+  const [refuelings, setRefuelings] = useState([]);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [formDataState, setFormDataState] = useState({
     vehicle: "",
     fuelType: "DIESEL",
     date: "",
@@ -62,128 +37,146 @@ export default function Refueling() {
     liters: "",
     mileage: "",
     observation: "",
-    signature: "", // Campo para armazenar a assinatura
-    attachments: [], // Campo para armazenar anexos
-  };
-
-  // Controles do diálogo principal (novo/editar)
-  const [open, setOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editId, setEditId] = useState(null);
-
-  // Objeto abastecimento em edição
-  const [newRefueling, setNewRefueling] = useState(initialRefueling);
-
-  // Estado para anexos (no momento da criação/edição)
-  const [attachments, setAttachments] = useState([]);
-
-  // -- CONTROLES DE ASSINATURA --
+    signature: "",
+  });
+  const [dialogAttachments, setDialogAttachments] = useState([]);
   const [openSignatureModal, setOpenSignatureModal] = useState(false);
   const signatureRef = useRef(null);
 
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
-  // --------------------------------------------------------------------------------
-  // AÇÕES DE ABRIR/FECHAR DIÁLOGO
-  // --------------------------------------------------------------------------------
-  const handleOpenDialog = (item) => {
+  useEffect(() => {
+    fetchRefuelings().then(data => setRefuelings(data));
+  }, []);
+
+  function handleOpenDialog(item) {
     if (item) {
       setSelectedItem(item);
       setIsEditing(true);
+      setFormDataState({
+        vehicle: item.vehicle_id,
+        fuelType: item.fuelType,
+        date: item.date,
+        post: item.post,
+        pump: item.pump || "",
+        invoiceNumber: item.invoiceNumber || "",
+        unitPrice: item.unitPrice || 0,
+        liters: item.liters,
+        mileage: item.mileage,
+        observation: item.observation || "",
+        signature: item.signatureUrl || "",
+      });
     } else {
+      setSelectedItem(null);
       setIsEditing(false);
-      setEditId(null);
-      setNewRefueling(initialRefueling);
-      setAttachments([]);
+      setFormDataState({
+        vehicle: "",
+        fuelType: "DIESEL",
+        date: "",
+        post: "interno",
+        pump: "",
+        invoiceNumber: "",
+        unitPrice: 0,
+        liters: "",
+        mileage: "",
+        observation: "",
+        signature: "",
+      });
     }
-    setOpen(true);
-  };
+    setDialogAttachments([]);
+    setOpenDialog(true);
+  }
 
-  const handleCloseDialog = () => {
-    setOpen(false);
-    setSelectedItem(null);
+  function handleCloseDialog() {
+    setOpenDialog(false);
     setIsEditing(false);
-    setEditId(null);
-    setNewRefueling(initialRefueling);
-    setAttachments([]);
-  };
+    setSelectedItem(null);
+    setDialogAttachments([]);
+  }
 
-  const handleSave = () => {
-    if (!attachments || attachments.length === 0) {
+  // recebe do diálogo: data = campos, atchs = arquivos
+  function handleSave(data, atchs) {
+    console.log("handleSave:", { data, attachments: atchs });
+    if (!atchs?.length) {
       alert("É obrigatório adicionar pelo menos um anexo!");
       return;
     }
+    setFormDataState(prev => ({ ...prev, ...data }));
+    setDialogAttachments(atchs);
 
-    // Validação: precisa ter ASSINATURA
-    if (!newRefueling.signature) {
+    if (!formDataState.signature) {
       setOpenSignatureModal(true);
-      return;
+    } else {
+      doFinalSave(data, atchs);
     }
+  }
 
-    doFinalSave();
-  };
+  function doFinalSave(data, atchs) {
+    const token = localStorage.getItem("access_token");
+    console.log("JWT being sent:", token);
 
-  // Função que realmente salva (após validação e assinatura)
-  const doFinalSave = () => {
-    // Save the refueling
+    const fd = new FormData();
+    fd.append("vehicle_id", data.vehicle);
+    fd.append("fuel_type", data.fuelType);
+    fd.append("date", data.date);
+    fd.append("post", data.post);
+    fd.append("pump", data.pump);
+    fd.append("invoice_number", data.invoiceNumber);
+    fd.append("unit_price", data.unitPrice);
+    fd.append("liters", data.liters);
+    fd.append("mileage", data.mileage);
+    fd.append("observation", data.observation);
 
-    setOpen(false);
-  };
+    fetch(formDataState.signature)
+      .then(res => res.blob())
+      .then(blob => {
+        fd.append("signature", blob, "signature.png");
+        atchs.forEach(file => fd.append("attachments", file, file.name));
 
-  // --------------------------------------------------------------------------------
-  // HANDLES DE ASSINATURA (CHAMADO AO TENTAR SALVAR)
-  // --------------------------------------------------------------------------------
-  const handleCloseSignature = () => {
-    setOpenSignatureModal(false);
-  };
+        const action = isEditing
+          ? updateRefueling(selectedItem.id, fd, true)
+          : createRefueling(fd);
 
-  const handleConfirmSignature = () => {
-    if (signatureRef.current && signatureRef.current.isEmpty()) {
+        action
+          .then(() => {
+            console.log("Upload successful");
+            fetchRefuelings().then(setRefuelings);
+            handleCloseDialog();
+          })
+          .catch(err => {
+            console.error("Upload error:", err);
+            console.error("Request headers were:", err.config?.headers);
+            alert("Erro ao salvar abastecimento: " + (err.response?.data?.error || err.message));
+          });
+      });
+  }
+
+  function handleConfirmSignature() {
+    if (signatureRef.current.isEmpty()) {
       alert("Por favor, faça a assinatura antes de confirmar.");
       return;
     }
-    const signatureDataUrl = signatureRef.current.toDataURL();
-
-    // Salva no estado do abastecimento atual
-    setNewRefueling((prev) => ({ ...prev, signature: signatureDataUrl }));
-
-    // Fecha modal
+    const sigDataUrl = signatureRef.current.toDataURL();
+    setFormDataState(prev => ({ ...prev, signature: sigDataUrl }));
     setOpenSignatureModal(false);
+    doFinalSave(formDataState, dialogAttachments);
+  }
 
-    // Agora que temos a assinatura, finalizamos o save
-    doFinalSave();
-  };
-
-  const handleClearSignature = () => {
-    if (signatureRef.current) {
-      signatureRef.current.clear();
-    }
-  };
-
-  const [selectedItem, setSelectedItem] = useState(null);
+  // filtros...
   const [searchTerm, setSearchTerm] = useState("");
   const [fuelFilter, setFuelFilter] = useState("");
-  const [userFilter, setUserFilter] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const filteredData = refuelings.filter((item) => {
-    const searchMatch =
-      item.vehicle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.observation.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const fuelMatch = fuelFilter === "" || item.fuelType === fuelFilter;
-
-    // const userMatch = userFilter === "" || item.post === userFilter;
-
-    const itemDate = item.date.split("T")[0];
-
+  const filteredData = refuelings.filter(item => {
+    const vehicleMatch = item.vehicle_id.toLowerCase().includes(searchTerm.toLowerCase());
+    const fuelMatch = !fuelFilter || item.fuelType === fuelFilter;
+    const dateOnly = item.date.split("T")[0];
     const dateMatch =
-      (!startDate || itemDate >= startDate) &&
-      (!endDate || itemDate <= endDate);
-
-    return searchMatch && fuelMatch && dateMatch;
+      (!startDate || dateOnly >= startDate) &&
+      (!endDate || dateOnly <= endDate);
+    return vehicleMatch && fuelMatch && dateMatch;
   });
 
   return (
@@ -193,105 +186,93 @@ export default function Refueling() {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={handleOpenDialog}
+          onClick={() => handleOpenDialog(null)}
         >
           Novo abastecimento
         </Button>
       </div>
 
+      {/* filtros */}
       <div className="gap-4 my-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 items-end">
         <TextField
           variant="outlined"
           placeholder="Pesquise um veículo:"
           className="lg:col-span-2 p-4"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={e => setSearchTerm(e.target.value)}
         />
-
         <select
           value={fuelFilter}
-          onChange={(e) => setFuelFilter(e.target.value)}
+          onChange={e => setFuelFilter(e.target.value)}
           className="border p-4 h-fit rounded border-gray-300"
         >
           <option value="">Todos os combustíveis</option>
           <option value="DIESEL">DIESEL</option>
           <option value="ARLA">ARLA</option>
         </select>
-
-        <select
-          value={userFilter}
-          onChange={(e) => setUserFilter(e.target.value)}
-          className="border p-4 h-fit rounded border-gray-300"
-        >
-          <option value="">Todos os usuários</option>
-        </select>
-
-        <div className="">
+        <div>
           <label className="block text-sm">Data inicial:</label>
           <input
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={e => setStartDate(e.target.value)}
             className="border p-3 h-fit w-full rounded border-gray-300"
           />
         </div>
-
         <div>
           <label className="block text-sm">Data final:</label>
           <input
             type="date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={e => setEndDate(e.target.value)}
             className="border p-3 h-fit w-full rounded border-gray-300"
           />
         </div>
       </div>
 
+      {/* cards */}
       <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-        {filteredData.map((refueling) => (
+        {filteredData.map(ref => (
           <RefuelingCard
-            key={refueling.id}
-            refueling={refueling}
-            handleOpenDialog={() => handleOpenDialog(refueling)}
+            key={ref.id}
+            refueling={ref}
+            handleOpenDialog={() => handleOpenDialog(ref)}
           />
         ))}
       </div>
 
+      {/* diálogo de formulário */}
       <RefuelingDialog
-        onClose={handleCloseDialog}
-        open={open}
+        open={openDialog}
         selectedItem={selectedItem}
+        onClose={handleCloseDialog}
         onSubmit={handleSave}
       />
 
-      {/* MODAL DE ASSINATURA (chamado se não tiver assinatura no momento do Save) */}
+      {/* modal de assinatura */}
       <Dialog
         open={openSignatureModal}
-        onClose={handleCloseSignature}
+        onClose={() => setOpenSignatureModal(false)}
         fullScreen={fullScreen}
       >
         <DialogTitle>Assinatura</DialogTitle>
         <DialogContent dividers>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Por favor, assine abaixo:
-          </Typography>
           <SignatureCanvas
             ref={signatureRef}
             penColor="black"
             canvasProps={{
               width: fullScreen ? window.innerWidth - 20 : 400,
               height: 200,
-              className: "sigCanvas",
             }}
           />
-          <Button onClick={handleClearSignature} sx={{ mt: 1 }}>
-            Limpar Assinatura
+          <Button onClick={() => signatureRef.current.clear()} sx={{ mt: 1 }}>
+            Limpar
           </Button>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseSignature}>Cancelar</Button>
+          <Button onClick={() => setOpenSignatureModal(false)}>Cancelar</Button>
           <Button variant="contained" onClick={handleConfirmSignature}>
-            Confirmar Assinatura
+            Confirmar
           </Button>
         </DialogActions>
       </Dialog>
