@@ -26,7 +26,7 @@ import {
 } from "@mui/material";
 import { Controller, useForm } from "react-hook-form";
 import { InputError } from "../InputError";
-import api from "../../services/apiFlask"; // ← agora busca pela API
+import api from "../../services/apiFlask";
 import {
   Delete as DeleteIcon,
   Image as ImageIcon,
@@ -35,14 +35,14 @@ import {
 } from "@mui/icons-material";
 
 export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
-  /* ---------------- state ---------------- */
+  /* ───────────── state ───────────── */
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [attachments, setAttachments] = useState(selectedItem?.attachments ?? []);
   const [userRole, setUserRole] = useState("");
   const [kmLabel, setKmLabel] = useState("Quilometragem atual");
 
-  /* ---------------- role ---------------- */
+  /* ───────────── role ───────────── */
   useEffect(() => {
     const storedRole = localStorage.getItem("role");
     if (storedRole) setUserRole(storedRole);
@@ -52,7 +52,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
   const isCreating = selectedItem?.id === undefined;
   const isDisabled = !isAdmin && !isCreating;
 
-  /* ---------------- form ---------------- */
+  /* ───────────── form ───────────── */
   const {
     register,
     handleSubmit,
@@ -71,7 +71,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
     setKmLabel(kmValue ? "" : "Quilometragem atual");
   }, [kmValue]);
 
-  /* ----------- load vehicles via API ----------- */
+  /* ───────────── load vehicles ───────────── */
   useEffect(() => {
     (async () => {
       try {
@@ -83,12 +83,14 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
     })();
   }, []);
 
-  /* ---------------- open/edit ---------------- */
+  /* ───────────── open / edit ───────────── */
   useEffect(() => {
     if (!open) return;
+    setSelectedVehicle(null);
+    setAttachments(selectedItem?.attachments ?? []);
     setTimeout(() => {
       [
-        "vehicle",
+        "vehicle_id",
         "fuelType",
         "date",
         "invoiceNumber",
@@ -98,11 +100,11 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
         "observation",
         "post",
         "pump",
-      ].forEach((f) => setValue(f, selectedItem?.[f]));
+      ].forEach((f) => setValue(f, selectedItem?.[f] ?? ""));
     });
   }, [open, selectedItem, setValue]);
 
-  /* ---------------- handlers ---------------- */
+  /* ───────────── handlers ───────────── */
   const handleClose = () => {
     setSelectedVehicle(null);
     reset();
@@ -112,16 +114,16 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
   const handleNumberField = (e, field) => {
     let value = e.target.value.replace(/[^0-9.]/g, "");
     const parts = value.split(".");
-    if (parts.length > 2) value = parts[0] + "." + parts.slice(1).join("");
+    if (parts.length > 2) value = `${parts[0]}.${parts.slice(1).join("")}`;
     setValue(field, value, { shouldValidate: true });
   };
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    const updated = [...attachments, ...files];
-    setAttachments(updated);
-    setValue("attachments", updated, { shouldValidate: true });
+    const upd = [...attachments, ...files];
+    setAttachments(upd);
+    setValue("attachments", upd, { shouldValidate: true });
     e.target.value = "";
   };
 
@@ -129,27 +131,30 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
     onSubmit(data, attachments);
   };
 
-  /* ---------------- render ---------------- */
+  /* ───────────── render ───────────── */
   return (
     <Dialog open={open} onClose={handleClose} fullWidth>
-      <DialogTitle>
-        {selectedItem?.id ? "Editar abastecimento" : "Novo abastecimento"}
-      </DialogTitle>
+      <DialogTitle>{selectedItem?.id ? "Editar abastecimento" : "Novo abastecimento"}</DialogTitle>
 
       <DialogContent className="!pt-2 pb-6">
         <form
           onSubmit={handleSubmit(onSubmitReal)}
           className="w-full flex flex-col gap-6 md:grid grid-cols-2"
         >
-          {/* veículo */}
+          {/* veículo (visível) */}
           <Autocomplete
             className="col-span-2"
             freeSolo
             readOnly={isDisabled}
-            value={selectedItem?.vehicle ?? selectedVehicle}
+            value={
+              selectedVehicle ||
+              vehicles.find((v) => v.id === watch("vehicle_id")) ||
+              null
+            }
             onChange={(_, newValue) => {
               const vObj = typeof newValue === "string" ? null : newValue;
               setSelectedVehicle(vObj);
+              setValue("vehicle_id", vObj?.id || "", { shouldValidate: true });
               if (vObj?.quilometragem) setValue("mileage", vObj.quilometragem);
               setKmLabel("");
             }}
@@ -168,9 +173,9 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                   {...params}
                   label="Placa ou nome do Veículo"
                   variant="outlined"
-                  {...register("vehicle", { required: "Insira o nome ou a placa do veículo" })}
+                  {...register("vehicle_id", { required: "Selecione o veículo" })}
                 />
-                {errors.vehicle && <InputError>{errors.vehicle.message}</InputError>}
+                {errors.vehicle_id && <InputError>{errors.vehicle_id.message}</InputError>}
               </>
             )}
           />
@@ -225,11 +230,10 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
           {/* bomba (interno) */}
           {isInternal && (
             <FormControl>
-              <InputLabel htmlFor="pump">Bomba</InputLabel>
+              <InputLabel>Bomba</InputLabel>
               <Input
                 readOnly={isDisabled}
                 {...register("pump", { required: "Insira a bomba" })}
-                aria-describedby="pump"
               />
               {errors.pump && <InputError>{errors.pump.message}</InputError>}
             </FormControl>
@@ -308,9 +312,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               disabled={isDisabled}
               inputProps={{ multiple: true, accept: "image/*,application/pdf" }}
             />
-            <Typography variant="caption" display="block">
-              Necessário pelo menos 1
-            </Typography>
+            <Typography variant="caption">Necessário pelo menos 1</Typography>
           </FormControl>
 
           {/* lista anexos */}
@@ -320,16 +322,15 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                 Arquivos anexados:
               </Typography>
               <List dense className="w-full md:grid grid-cols-2 gap-4">
-                {attachments.map((file, i) => (
+                {attachments.map((file, idx) => (
                   <ListItem
-                    key={i}
+                    key={idx}
                     secondaryAction={
                       !isDisabled && (
                         <IconButton
                           edge="end"
-                          aria-label="remover"
                           onClick={() => {
-                            const upd = attachments.filter((_, idx) => idx !== i);
+                            const upd = attachments.filter((_, i) => i !== idx);
                             setAttachments(upd);
                             setValue("attachments", upd, { shouldValidate: true });
                           }}
@@ -340,8 +341,8 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                     }
                     sx={{
                       backgroundColor: "#f5f5f5",
-                      borderRadius: "4px",
-                      mb: "8px",
+                      borderRadius: 1,
+                      mb: 1,
                       p: "8px 16px",
                     }}
                   >
@@ -363,6 +364,9 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               </List>
             </div>
           )}
+
+          {/* campo oculto vehicle_id */}
+          <input type="hidden" {...register("vehicle_id", { required: true })} />
 
           {/* ações */}
           <div className="flex justify-end col-span-2">
