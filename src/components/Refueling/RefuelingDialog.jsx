@@ -158,7 +158,12 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               if (vObj?.quilometragem) setValue("mileage", vObj.quilometragem);
               setKmLabel("");
             }}
-            onInputChange={() => setSelectedVehicle(null)}
+            onInputChange={(_, value, reason) => {
+              if (reason === "input" && !value) {
+                setSelectedVehicle(null);
+                setValue("vehicle_id", "", { shouldValidate: true });
+              }
+            }}
             options={vehicles}
             getOptionLabel={(opt) =>
               typeof opt === "string"
@@ -168,15 +173,13 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                   : ""
             }
             renderInput={(params) => (
-              <>
-                <TextField
-                  {...params}
-                  label="Placa ou nome do Veículo"
-                  variant="outlined"
-                  {...register("vehicle_id", { required: "Selecione o veículo" })}
-                />
-                {errors.vehicle_id && <InputError>{errors.vehicle_id.message}</InputError>}
-              </>
+              <TextField
+                {...params}
+                label="Placa ou nome do Veículo"
+                variant="outlined"
+                error={!!errors.vehicle_id}
+                helperText={errors.vehicle_id?.message}
+              />
             )}
           />
 
