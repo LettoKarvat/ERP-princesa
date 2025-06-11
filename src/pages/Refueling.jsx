@@ -24,31 +24,35 @@ import {
 export default function Refueling() {
   const [refuelings, setRefuelings] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [openDialog, setOpenDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [formDataState, setFormDataState] = useState({
-    vehicle: "",
-    fuelType: "DIESEL",
-    date: "",
-    post: "interno",
-    pump: "",
-    invoiceNumber: "",
-    unitPrice: 0,
-    liters: "",
-    mileage: "",
-    observation: "",
-    signature: "",
-  });
+  const [openDialog, setOpenDialog] = useState(false);
+  const [formDataState, setFormDataState] = useState({});
   const [dialogAttachments, setDialogAttachments] = useState([]);
   const [openSignatureModal, setOpenSignatureModal] = useState(false);
   const signatureRef = useRef(null);
+
+  // filtros
+  const [searchTerm, setSearchTerm] = useState("");
+  const [fuelFilter, setFuelFilter] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
   useEffect(() => {
-    fetchRefuelings().then(data => setRefuelings(data));
+    fetchRefuelings().then(setRefuelings);
   }, []);
+
+  const filteredData = refuelings.filter(item => {
+    const vehicleMatch = item.vehicle_id.toLowerCase().includes(searchTerm.toLowerCase());
+    const fuelMatch = !fuelFilter || item.fuelType === fuelFilter;
+    const dateOnly = item.date.split("T")[0];
+    const dateMatch =
+      (!startDate || dateOnly >= startDate) &&
+      (!endDate || dateOnly <= endDate);
+    return vehicleMatch && fuelMatch && dateMatch;
+  });
 
   function handleOpenDialog(item) {
     if (item) {
@@ -61,12 +65,13 @@ export default function Refueling() {
         post: item.post,
         pump: item.pump || "",
         invoiceNumber: item.invoiceNumber || "",
-        unitPrice: item.unitPrice || 0,
+        unitPrice: item.unitPrice || "",
         liters: item.liters,
         mileage: item.mileage,
         observation: item.observation || "",
         signature: item.signatureUrl || "",
       });
+      setDialogAttachments([]);
     } else {
       setSelectedItem(null);
       setIsEditing(false);
@@ -77,14 +82,14 @@ export default function Refueling() {
         post: "interno",
         pump: "",
         invoiceNumber: "",
-        unitPrice: 0,
+        unitPrice: "",
         liters: "",
         mileage: "",
         observation: "",
         signature: "",
       });
+      setDialogAttachments([]);
     }
-    setDialogAttachments([]);
     setOpenDialog(true);
   }
 
@@ -93,42 +98,50 @@ export default function Refueling() {
     setIsEditing(false);
     setSelectedItem(null);
     setDialogAttachments([]);
+    setFormDataState({});
   }
 
-  // recebe do diálogo: data = campos, atchs = arquivos
   function handleSave(data, atchs) {
-    console.log("handleSave:", { data, attachments: atchs });
-    if (!atchs?.length) {
-      alert("É obrigatório adicionar pelo menos um anexo!");
-      return;
+    if (!atchs.length) {
+      return alert("É obrigatório adicionar pelo menos um anexo!");
     }
+    if (data.post === "interno" && !data.pump) {
+      return alert("Informe a bomba para abastecimento interno.");
+    }
+    if (data.post === "externo" && (!data.invoiceNumber || !data.unitPrice)) {
+      return alert("Para posto externo, informe nota e preço unitário.");
+    }
+
     setFormDataState(prev => ({ ...prev, ...data }));
     setDialogAttachments(atchs);
 
     if (!formDataState.signature) {
       setOpenSignatureModal(true);
     } else {
-      doFinalSave(data, atchs);
+      doFinalSave(data, atchs, formDataState.signature);
     }
   }
 
-  function doFinalSave(data, atchs) {
-    const token = localStorage.getItem("access_token");
-    console.log("JWT being sent:", token);
-
+  function doFinalSave(data, atchs, signatureDataUrl) {
     const fd = new FormData();
     fd.append("vehicle_id", data.vehicle);
     fd.append("fuel_type", data.fuelType);
     fd.append("date", data.date);
     fd.append("post", data.post);
-    fd.append("pump", data.pump);
-    fd.append("invoice_number", data.invoiceNumber);
-    fd.append("unit_price", data.unitPrice);
+
+    if (data.post === "interno") {
+      fd.append("pump", data.pump);
+    } else {
+      fd.append("invoice_number", data.invoiceNumber);
+      fd.append("unit_price", data.unitPrice);
+    }
+
     fd.append("liters", data.liters);
     fd.append("mileage", data.mileage);
-    fd.append("observation", data.observation);
+    fd.append("observation", data.observation || "");
 
-    fetch(formDataState.signature)
+    // transforma dataURL em Blob
+    fetch(signatureDataUrl)
       .then(res => res.blob())
       .then(blob => {
         fd.append("signature", blob, "signature.png");
@@ -140,44 +153,28 @@ export default function Refueling() {
 
         action
           .then(() => {
-            console.log("Upload successful");
             fetchRefuelings().then(setRefuelings);
             handleCloseDialog();
           })
           .catch(err => {
-            console.error("Upload error:", err);
-            console.error("Request headers were:", err.config?.headers);
-            alert("Erro ao salvar abastecimento: " + (err.response?.data?.error || err.message));
+            console.error("Erro ao salvar abastecimento:", err);
+            alert(
+              "Erro ao salvar abastecimento: " +
+              (err.response?.data?.error || err.message)
+            );
           });
       });
   }
 
   function handleConfirmSignature() {
     if (signatureRef.current.isEmpty()) {
-      alert("Por favor, faça a assinatura antes de confirmar.");
-      return;
+      return alert("Faça a assinatura antes de confirmar.");
     }
-    const sigDataUrl = signatureRef.current.toDataURL();
-    setFormDataState(prev => ({ ...prev, signature: sigDataUrl }));
+    const sigUrl = signatureRef.current.toDataURL();
+    setFormDataState(prev => ({ ...prev, signature: sigUrl }));
     setOpenSignatureModal(false);
-    doFinalSave(formDataState, dialogAttachments);
+    doFinalSave(formDataState, dialogAttachments, sigUrl);
   }
-
-  // filtros...
-  const [searchTerm, setSearchTerm] = useState("");
-  const [fuelFilter, setFuelFilter] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-
-  const filteredData = refuelings.filter(item => {
-    const vehicleMatch = item.vehicle_id.toLowerCase().includes(searchTerm.toLowerCase());
-    const fuelMatch = !fuelFilter || item.fuelType === fuelFilter;
-    const dateOnly = item.date.split("T")[0];
-    const dateMatch =
-      (!startDate || dateOnly >= startDate) &&
-      (!endDate || dateOnly <= endDate);
-    return vehicleMatch && fuelMatch && dateMatch;
-  });
 
   return (
     <>
