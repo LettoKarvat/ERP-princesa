@@ -1,10 +1,10 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_FLASK_URL || " https://777c-206-84-60-250.ngrok-free.app",
+  baseURL: import.meta.env.VITE_FLASK_URL,
   headers: {
     // 👉 só o default; o Content-Type será ajustado dinamicamente
-    "ngrok-skip-browser-warning": "true",
+    //"ngrok-skip-browser-warning": "true",
   },
   withCredentials: false,
 });
