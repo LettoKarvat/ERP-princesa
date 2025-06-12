@@ -4,7 +4,7 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_FLASK_URL,
   headers: {
     // 👉 só o default; o Content-Type será ajustado dinamicamente
-    //"ngrok-skip-browser-warning": "true",
+    "ngrok-skip-browser-warning": "true",
   },
   withCredentials: false,
 });
