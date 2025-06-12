@@ -7,61 +7,76 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  useMediaQuery,
   TextField,
+  useMediaQuery,
+  MenuItem,
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import SignatureCanvas from "react-signature-canvas";
 import { useTheme } from "@mui/material/styles";
+
 import { RefuelingDialog } from "../components/Refueling/RefuelingDialog";
-import { RefuelingCard } from "../components/Refueling/RefuelingCard";
+import RefuelingCard from "../components/Refueling/RefuelingCard";
+import RefuelingDetails from "../components/Refueling/RefuelingDetails";
+
 import {
   fetchRefuelings,
   createRefueling,
   updateRefueling,
 } from "../services/refuelingService";
 
+/* ────────────────────────────────────────────────────────── */
 export default function Refueling() {
+  /* ───── estados principais ───── */
   const [refuelings, setRefuelings] = useState([]);
-  const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedItem, setSelected] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
-  const [formDataState, setFormDataState] = useState({});
-  const [dialogAttachments, setDialogAttachments] = useState([]);
-  const [openSignatureModal, setOpenSignatureModal] = useState(false);
-  const signatureRef = useRef(null);
 
-  // filtros
-  const [searchTerm, setSearchTerm] = useState("");
-  const [fuelFilter, setFuelFilter] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  /* anexos + assinatura */
+  const [formState, setFormState] = useState({});
+  const [dialogFiles, setDialogFiles] = useState([]);
+  const [openSignature, setOpenSignature] = useState(false);
+  const sigRef = useRef(null);
 
+  /* detalhes */
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailItem, setDetailItem] = useState(null);
+
+  /* filtros */
+  const [search, setSearch] = useState("");
+  const [fuel, setFuel] = useState("");
+  const [dIni, setDIni] = useState("");
+  const [dFim, setDFim] = useState("");
+
+  /* layout helper */
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
-  useEffect(() => {
-    fetchRefuelings().then(setRefuelings);
-  }, []);
+  /* ───── carregar lista ───── */
+  useEffect(() => { fetchRefuelings().then(setRefuelings); }, []);
 
-  const filteredData = refuelings.filter(item => {
-    const vehicleMatch = item.vehicle_id.toLowerCase().includes(searchTerm.toLowerCase());
-    const fuelMatch = !fuelFilter || item.fuelType === fuelFilter;
-    const dateOnly = item.date.split("T")[0];
-    const dateMatch =
-      (!startDate || dateOnly >= startDate) &&
-      (!endDate || dateOnly <= endDate);
-    return vehicleMatch && fuelMatch && dateMatch;
+  /* ───── filtro de pesquisa ───── */
+  const normalize = (s = "") =>
+    s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+  const dataFiltered = refuelings.filter(r => {
+    const label = r.vehicleLabel || r.vehicle_id;
+    const vMatch = normalize(label).includes(normalize(search));
+    const fMatch = !fuel || r.fuelType === fuel;
+    const d = r.date.split("T")[0];
+    const dMatch = (!dIni || d >= dIni) && (!dFim || d <= dFim);
+    return vMatch && fMatch && dMatch;
   });
 
-  function handleOpenDialog(item) {
+  /* ───── abrindo forms ───── */
+  function openForm(item = null) {
     if (item) {
-      setSelectedItem(item);
-      setIsEditing(true);
-      setFormDataState({
-        vehicle: item.vehicle_id,
+      setIsEditing(true); setSelected(item);
+      setFormState({
+        vehicle_id: item.vehicle_id,
         fuelType: item.fuelType,
-        date: item.date,
+        date: item.date.split("T")[0],
         post: item.post,
         pump: item.pump || "",
         invoiceNumber: item.invoiceNumber || "",
@@ -71,206 +86,134 @@ export default function Refueling() {
         observation: item.observation || "",
         signature: item.signatureUrl || "",
       });
-      setDialogAttachments([]);
     } else {
-      setSelectedItem(null);
-      setIsEditing(false);
-      setFormDataState({
-        vehicle: "",
-        fuelType: "DIESEL",
-        date: "",
-        post: "interno",
-        pump: "",
-        invoiceNumber: "",
-        unitPrice: "",
-        liters: "",
-        mileage: "",
-        observation: "",
-        signature: "",
+      setIsEditing(false); setSelected(null);
+      setFormState({
+        vehicle_id: "", fuelType: "DIESEL", date: "", post: "interno",
+        pump: "", invoiceNumber: "", unitPrice: "", liters: "",
+        mileage: "", observation: "", signature: ""
       });
-      setDialogAttachments([]);
     }
+    setDialogFiles([]);
     setOpenDialog(true);
   }
-
-  function handleCloseDialog() {
-    setOpenDialog(false);
-    setIsEditing(false);
-    setSelectedItem(null);
-    setDialogAttachments([]);
-    setFormDataState({});
+  function closeForm() {
+    setOpenDialog(false); setIsEditing(false);
+    setSelected(null); setDialogFiles([]); setFormState({});
   }
 
-  function handleSave(data, atchs) {
-    if (!atchs.length) {
-      return alert("É obrigatório adicionar pelo menos um anexo!");
+  /* ───── salvar ───── */
+  function handleSave(data, newFiles) {
+    const persisted = isEditing ? (selectedItem?.attachments?.length || 0) : 0;
+    if (persisted === 0 && newFiles.length === 0) {
+      alert("Anexe pelo menos um arquivo."); return;
     }
-    if (data.post === "interno" && !data.pump) {
-      return alert("Informe a bomba para abastecimento interno.");
-    }
-    if (data.post === "externo" && (!data.invoiceNumber || !data.unitPrice)) {
-      return alert("Para posto externo, informe nota e preço unitário.");
-    }
+    if (data.post === "interno" && !data.pump)
+      return alert("Informe a bomba.");
+    if (data.post === "externo" && (!data.invoiceNumber || !data.unitPrice))
+      return alert("Informe nota e preço.");
 
-    setFormDataState(prev => ({ ...prev, ...data }));
-    setDialogAttachments(atchs);
+    setFormState({ ...data }); setDialogFiles(newFiles);
 
-    if (!formDataState.signature) {
-      setOpenSignatureModal(true);
-    } else {
-      doFinalSave(data, atchs, formDataState.signature);
+    if (!data.signature) setOpenSignature(true);
+    else doSave(data, newFiles, data.signature);
+  }
+
+  async function doSave(payload, files, sigUrl) {
+    try {
+      const sigBlob = sigUrl?.startsWith("data:")
+        ? await fetch(sigUrl).then(r => r.blob()) : null;
+
+      if (isEditing)
+        await updateRefueling(selectedItem.id, payload, files, sigBlob);
+      else
+        await createRefueling(payload, files, sigBlob);
+
+      await fetchRefuelings().then(setRefuelings);
+      closeForm();
+    } catch (err) {
+      console.error(err);
+      alert("Erro: " + (err.response?.data?.error || err.message));
     }
   }
 
-  function doFinalSave(data, atchs, signatureDataUrl) {
-    const fd = new FormData();
-    fd.append("vehicle_id", data.vehicle);
-    fd.append("fuel_type", data.fuelType);
-    fd.append("date", data.date);
-    fd.append("post", data.post);
+  /* ───── assinatura ───── */
+  const confirmSignature = () => {
+    if (sigRef.current.isEmpty()) return alert("Assine antes de confirmar.");
+    const url = sigRef.current.toDataURL();
+    setOpenSignature(false); doSave(formState, dialogFiles, url);
+  };
 
-    if (data.post === "interno") {
-      fd.append("pump", data.pump);
-    } else {
-      fd.append("invoice_number", data.invoiceNumber);
-      fd.append("unit_price", data.unitPrice);
-    }
+  /* ───── detalhes ───── */
+  const openDetails = (item) => { setDetailItem(item); setDetailOpen(true); };
 
-    fd.append("liters", data.liters);
-    fd.append("mileage", data.mileage);
-    fd.append("observation", data.observation || "");
-
-    // transforma dataURL em Blob
-    fetch(signatureDataUrl)
-      .then(res => res.blob())
-      .then(blob => {
-        fd.append("signature", blob, "signature.png");
-        atchs.forEach(file => fd.append("attachments", file, file.name));
-
-        const action = isEditing
-          ? updateRefueling(selectedItem.id, fd, true)
-          : createRefueling(fd);
-
-        action
-          .then(() => {
-            fetchRefuelings().then(setRefuelings);
-            handleCloseDialog();
-          })
-          .catch(err => {
-            console.error("Erro ao salvar abastecimento:", err);
-            alert(
-              "Erro ao salvar abastecimento: " +
-              (err.response?.data?.error || err.message)
-            );
-          });
-      });
-  }
-
-  function handleConfirmSignature() {
-    if (signatureRef.current.isEmpty()) {
-      return alert("Faça a assinatura antes de confirmar.");
-    }
-    const sigUrl = signatureRef.current.toDataURL();
-    setFormDataState(prev => ({ ...prev, signature: sigUrl }));
-    setOpenSignatureModal(false);
-    doFinalSave(formDataState, dialogAttachments, sigUrl);
-  }
-
+  /* ───── render ───── */
   return (
     <>
-      <div className="py-8 w-full flex justify-between px-4">
+      {/* cabeçalho */}
+      <div className="flex justify-between py-8 px-4">
         <Typography variant="h4">Abastecimentos</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog(null)}
-        >
+        <Button variant="contained" startIcon={<AddIcon />}
+          onClick={() => openForm()}>
           Novo abastecimento
         </Button>
       </div>
 
       {/* filtros */}
-      <div className="gap-4 my-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 items-end">
-        <TextField
-          variant="outlined"
-          placeholder="Pesquise um veículo:"
-          className="lg:col-span-2 p-4"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-        />
-        <select
-          value={fuelFilter}
-          onChange={e => setFuelFilter(e.target.value)}
-          className="border p-4 h-fit rounded border-gray-300"
-        >
-          <option value="">Todos os combustíveis</option>
-          <option value="DIESEL">DIESEL</option>
-          <option value="ARLA">ARLA</option>
-        </select>
-        <div>
-          <label className="block text-sm">Data inicial:</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={e => setStartDate(e.target.value)}
-            className="border p-3 h-fit w-full rounded border-gray-300"
-          />
-        </div>
-        <div>
-          <label className="block text-sm">Data final:</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={e => setEndDate(e.target.value)}
-            className="border p-3 h-fit w-full rounded border-gray-300"
-          />
-        </div>
+      <div className="grid gap-4 mb-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 items-end px-4">
+        <TextField label="Pesquisar veículo" value={search}
+          onChange={e => setSearch(e.target.value)} className="lg:col-span-2" />
+        <TextField select label="Combustível" value={fuel}
+          onChange={e => setFuel(e.target.value)}>
+          <MenuItem value="">Todos</MenuItem>
+          <MenuItem value="DIESEL">DIESEL</MenuItem>
+          <MenuItem value="ARLA">ARLA</MenuItem>
+        </TextField>
+        <TextField type="date" label="Início" InputLabelProps={{ shrink: true }}
+          value={dIni} onChange={e => setDIni(e.target.value)} />
+        <TextField type="date" label="Fim" InputLabelProps={{ shrink: true }}
+          value={dFim} onChange={e => setDFim(e.target.value)} />
       </div>
 
-      {/* cards */}
-      <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-        {filteredData.map(ref => (
+      {/* lista */}
+      <div className="grid gap-4 mb-10 px-4 grid-cols-1 lg:grid-cols-2">
+        {dataFiltered.map(r => (
           <RefuelingCard
-            key={ref.id}
-            refueling={ref}
-            handleOpenDialog={() => handleOpenDialog(ref)}
+            key={r.id}
+            refueling={r}
+            onEdit={() => openForm(r)}
+            onDetails={() => openDetails(r)}
           />
         ))}
       </div>
 
-      {/* diálogo de formulário */}
+      {/* dialog CRUD */}
       <RefuelingDialog
         open={openDialog}
         selectedItem={selectedItem}
-        onClose={handleCloseDialog}
+        onClose={closeForm}
         onSubmit={handleSave}
       />
 
-      {/* modal de assinatura */}
-      <Dialog
-        open={openSignatureModal}
-        onClose={() => setOpenSignatureModal(false)}
-        fullScreen={fullScreen}
-      >
-        <DialogTitle>Assinatura</DialogTitle>
+      {/* detalhes */}
+      <RefuelingDetails
+        item={detailItem}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+      />
+
+      {/* assinatura */}
+      <Dialog open={openSignature} onClose={() => setOpenSignature(false)}
+        fullScreen={fullScreen}>
+        <DialogTitle>Assinatura do Responsável</DialogTitle>
         <DialogContent dividers>
-          <SignatureCanvas
-            ref={signatureRef}
-            penColor="black"
-            canvasProps={{
-              width: fullScreen ? window.innerWidth - 20 : 400,
-              height: 200,
-            }}
-          />
-          <Button onClick={() => signatureRef.current.clear()} sx={{ mt: 1 }}>
-            Limpar
-          </Button>
+          <SignatureCanvas ref={sigRef} penColor="black"
+            canvasProps={{ width: fullScreen ? window.innerWidth - 20 : 400, height: 200 }} />
+          <Button onClick={() => sigRef.current.clear()} sx={{ mt: 1 }}>Limpar</Button>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenSignatureModal(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleConfirmSignature}>
-            Confirmar
-          </Button>
+          <Button onClick={() => setOpenSignature(false)}>Cancelar</Button>
+          <Button variant="contained" onClick={confirmSignature}>Confirmar</Button>
         </DialogActions>
       </Dialog>
     </>

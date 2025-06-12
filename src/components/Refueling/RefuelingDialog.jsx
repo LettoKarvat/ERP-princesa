@@ -1,4 +1,3 @@
-// src/components/Refueling/RefuelingDialog.jsx
 import React, { useEffect, useState } from "react";
 import {
   Button,
@@ -123,28 +122,38 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
     if (!files.length) return;
     const upd = [...attachments, ...files];
     setAttachments(upd);
+    // não enviamos attachments via react-hook-form; só validamos quantidade
     setValue("attachments", upd, { shouldValidate: true });
     e.target.value = "";
   };
 
   const onSubmitReal = (data) => {
-    onSubmit(data, attachments);
+    if (!data.vehicle_id) {
+      alert("Selecione o veículo na lista antes de salvar.");
+      return;
+    }
+
+    /*  ① Mantém anexos já salvos
+        ② Envia apenas arquivos novos ao backend  */
+    const newFiles = attachments.filter((f) => f instanceof File);
+    onSubmit(data, newFiles);
   };
 
   /* ───────────── render ───────────── */
   return (
     <Dialog open={open} onClose={handleClose} fullWidth>
-      <DialogTitle>{selectedItem?.id ? "Editar abastecimento" : "Novo abastecimento"}</DialogTitle>
+      <DialogTitle>
+        {selectedItem?.id ? "Editar abastecimento" : "Novo abastecimento"}
+      </DialogTitle>
 
       <DialogContent className="!pt-2 pb-6">
         <form
           onSubmit={handleSubmit(onSubmitReal)}
           className="w-full flex flex-col gap-6 md:grid grid-cols-2"
         >
-          {/* veículo (visível) */}
+          {/* ───────────────────────── veículo ───────────────────────── */}
           <Autocomplete
             className="col-span-2"
-            freeSolo
             readOnly={isDisabled}
             value={
               selectedVehicle ||
@@ -152,25 +161,17 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
               null
             }
             onChange={(_, newValue) => {
-              const vObj = typeof newValue === "string" ? null : newValue;
+              const vObj = newValue || null;
               setSelectedVehicle(vObj);
               setValue("vehicle_id", vObj?.id || "", { shouldValidate: true });
               if (vObj?.quilometragem) setValue("mileage", vObj.quilometragem);
               setKmLabel("");
             }}
-            onInputChange={(_, value, reason) => {
-              if (reason === "input" && !value) {
-                setSelectedVehicle(null);
-                setValue("vehicle_id", "", { shouldValidate: true });
-              }
-            }}
             options={vehicles}
             getOptionLabel={(opt) =>
-              typeof opt === "string"
-                ? opt
-                : opt.placa
-                  ? `${opt.placa} - ${opt.marca || ""} ${opt.modelo || ""}`
-                  : ""
+              opt?.placa
+                ? `${opt.placa} - ${opt.marca || ""} ${opt.modelo || ""}`
+                : ""
             }
             renderInput={(params) => (
               <TextField
@@ -183,7 +184,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             )}
           />
 
-          {/* combustível */}
+          {/* ───────────────────────── combustível ───────────────────── */}
           <FormControl className="col-span-2">
             <FormLabel>Combustível</FormLabel>
             <Controller
@@ -201,7 +202,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             {errors.fuelType && <InputError>{errors.fuelType.message}</InputError>}
           </FormControl>
 
-          {/* data */}
+          {/* ───────────────────────── data ──────────────────────────── */}
           <FormControl className="col-span-2">
             <FormLabel htmlFor="date">Data do abastecimento</FormLabel>
             <Input
@@ -212,7 +213,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             {errors.date && <InputError>{errors.date.message}</InputError>}
           </FormControl>
 
-          {/* posto */}
+          {/* ───────────────────────── posto ─────────────────────────── */}
           <FormControl className="col-span-2">
             <InputLabel id="post-label">Posto</InputLabel>
             <Controller
@@ -230,7 +231,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             {errors.post && <InputError>{errors.post.message}</InputError>}
           </FormControl>
 
-          {/* bomba (interno) */}
+          {/* ───────────────────────── bomba (interno) ───────────────── */}
           {isInternal && (
             <FormControl>
               <InputLabel>Bomba</InputLabel>
@@ -242,7 +243,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             </FormControl>
           )}
 
-          {/* nota / preço (externo) */}
+          {/* ───────────────────────── nota / preço (externo) ────────── */}
           {!isInternal && (
             <>
               <FormControl>
@@ -266,7 +267,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             </>
           )}
 
-          {/* litros */}
+          {/* ───────────────────────── litros ────────────────────────── */}
           <FormControl className="self-end">
             <InputLabel htmlFor="liters">Litros abastecidos</InputLabel>
             <Input
@@ -277,7 +278,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             {errors.liters && <InputError>{errors.liters.message}</InputError>}
           </FormControl>
 
-          {/* quilometragem */}
+          {/* ───────────────────────── quilometragem ─────────────────── */}
           <FormControl>
             <InputLabel htmlFor="mileage">{kmLabel}</InputLabel>
             <Input
@@ -294,13 +295,13 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             {errors.mileage && <InputError>{errors.mileage.message}</InputError>}
           </FormControl>
 
-          {/* observação */}
+          {/* ───────────────────────── observação ────────────────────── */}
           <FormControl className="col-span-2">
             <InputLabel htmlFor="observation">Observação</InputLabel>
             <Input readOnly={isDisabled} {...register("observation")} />
           </FormControl>
 
-          {/* anexos */}
+          {/* ───────────────────────── anexos ────────────────────────── */}
           <FormControl className="col-span-2">
             <label htmlFor="attachments">
               <Button variant="contained" component="span" disabled={isDisabled}>
@@ -310,7 +311,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             <Input
               id="attachments"
               type="file"
-              style={{ display: "none" }}
+              sx={{ display: "none" }}
               onChange={handleFileChange}
               disabled={isDisabled}
               inputProps={{ multiple: true, accept: "image/*,application/pdf" }}
@@ -318,52 +319,71 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
             <Typography variant="caption">Necessário pelo menos 1</Typography>
           </FormControl>
 
-          {/* lista anexos */}
+          {/* ───────────────────────── lista anexos ──────────────────── */}
           {attachments.length > 0 && (
             <div className="col-span-2">
               <Typography variant="subtitle2" gutterBottom>
                 Arquivos anexados:
               </Typography>
+
               <List dense className="w-full md:grid grid-cols-2 gap-4">
-                {attachments.map((file, idx) => (
-                  <ListItem
-                    key={idx}
-                    secondaryAction={
-                      !isDisabled && (
-                        <IconButton
-                          edge="end"
-                          onClick={() => {
-                            const upd = attachments.filter((_, i) => i !== idx);
-                            setAttachments(upd);
-                            setValue("attachments", upd, { shouldValidate: true });
-                          }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      )
-                    }
-                    sx={{
-                      backgroundColor: "#f5f5f5",
-                      borderRadius: 1,
-                      mb: 1,
-                      p: "8px 16px",
-                    }}
-                  >
-                    <ListItemIcon>
-                      {file.type?.includes("image") ? (
-                        <ImageIcon />
-                      ) : file.type?.includes("pdf") ? (
-                        <PictureAsPdfIcon />
-                      ) : (
-                        <InsertDriveFileIcon />
-                      )}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={file.name || file}
-                      secondary={typeof file === "string" ? "" : `${(file.size / 1024).toFixed(2)} KB`}
-                    />
-                  </ListItem>
-                ))}
+                {attachments.map((file, idx) => {
+                  /* File novo × objeto da API */
+                  const isNew = file instanceof File;
+                  const isObj = !isNew && typeof file === "object";
+
+                  const mime = isNew
+                    ? file.type
+                    : isObj
+                      ? file.mimeType || ""
+                      : "";
+
+                  const icon =
+                    mime.includes("image") ? (
+                      <ImageIcon />
+                    ) : mime.includes("pdf") ? (
+                      <PictureAsPdfIcon />
+                    ) : (
+                      <InsertDriveFileIcon />
+                    );
+
+                  const displayName = isNew
+                    ? file.name
+                    : isObj
+                      ? file.fileName
+                      : String(file);
+
+                  const sizeLabel = isNew ? `${(file.size / 1024).toFixed(2)} KB` : "";
+
+                  return (
+                    <ListItem
+                      key={isObj ? file.id : idx}
+                      secondaryAction={
+                        !isDisabled && (
+                          <IconButton
+                            edge="end"
+                            onClick={() => {
+                              const upd = attachments.filter((_, i) => i !== idx);
+                              setAttachments(upd);
+                              setValue("attachments", upd, { shouldValidate: true });
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        )
+                      }
+                      sx={{
+                        backgroundColor: "#f5f5f5",
+                        borderRadius: 1,
+                        mb: 1,
+                        p: "8px 16px",
+                      }}
+                    >
+                      <ListItemIcon>{icon}</ListItemIcon>
+                      <ListItemText primary={displayName} secondary={sizeLabel} />
+                    </ListItem>
+                  );
+                })}
               </List>
             </div>
           )}
@@ -371,7 +391,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
           {/* campo oculto vehicle_id */}
           <input type="hidden" {...register("vehicle_id", { required: true })} />
 
-          {/* ações */}
+          {/* ───────────────────────── ações ─────────────────────────── */}
           <div className="flex justify-end col-span-2">
             <DialogActions>
               <Button onClick={onClose}>Cancelar</Button>
