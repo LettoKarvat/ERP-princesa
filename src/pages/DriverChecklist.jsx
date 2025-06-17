@@ -1,5 +1,10 @@
 // src/pages/DriverChecklist.jsx
-import React, { useState, useEffect, useRef } from "react";
+import React, {
+    useState,
+    useEffect,
+    useRef,
+    useCallback,
+} from "react";
 import {
     Box,
     Typography,
@@ -22,9 +27,10 @@ import {
 } from "@mui/material";
 import { Autocomplete } from "@mui/material";
 import SignatureCanvas from "react-signature-canvas";
+import { useNavigate } from "react-router-dom";
 import api from "../services/apiFlask";
 
-/* ─── Itens fixos do checklist ─── */
+/* ─── constantes ─── */
 const CHECKLIST_ITEMS = [
     { code: 1, description: "CRLV atualizado" },
     { code: 2, description: "CNH atualizada" },
@@ -51,15 +57,37 @@ const CHECKLIST_ITEMS = [
 const makeAnswerArray = (items) =>
     items.map((it) => ({ code: it.code, answer: "", obs: "", attachments: [] }));
 
+const TOKEN_KEY = "token";   // localStorage key onde o JWT é salvo
+
 export default function DriverChecklist() {
-    /* ───── estados principais ───── */
+    const navigate = useNavigate();
+    const logout = useCallback(() => {
+        localStorage.removeItem(TOKEN_KEY);
+        navigate("/login", { replace: true });
+    }, [navigate]);
+
+    /* ─── Axios interceptor para 401/403 ─── */
+    useEffect(() => {
+        const id = api.interceptors.response.use(
+            (res) => res,
+            (err) => {
+                if (err.response?.status === 401 || err.response?.status === 403) {
+                    logout();
+                }
+                return Promise.reject(err);
+            }
+        );
+        return () => api.interceptors.response.eject(id);
+    }, [logout]);
+
+    /* ─── estados principais ─── */
     const [vehicles, setVehicles] = useState([]);
     const [answers, setAnswers] = useState(makeAnswerArray(CHECKLIST_ITEMS));
     const [plateInput, setPlateInput] = useState("");
     const [selectedVehicle, setSelectedVehicle] = useState(null);
 
     /* passo & upload */
-    const [currentStep, setCurrentStep] = useState(1); // item desbloqueado
+    const [currentStep, setCurrentStep] = useState(1);
     const [uploading, setUploading] = useState({}); // {code:true|false}
 
     /* assinatura & ui */
@@ -77,19 +105,25 @@ export default function DriverChecklist() {
         setSnackbarOpen(true);
     };
 
-    /* ───── carrega veículos uma vez ───── */
-    useEffect(() => {
-        (async () => {
-            try {
-                const { data } = await api.get("/vehicles");
-                setVehicles(data || []);
-            } catch {
-                showSnackbar("error", "Falha ao carregar veículos.");
-            }
-        })();
-    }, []);
+    /* ─── recarrega veículos + valida token ─── */
+    const loadVehicles = useCallback(async () => {
+        try {
+            await api.get("/auth/ping");              // endpoint leve protegido
+            const { data } = await api.get("/vehicles");
+            setVehicles(data || []);
+        } catch (err) {
+            if (err.response?.status === 401) logout();
+            else showSnackbar("error", "Falha ao carregar veículos.");
+        }
+    }, [logout]);
 
-    /* ───── upload único ───── */
+    useEffect(() => { loadVehicles(); }, [loadVehicles]);
+    useEffect(() => {
+        window.addEventListener("focus", loadVehicles);
+        return () => window.removeEventListener("focus", loadVehicles);
+    }, [loadVehicles]);
+
+    /* ─── upload único ─── */
     const uploadFile = async (code, file) => {
         const fd = new FormData();
         fd.append("file", file);
@@ -102,12 +136,13 @@ export default function DriverChecklist() {
         return { attachmentId: data.attachmentId, fileName: data.fileName };
     };
 
-    /* ───── mudanças de resposta ───── */
-    const handleAnswerChange = (code, field, value) => {
+    /* ─── helpers de resposta ─── */
+    const handleAnswerChange = (code, field, value) =>
         setAnswers((prev) =>
-            prev.map((a) => (a.code === code ? { ...a, [field]: value } : a))
+            prev.map((a) =>
+                a.code === code ? { ...a, [field]: value } : a
+            )
         );
-    };
 
     /* desbloqueia próximo item quando marcar “sim” */
     useEffect(() => {
@@ -115,7 +150,7 @@ export default function DriverChecklist() {
         if (ans && ans.answer === "sim") setCurrentStep(currentStep + 1);
     }, [answers, currentStep]);
 
-    /* ───── anexo imediato ───── */
+    /* ─── anexo imediato ─── */
     const handleItemFileChange = async (code, files) => {
         if (!files.length) return;
         setUploading((u) => ({ ...u, [code]: true }));
@@ -126,7 +161,7 @@ export default function DriverChecklist() {
                     a.code === code ? { ...a, attachments: uploaded } : a
                 )
             );
-            setCurrentStep(code + 1); // libera o próximo
+            setCurrentStep(code + 1);
         } catch (err) {
             showSnackbar("error", err.message);
         } finally {
@@ -134,7 +169,7 @@ export default function DriverChecklist() {
         }
     };
 
-    /* ───── submit passo 1 ───── */
+    /* ─── submit passo 1 ─── */
     const handleSubmit = () => {
         if (answers.some((a) => a.answer === ""))
             return showSnackbar("error", "Responda todos os itens.");
@@ -144,7 +179,7 @@ export default function DriverChecklist() {
         setOpenSignModal(true);
     };
 
-    /* ───── assinatura ───── */
+    /* ─── assinatura ─── */
     const handleSaveSignature = () => {
         if (signatureRef.current?.isEmpty())
             return showSnackbar("error", "Assine antes de salvar.");
@@ -158,7 +193,7 @@ export default function DriverChecklist() {
         setSavedSignature(null);
     };
 
-    /* ───── submit passo 2 ───── */
+    /* ─── submit passo 2 ─── */
     const handleConfirmSignature = async () => {
         if (!savedSignature)
             return showSnackbar("error", "Salve a assinatura antes de confirmar.");
@@ -173,7 +208,7 @@ export default function DriverChecklist() {
                     code: a.code,
                     answer: a.answer,
                     obs: a.obs,
-                    attachments: a.attachments, // já contém attachmentId
+                    attachments: a.attachments,
                 })),
                 isDecendial: false,
             };
@@ -194,7 +229,7 @@ export default function DriverChecklist() {
         }
     };
 
-    /* ───── UI ───── */
+    /* ─── UI ─── */
     return (
         <Box sx={{ p: 2 }}>
             <Typography variant="h5" sx={{ mb: 2 }}>
@@ -332,7 +367,12 @@ export default function DriverChecklist() {
                 );
             })}
 
-            <Button variant="contained" fullWidth sx={{ mt: 2 }} onClick={handleSubmit}>
+            <Button
+                variant="contained"
+                fullWidth
+                sx={{ mt: 2 }}
+                onClick={handleSubmit}
+            >
                 Enviar Checklist
             </Button>
 
@@ -359,10 +399,18 @@ export default function DriverChecklist() {
                         />
                     </Box>
                     <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                        <Button onClick={handleClearSignature} variant="outlined" disabled={loading}>
+                        <Button
+                            onClick={handleClearSignature}
+                            variant="outlined"
+                            disabled={loading}
+                        >
                             Limpar
                         </Button>
-                        <Button onClick={handleSaveSignature} variant="outlined" disabled={loading}>
+                        <Button
+                            onClick={handleSaveSignature}
+                            variant="outlined"
+                            disabled={loading}
+                        >
                             Salvar
                         </Button>
                     </Box>
@@ -371,7 +419,11 @@ export default function DriverChecklist() {
                     <Button onClick={() => setOpenSignModal(false)} disabled={loading}>
                         Cancelar
                     </Button>
-                    <Button variant="contained" onClick={handleConfirmSignature} disabled={loading}>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmSignature}
+                        disabled={loading}
+                    >
                         Confirmar
                     </Button>
                 </DialogActions>

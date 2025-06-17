@@ -1,45 +1,45 @@
 // src/services/apiFlask.js
 import axios from "axios";
 
-/* ——— helper para limpar sessão e voltar ao login ——— */
+/* ——— helper: limpa sessão e força volta ao login ——— */
 export function logout() {
   localStorage.clear();
-  window.location.href = "/";        // ajuste a rota se o login não for "/"
+  window.location.href = "/login";     // ajuste se sua rota de login for diferente
 }
 
+/* ——— instancia Axios ——— */
 const api = axios.create({
   baseURL: import.meta.env.VITE_FLASK_URL,
-  headers: {
-    "ngrok-skip-browser-warning": "true",
-  },
+  headers: { "ngrok-skip-browser-warning": "true" },
   withCredentials: false,
 });
 
-/* —— injeta JWT e ajusta Content-Type —— */
+/* ——— request: injeta JWT e corrige Content-Type ——— */
 api.interceptors.request.use((config) => {
   const jwt = localStorage.getItem("token");
   if (jwt) config.headers.Authorization = `Bearer ${jwt}`;
 
-  // se o corpo é FormData, remove o JSON default
+  // se for FormData, deixa o browser definir o boundary
   if (config.data instanceof FormData) {
     delete config.headers["Content-Type"];
     delete config.headers["content-type"];
-    config.headers["Content-Type"] = "multipart/form-data";
   }
   return config;
 });
 
-/* —— captura 401 ou token expirado e desloga —— */
+/* ——— response: trata expiração/ausência de token ——— */
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (
-      error.response?.status === 401 ||
-      error.response?.data?.msg === "Token has expired"
-    ) {
+  (res) => res,
+  (err) => {
+    const status = err.response?.status;
+    const msg = err.response?.data?.msg;
+
+    // 401 → inválido/expirado, 403 → sem permissão,
+    // 422 → header Authorization ausente/mal-formado (Flask-JWT-Extended)
+    if ([401, 403, 422].includes(status) || msg === "Token has expired") {
       logout();
     }
-    return Promise.reject(error);
+    return Promise.reject(err);
   }
 );
 
