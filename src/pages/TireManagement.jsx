@@ -1,26 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  Grid,
-  TextField,
-  Tabs,
-  Tab,
-  Paper,
-  styled,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Alert,
-  Switch,
-  FormControlLabel
+  Box, Typography, Grid, TextField, Tabs, Tab, Paper, styled, Button,
+  Dialog, DialogTitle, DialogContent, DialogActions, Alert, Switch, FormControlLabel
 } from '@mui/material';
 import { MdOutlineTireRepair } from 'react-icons/md';
 import api from '../services/apiFlask';
 import VehicleTireManagement from './VehicleTireManagement';
 
+/* ─── estilos ─── */
 const TireCard = styled(Paper)(({ theme }) => ({
   cursor: 'pointer',
   padding: theme.spacing(2),
@@ -29,6 +16,9 @@ const TireCard = styled(Paper)(({ theme }) => ({
   border: '1px solid #ccc',
 }));
 
+/* ─── helper numérico ─── */
+const onlyNum = v => v.replace(/[^0-9]/g, '');
+
 export default function TireManagement() {
   const [viewMode, setViewMode] = useState('stock');
   const [stockTires, setStockTires] = useState([]);
@@ -36,33 +26,29 @@ export default function TireManagement() {
   const [stockSearch, setStockSearch] = useState('');
   const [recapSearch, setRecapSearch] = useState('');
 
-  const [openAdd, setOpenAdd] = useState(false);
-  const [addErr, setAddErr] = useState('');
-  const [newTire, setNewTire] = useState({
-    empresa: '',
-    codigo: '',
-    filial: '',
-    departamento: '',
-    numeroSerie: '',
-    dot: '',
-    vencimento: '',
-    vidaAtual: '',
-    modelo: '',
-    chipInstalado: false,
-    nroChip: '',
-    desenhoOriginal: '',
-    desenhoAtual: '',
-    fabricante: '',
-    nrSulcos: '',
-    nrLonas: '',
-    dimensao: '',
-    librasInicial: '',
-    librasFinal: '',
+  /* -------- estado do modal -------- */
+  const blankTire = {
+    empresa: '', codigo: '', filial: '', departamento: '',
+    numeroSerie: '', dot: '', vencimento: '',
+    vidaAtual: '', modelo: '', chipInstalado: false, nroChip: '',
+    desenhoOriginal: '', desenhoAtual: '', fabricante: '',
+    nrSulcos: '', nrLonas: '', dimensao: '',
+    librasInicial: '', librasFinal: '',
+    // novos campos de compra
+    fornecedor: '', nfNumero: '', nfSerie: '',
+    dataCompra: '', valorCusto: '', valorFrete: '',
+    despesasAcessorias: '', sulcoOriginal: '', sulcoAtual: '',
+    // hod / hori
     hod: Array(7).fill({ previsto: '', implantacao: '', realizado: '' }),
     hori: Array(7).fill({ previsto: '', implantacao: '', realizado: '' }),
-  });
+  };
+
+  const [openAdd, setOpenAdd] = useState(false);
+  const [addErr, setAddErr] = useState('');
+  const [newTire, setNewTire] = useState(blankTire);
   const [newErrors, setNewErrors] = useState({});
 
+  /* -------- detalhes / edição -------- */
   const [openDet, setOpenDet] = useState(false);
   const [selTire, setSelTire] = useState(null);
   const [edit, setEdit] = useState(false);
@@ -74,15 +60,14 @@ export default function TireManagement() {
 
   async function loadTires() {
     try {
-      const { data } = await api.post('/functions/getAllPneus', {});
+      const { data } = await api.post('/functions/getAllPneus');
       const list = data.result || [];
-      setStockTires(list.filter(p => p.status?.toLowerCase() === 'em estoque'));
-      setRecapTires(list.filter(p => p.status?.toLowerCase() === 'em recapagem'));
-    } catch (e) {
-      console.error(e);
-    }
+      setStockTires(list.filter(p => (p.status || '').toLowerCase() === 'em estoque'));
+      setRecapTires(list.filter(p => (p.status || '').toLowerCase() === 'em recapagem'));
+    } catch (e) { console.error(e); }
   }
 
+  /* -------- filtros / validações -------- */
   const filtra = (arr, termo) =>
     arr.filter(x =>
       ['numeroSerie', 'fabricante', 'modelo', 'dimensao'].some(k =>
@@ -92,29 +77,31 @@ export default function TireManagement() {
 
   function validate(tire) {
     const errs = {};
-    if (!tire.numeroSerie.trim()) errs.numeroSerie = 'Obrigatório';
-    ['nrSulcos', 'nrLonas', 'librasInicial', 'librasFinal', 'vidaAtual'].forEach(k => {
+    const mustNum = k => {
       const v = tire[k]?.toString().trim();
-      if (!v) {
-        errs[k] = 'Obrigatório';
-      } else if (isNaN(Number(v))) {
-        errs[k] = 'Deve ser número';
-      }
+      if (!v) errs[k] = 'Obrigatório';
+      else if (isNaN(Number(v))) errs[k] = 'Somente números';
+    };
+
+    if (!tire.numeroSerie.trim()) errs.numeroSerie = 'Obrigatório';
+    ['nrSulcos', 'nrLonas', 'librasInicial', 'librasFinal', 'vidaAtual'].forEach(mustNum);
+
+    if (tire.vencimento && isNaN(Date.parse(tire.vencimento))) errs.vencimento = 'Data inválida';
+    if (tire.dataCompra && isNaN(Date.parse(tire.dataCompra))) errs.dataCompra = 'Data inválida';
+
+    // valores monetários
+    ['valorCusto', 'valorFrete', 'despesasAcessorias'].forEach(k => {
+      if (tire[k] && isNaN(Number(tire[k].replace(',', '.')))) errs[k] = 'Número inválido';
     });
-    if (tire.vencimento && isNaN(Date.parse(tire.vencimento))) {
-      errs.vencimento = 'Data inválida';
-    }
     return errs;
   }
 
+  /* -------- handlers de cadastro -------- */
   async function handleAdd() {
     const errs = validate(newTire);
-    if (Object.keys(errs).length) {
-      setNewErrors(errs);
-      setAddErr('Corrija os campos em destaque.');
-      return;
-    }
+    if (Object.keys(errs).length) { setNewErrors(errs); setAddErr('Corrija os campos.'); return; }
     setNewErrors({});
+
     try {
       await api.post('/functions/criarPneu', {
         ...newTire,
@@ -125,31 +112,22 @@ export default function TireManagement() {
         vida: +newTire.vidaAtual,
       });
       setOpenAdd(false);
+      setNewTire(blankTire);
       loadTires();
-    } catch {
-      setAddErr('Falha ao cadastrar.');
-    }
+    } catch { setAddErr('Falha ao cadastrar.'); }
   }
 
+  /* -------- detalhes -------- */
   function openDetails(t) {
     setSelTire(t);
-    setEditT({
-      ...t,
-      chipInstalado: t.chipInstalado === 'Sim'
-    });
-    setEdit(false);
-    setEditErr('');
-    setEditErrors({});
+    setEditT({ ...t, chipInstalado: t.chipInstalado === 'Sim' });
+    setEdit(false); setEditErr(''); setEditErrors({});
     setOpenDet(true);
   }
 
   async function saveEdit() {
     const errs = validate(editT);
-    if (Object.keys(errs).length) {
-      setEditErrors(errs);
-      setEditErr('Corrija os campos em destaque.');
-      return;
-    }
+    if (Object.keys(errs).length) { setEditErrors(errs); setEditErr('Corrija os campos.'); return; }
     setEditErrors({});
     try {
       await api.post('/functions/editarPneu', {
@@ -158,65 +136,47 @@ export default function TireManagement() {
       });
       setOpenDet(false);
       loadTires();
-    } catch {
-      setEditErr('Falha ao salvar.');
-    }
+    } catch { setEditErr('Falha ao salvar.'); }
   }
 
-  async function delTire() {
-    try {
-      await api.post('/functions/softDeletePneu', { objectId: selTire.objectId });
-      setOpenDet(false);
-      loadTires();
-    } catch {
-      setEditErr('Falha ao excluir.');
-    }
-  }
-
+  /* -------- misc handlers -------- */
   const change = key => e => {
     setNewTire(n => ({ ...n, [key]: e.target.value }));
-    if (Object.keys(newErrors).length) {
-      setNewErrors(validate({ ...newTire, [key]: e.target.value }));
-    }
+    if (Object.keys(newErrors).length) setNewErrors(validate({ ...newTire, [key]: e.target.value }));
   };
-  const changeToggle = key => (_e, checked) => setNewTire(n => ({ ...n, [key]: checked }));
+  const changeToggle = key => (_e, chk) => setNewTire(n => ({ ...n, [key]: chk }));
   const changeEdit = key => e => {
     const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setEditT(n => ({ ...n, [key]: v }));
-    if (Object.keys(editErrors).length) {
-      setEditErrors(validate({ ...editT, [key]: v }));
-    }
+    if (Object.keys(editErrors).length) setEditErrors(validate({ ...editT, [key]: v }));
   };
+
   const changeMarker = (type, i, field) => e => {
-    const vv = e.target.value.replace(/[^0-9]/g, '');
+    const vv = onlyNum(e.target.value);
     const arr = [...newTire[type]];
     arr[i] = { ...arr[i], [field]: vv };
     setNewTire(n => ({ ...n, [type]: arr }));
   };
 
+  /* -------- render -------- */
   return (
     <Box sx={{ p: 2 }}>
       <Typography variant="h4" sx={{ mb: 2 }}>Gestão de Pneus</Typography>
 
+      {/* abas */}
       <Tabs value={viewMode} onChange={(_, v) => setViewMode(v)} sx={{ mb: 2 }}>
         <Tab label="Pneus em Estoque" value="stock" />
         <Tab label="Recapadora" value="recapadora" />
         <Tab label="Gerenciar Veículos" value="vehicle" />
       </Tabs>
 
+      {/* estoque */}
       {viewMode === 'stock' && (
         <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-            <TextField
-              size="small"
-              sx={{ width: 300 }}
-              label="Buscar Pneus"
-              value={stockSearch}
-              onChange={e => setStockSearch(e.target.value)}
-            />
-            <Button variant="contained" onClick={() => setOpenAdd(true)}>
-              Cadastrar Pneu
-            </Button>
+            <TextField size="small" sx={{ width: 300 }} label="Buscar Pneus"
+              value={stockSearch} onChange={e => setStockSearch(e.target.value)} />
+            <Button variant="contained" onClick={() => setOpenAdd(true)}>Cadastrar Pneu</Button>
           </Box>
 
           {filtra(stockTires, stockSearch).length === 0 ? (
@@ -242,15 +202,11 @@ export default function TireManagement() {
         </Box>
       )}
 
+      {/* recapadora */}
       {viewMode === 'recapadora' && (
         <Box>
-          <TextField
-            size="small"
-            sx={{ width: 300, mb: 2 }}
-            label="Buscar Pneus"
-            value={recapSearch}
-            onChange={e => setRecapSearch(e.target.value)}
-          />
+          <TextField size="small" sx={{ width: 300, mb: 2 }} label="Buscar Pneus"
+            value={recapSearch} onChange={e => setRecapSearch(e.target.value)} />
           {filtra(recapTires, recapSearch).length === 0 ? (
             <Typography>Nenhum pneu em recapagem.</Typography>
           ) : (
@@ -272,118 +228,109 @@ export default function TireManagement() {
         </Box>
       )}
 
+      {/* gerenciar veículos */}
       {viewMode === 'vehicle' && <VehicleTireManagement />}
 
-      {/* Modal Cadastrar */}
+      {/* ---------- Modal Cadastrar ---------- */}
       <Dialog open={openAdd} onClose={() => setOpenAdd(false)} maxWidth="md" fullWidth>
         <DialogTitle>Cadastrar Pneu</DialogTitle>
         <DialogContent dividers>
           {addErr && <Alert severity="error" sx={{ mb: 2 }}>{addErr}</Alert>}
 
-          {/* Cabeçalho */}
+          {/* cabeçalho */}
           <Grid container spacing={2} mb={2}>
             {['empresa', 'codigo', 'filial', 'departamento'].map(k => (
               <Grid item xs={3} key={k}>
-                <TextField
-                  label={k.charAt(0).toUpperCase() + k.slice(1)}
-                  size="small"
-                  fullWidth
-                  value={newTire[k]}
-                  onChange={change(k)}
-                />
+                <TextField label={k.charAt(0).toUpperCase() + k.slice(1)}
+                  size="small" fullWidth value={newTire[k]} onChange={change(k)} />
               </Grid>
             ))}
           </Grid>
 
-          {/* Principais */}
+          {/* principais */}
           <Grid container spacing={2} mb={2}>
             {[
-              { key: 'numeroSerie', label: 'Nº de Série', type: 'text' },
-              { key: 'dot', label: 'DOT', type: 'text' },
-              { key: 'vencimento', label: 'Vencimento', type: 'date' },
-              { key: 'vidaAtual', label: 'Vida Atual', type: 'number' },
-              { key: 'modelo', label: 'Modelo', type: 'text' }
-            ].map(({ key, label, type }) => (
+              ['numeroSerie', 'Nº de Série', 'text', true],
+              ['dot', 'DOT', 'text', false],
+              ['vencimento', 'Vencimento', 'date', false],
+              ['vidaAtual', 'Vida Atual', 'number', true],
+              ['modelo', 'Modelo', 'text', false],
+            ].map(([key, label, type, req]) => (
               <Grid item xs={3} key={key}>
-                <TextField
-                  required={['numeroSerie', 'vidaAtual'].includes(key)}
-                  label={label}
-                  size="small"
-                  fullWidth
-                  type={type}
-                  InputLabelProps={type === 'date' ? { shrink: true } : undefined}
+                <TextField required={req} label={label} size="small" fullWidth
+                  type={type} InputLabelProps={type === 'date' ? { shrink: true } : undefined}
                   inputMode={type === 'number' ? 'numeric' : undefined}
-                  pattern={type === 'number' ? '[0-9]*' : undefined}
-                  onInput={type === 'number'
-                    ? e => e.target.value = e.target.value.replace(/[^0-9]/g, '')
-                    : undefined}
-                  value={newTire[key]}
-                  onChange={change(key)}
-                  error={!!newErrors[key]}
-                  helperText={newErrors[key]}
+                  onInput={type === 'number' ? e => e.target.value = onlyNum(e.target.value) : undefined}
+                  value={newTire[key]} onChange={change(key)}
+                  error={!!newErrors[key]} helperText={newErrors[key]}
                 />
               </Grid>
             ))}
 
-            {/* Switch CHIP */}
+            {/* switch chip */}
             <Grid item xs={3}>
               <FormControlLabel
-                control={
-                  <Switch
-                    checked={newTire.chipInstalado}
-                    onChange={changeToggle('chipInstalado')}
-                  />
-                }
+                control={<Switch checked={newTire.chipInstalado}
+                  onChange={changeToggle('chipInstalado')} />}
                 label="CHIP instalado?"
               />
             </Grid>
-
-            {/* Nº CHIP */}
             <Grid item xs={3}>
-              <TextField
-                label="Nº CHIP"
-                size="small"
-                fullWidth
-                value={newTire.nroChip}
-                onChange={change('nroChip')}
-              />
+              <TextField label="Nº CHIP" size="small" fullWidth
+                value={newTire.nroChip} onChange={change('nroChip')} />
             </Grid>
           </Grid>
 
-          {/* Características */}
+          {/* características */}
           <Grid container spacing={2} mb={2}>
             {[
               ['Desenho Original', 'desenhoOriginal', 'text'],
               ['Desenho Atual', 'desenhoAtual', 'text'],
               ['Fabricante', 'fabricante', 'text'],
-              ['N° Sulcos', 'nrSulcos', 'number'],
-              ['N° Lonas', 'nrLonas', 'number'],
+              ['N° Sulcos', 'nrSulcos', 'number', true],
+              ['N° Lonas', 'nrLonas', 'number', true],
               ['Dimensão', 'dimensao', 'text'],
-              ['Libras Inicial', 'librasInicial', 'number'],
-              ['Libras Final', 'librasFinal', 'number'],
-            ].map(([lbl, key, type]) => (
+              ['Libras Inicial', 'librasInicial', 'number', true],
+              ['Libras Final', 'librasFinal', 'number', true],
+            ].map(([lbl, key, type, req]) => (
               <Grid item xs={3} key={key}>
-                <TextField
-                  required={['nrSulcos', 'nrLonas', 'librasInicial', 'librasFinal'].includes(key)}
-                  label={lbl}
-                  size="small"
-                  fullWidth
-                  type={type}
-                  inputMode={type === 'number' ? 'numeric' : undefined}
-                  pattern={type === 'number' ? '[0-9]*' : undefined}
-                  onInput={type === 'number'
-                    ? e => e.target.value = e.target.value.replace(/[^0-9]/g, '')
-                    : undefined}
-                  value={newTire[key]}
-                  onChange={change(key)}
-                  error={!!newErrors[key]}
-                  helperText={newErrors[key]}
+                <TextField required={req} label={lbl} size="small" fullWidth
+                  type={type} inputMode={type === 'number' ? 'numeric' : undefined}
+                  onInput={type === 'number' ? e => e.target.value = onlyNum(e.target.value) : undefined}
+                  value={newTire[key]} onChange={change(key)}
+                  error={!!newErrors[key]} helperText={newErrors[key]}
                 />
               </Grid>
             ))}
           </Grid>
 
-          {/* Marcadores */}
+          {/* dados de compra */}
+          <Typography variant="subtitle1" sx={{ mb: 1 }}>Dados de Compra</Typography>
+          <Grid container spacing={2} mb={2}>
+            {[
+              ['Fornecedor', 'fornecedor'],
+              ['NF Nº', 'nfNumero'],
+              ['NF Série', 'nfSerie'],
+              ['Data Compra', 'dataCompra', 'datetime-local'],
+              ['Valor Custo', 'valorCusto'],
+              ['Valor Frete', 'valorFrete'],
+              ['Despesas', 'despesasAcessorias'],
+              ['Sulco Orig. (mm)', 'sulcoOriginal', 'number'],
+              ['Sulco Atual (mm)', 'sulcoAtual', 'number'],
+            ].map(([lbl, key, type = 'text']) => (
+              <Grid item xs={3} key={key}>
+                <TextField label={lbl} size="small" fullWidth type={type}
+                  InputLabelProps={type.startsWith('datetime') ? { shrink: true } : undefined}
+                  inputMode={type === 'number' ? 'numeric' : undefined}
+                  onInput={type === 'number' ? e => e.target.value = onlyNum(e.target.value) : undefined}
+                  value={newTire[key]} onChange={change(key)}
+                  error={!!newErrors[key]} helperText={newErrors[key]}
+                />
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* hod / hori (mantido igual) */}
           {['hod', 'hori'].map(type => (
             <Box key={type} mb={2}>
               <Typography variant="subtitle1">
@@ -399,17 +346,9 @@ export default function TireManagement() {
                     <Grid item xs={2}><Typography>{i + 1}ª</Typography></Grid>
                     {['previsto', 'implantacao', 'realizado'].map(f => (
                       <Grid item xs={3} key={f}>
-                        <TextField
-                          required
-                          size="small"
-                          fullWidth
-                          type="number"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          onInput={e => e.target.value = e.target.value.replace(/[^0-9]/g, '')}
-                          value={m[f]}
-                          onChange={changeMarker(type, i, f)}
-                        />
+                        <TextField required size="small" fullWidth type="number"
+                          inputMode="numeric" onInput={e => e.target.value = onlyNum(e.target.value)}
+                          value={m[f]} onChange={changeMarker(type, i, f)} />
                       </Grid>
                     ))}
                   </React.Fragment>
@@ -420,17 +359,12 @@ export default function TireManagement() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenAdd(false)}>Cancelar</Button>
-          <Button
-            variant="contained"
-            onClick={handleAdd}
-            disabled={Object.keys(newErrors).length > 0}
-          >
-            Salvar
-          </Button>
+          <Button variant="contained" onClick={handleAdd}
+            disabled={Object.keys(newErrors).length > 0}>Salvar</Button>
         </DialogActions>
       </Dialog>
 
-      {/* Modal Detalhes */}
+      {/* ---------- Modal Detalhes ---------- */}
       <Dialog open={openDet} onClose={() => setOpenDet(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Detalhes do Pneu</DialogTitle>
         {selTire && (
@@ -439,67 +373,39 @@ export default function TireManagement() {
             {edit ? (
               <>
                 {[
+                  // lista reduzida para exemplo; inclua mais se precisar
                   'empresa', 'codigo', 'filial', 'departamento',
-                  'numeroSerie', 'dot', 'vencimento', 'vidaAtual',
-                  'modelo', 'status'
+                  'numeroSerie', 'dot', 'vencimento', 'vidaAtual', 'modelo', 'status',
+                  'fornecedor', 'nfNumero', 'nfSerie', 'dataCompra'
                 ].map(key => (
                   <TextField
                     key={key}
-                    required={['numeroSerie', 'vidaAtual'].includes(key)}
-                    label={key.charAt(0).toUpperCase() + key.slice(1)}
-                    margin="dense"
-                    fullWidth
-                    size="small"
-                    type={key === 'vencimento' ? 'date' : key === 'vidaAtual' ? 'number' : 'text'}
-                    InputLabelProps={key === 'vencimento' ? { shrink: true } : undefined}
-                    inputMode={key === 'vidaAtual' ? 'numeric' : undefined}
-                    pattern={key === 'vidaAtual' ? '[0-9]*' : undefined}
-                    onInput={key === 'vidaAtual'
-                      ? e => e.target.value = e.target.value.replace(/[^0-9]/g, '')
-                      : undefined}
+                    label={key}
+                    margin="dense" fullWidth size="small"
+                    type={key === 'vencimento' || key === 'dataCompra' ? 'date' : 'text'}
+                    InputLabelProps={key === 'vencimento' || key === 'dataCompra' ? { shrink: true } : undefined}
                     value={editT[key] || ''}
                     onChange={changeEdit(key)}
-                    error={!!editErrors[key]}
-                    helperText={editErrors[key]}
                     sx={{ mb: 2 }}
                   />
                 ))}
 
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={!!editT.chipInstalado}
-                      onChange={changeEdit('chipInstalado')}
-                    />
-                  }
-                  label="CHIP instalado?"
-                  sx={{ mb: 2 }}
-                />
+                <FormControlLabel control={
+                  <Switch checked={!!editT.chipInstalado} onChange={changeEdit('chipInstalado')} />
+                } label="CHIP instalado?" sx={{ mb: 2 }} />
 
-                <TextField
-                  label="Nº CHIP"
-                  margin="dense"
-                  fullWidth
-                  size="small"
-                  value={editT.nroChip || ''}
-                  onChange={changeEdit('nroChip')}
-                  sx={{ mb: 2 }}
-                />
+                <TextField label="Nº CHIP" margin="dense" fullWidth size="small"
+                  value={editT.nroChip || ''} onChange={changeEdit('nroChip')} sx={{ mb: 2 }} />
               </>
             ) : (
               <Box>
                 {[
                   ['Empresa', selTire.empresa],
-                  ['Código', selTire.codigo],
-                  ['Filial', selTire.filial],
-                  ['Depto', selTire.departamento],
+                  ['Fornecedor', selTire.fornecedor],
                   ['Nº Série', selTire.numeroSerie],
-                  ['DOT', selTire.dot],
                   ['Vida Atual', selTire.vidaAtual],
-                  ['Modelo', selTire.modelo],
+                  ['Valor Custo', selTire.valorCusto],
                   ['Status', selTire.status],
-                  ['CHIP', selTire.chipInstalado],
-                  ['Nº CHIP', selTire.nroChip]
                 ].map(([l, v]) => (
                   <Typography key={l} variant="subtitle1">
                     <strong>{l}:</strong> {v}
@@ -512,19 +418,14 @@ export default function TireManagement() {
         <DialogActions>
           {!edit ? (
             <>
-              <Button color="error" onClick={delTire}>Excluir</Button>
+              <Button color="error" /* onClick={delTire} */>Excluir</Button>
               <Button variant="contained" onClick={() => setEdit(true)}>Editar</Button>
             </>
           ) : (
             <>
               <Button onClick={() => setEdit(false)}>Cancelar</Button>
-              <Button
-                variant="contained"
-                onClick={saveEdit}
-                disabled={Object.keys(editErrors).length > 0}
-              >
-                Salvar Alterações
-              </Button>
+              <Button variant="contained" onClick={saveEdit}
+                disabled={Object.keys(editErrors).length > 0}>Salvar</Button>
             </>
           )}
           <Button onClick={() => setOpenDet(false)}>Fechar</Button>

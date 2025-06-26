@@ -1,424 +1,320 @@
-// src/components/VehicleTireManagement.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import {
-    Box, Typography, TextField, Button, Dialog, DialogTitle,
-    DialogContent, DialogActions, Grid, Paper, styled, Alert,
-    FormControl, InputLabel, Select, MenuItem
-} from '@mui/material';
-import { DataGrid } from '@mui/x-data-grid';
-import { MdOutlineTireRepair } from 'react-icons/md';
-import html2canvas from 'html2canvas';
+/*  src/pages/VehicleTireManagement.jsx
+ *  Tela integrada ao Flask (apiFlask.js)
+ */
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, Edit2 } from 'lucide-react';
 import jsPDF from 'jspdf';
-import api from '../services/api';
+import api from '../services/apiFlask';
+import VehicleModal from './components/VehicleModal.jsx';
+import TirePositionModal from './components/TirePositionModal.jsx';
+import SwapConfirmModal from './components/SwapConfirmModal.jsx';
 
-/* ─── layouts por tipo de veículo ─── */
+/* ───────────────────────── layouts ───────────────────────── */
 const TIRE_LAYOUTS = {
-    'Passeio': [
-        { label: 'Eixo Dianteiro', positions: ['1E', '1D'] },
-        { label: 'Eixo Traseiro', positions: ['2E', '2D'] },
-        { label: 'Estepe', positions: ['E'] }
-    ],
-    'Delivery': [
-        { label: '1º Eixo (Dianteiro)', positions: ['1E', '1D'] },
-        { label: '2º Eixo (Traseiro)', positions: ['2E', '2D'] },
-        { label: 'Estepe', positions: ['E'] }
-    ],
-    '3/4': [
-        { label: '1º Eixo (Dianteiro)', positions: ['1E', '1D'] },
-        { label: '2º Eixo (Traseiro)', positions: ['2DI', '2DE', '2EI', '2EE'] },
-        { label: 'Estepe', positions: ['E'] }
-    ],
-    'Toco': [
-        { label: '1º Eixo (Dianteiro)', positions: ['1E', '1D'] },
-        { label: '2º Eixo (Traseiro)', positions: ['2DI', '2DE', '2EI', '2EE'] },
-        { label: 'Estepe', positions: ['E'] }
-    ],
-    'Truck': [
-        { label: '1º Eixo (Dianteiro)', positions: ['1E', '1D'] },
-        { label: '2º Eixo (Traseiro)', positions: ['2DI', '2DE', '2EI', '2EE'] },
-        { label: '3º Eixo (Traseiro)', positions: ['3DI', '3DE', '3EI', '3EE'] },
-        { label: 'Estepe', positions: ['E'] }
-    ],
-    'Bi-Truck': [
-        { label: '1º Eixo (Dianteiro)', positions: ['1E', '1D'] },
-        { label: '2º Eixo', positions: ['2E', '2D'] },
-        { label: '3º Eixo', positions: ['3DI', '3DE', '3EI', '3EE'] },
-        { label: '4º Eixo', positions: ['4DI', '4DE', '4EI', '4EE'] },
-        { label: 'Estepe', positions: ['E'] }
-    ],
-    'Cavalo': [
-        { label: '1º Eixo (Dianteiro)', positions: ['1E', '1D'] },
-        { label: '2º Eixo', positions: ['2DI', '2DE', '2EI', '2EE'] },
-        { label: '3º Eixo', positions: ['3I', '3E'] },
-        { label: 'Estepe', positions: ['E'] }
-    ],
-    'Semi-Reboque (Bi-Trem)': [
-        { label: '1º Eixo', positions: ['1DE', '1E'] },
-        { label: '2º Eixo', positions: ['2DI', '2DE', '2EI', '2EE'] },
-        { label: 'Estepe', positions: ['E', 'E'] }
-    ],
-    'Semi-Reboque (Rodo-Trem)': [
-        { label: '1º Eixo', positions: ['1D', '1E'] },
-        { label: '2º Eixo', positions: ['2DI', '2DE', '2EI', '2EE'] },
-        { label: '3º Eixo', positions: ['3DI', '3DE', '3EI', '3EE'] },
-        { label: 'Estepe', positions: ['E', 'E'] }
-    ]
+    'Passeio': [{ eixo: 'Eixo Dianteiro', pos: ['1E', '1D'] }, { eixo: 'Eixo Traseiro', pos: ['2E', '2D'] }, { eixo: 'Estepe', pos: ['E'] }],
+    'Delivery': [{ eixo: '1º Eixo (Dianteiro)', pos: ['1E', '1D'] }, { eixo: '2º Eixo (Traseiro)', pos: ['2E', '2D'] }, { eixo: 'Estepe', pos: ['E'] }],
+    '3/4': [{ eixo: '1º Eixo (Dianteiro)', pos: ['1E', '1D'] }, { eixo: '2º Eixo (Traseiro)', pos: ['2DI', '2DE', '2EI', '2EE'] }, { eixo: 'Estepe', pos: ['E'] }],
+    'Toco': [{ eixo: '1º Eixo (Dianteiro)', pos: ['1E', '1D'] }, { eixo: '2º Eixo (Traseiro)', pos: ['2DI', '2DE', '2EI', '2EE'] }, { eixo: 'Estepe', pos: ['E'] }],
+    'Truck': [{ eixo: '1º Eixo (Dianteiro)', pos: ['1E', '1D'] }, { eixo: '2º Eixo (Traseiro)', pos: ['2DI', '2DE', '2EI', '2EE'] }, { eixo: '3º Eixo (Traseiro)', pos: ['3DI', '3DE', '3EI', '3EE'] }, { eixo: 'Estepe', pos: ['E'] }],
+    'Bi-Truck': [{ eixo: '1º Eixo (Dianteiro)', pos: ['1E', '1D'] }, { eixo: '2º Eixo', pos: ['2E', '2D'] }, { eixo: '3º Eixo', pos: ['3DI', '3DE', '3EI', '3EE'] }, { eixo: '4º Eixo', pos: ['4DI', '4DE', '4EI', '4EE'] }, { eixo: 'Estepe', pos: ['E'] }],
+    'Cavalo': [{ eixo: '1º Eixo (Dianteiro)', pos: ['1E', '1D'] }, { eixo: '2º Eixo', pos: ['2DI', '2DE', '2EI', '2EE'] }, { eixo: '3º Eixo', pos: ['3I', '3E'] }, { eixo: 'Estepe', pos: ['E'] }],
+    'Semi-Reboque (Bi-Trem)': [{ eixo: '1º Eixo', pos: ['1DE', '1E'] }, { eixo: '2º Eixo', pos: ['2DI', '2DE', '2EI', '2EE'] }, { eixo: 'Estepe', pos: ['E', 'E'] }],
+    'Semi-Reboque (Rodo-Trem)': [{ eixo: '1º Eixo', pos: ['1D', '1E'] }, { eixo: '2º Eixo', pos: ['2DI', '2DE', '2EI', '2EE'] }, { eixo: '3º Eixo', pos: ['3DI', '3DE', '3EI', '3EE'] }, { eixo: 'Estepe', pos: ['E', 'E'] }]
 };
 
-/* ─── card de posição ─── */
-const TirePositionCard = styled(Paper, {
-    shouldForwardProp: (prop) => prop !== 'selected'
-})(({ theme, selected }) => ({
-    padding: theme.spacing(1),
-    textAlign: 'center',
-    cursor: 'pointer',
-    minHeight: 80,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: theme.spacing(1),
-    border: selected ? `2px solid ${theme.palette.primary.main}` : undefined,
-    backgroundColor: selected ? theme.palette.action.selected : undefined
-}));
-
-/* ────────────────────────────────────────────────────────── */
 export default function VehicleTireManagement() {
+    /* ---------- dados ---------- */
     const [vehicles, setVehicles] = useState([]);
-    const [vehicleSearch, setVehicleSearch] = useState('');
-    const [selectedVehicle, setSelectedVehicle] = useState(null);
     const [vehicleTires, setVehicleTires] = useState([]);
     const [stockTires, setStockTires] = useState([]);
 
-    const [openVehicleModal, setOpenVehicleModal] = useState(false);
-    const [openPositionModal, setOpenPositionModal] = useState(false);
-    const [openSwapConfirm, setOpenSwapConfirm] = useState(false);
+    /* ---------- UI / estados ---------- */
+    const [vehicleSearch, setVehicleSearch] = useState('');
+    const [selectedVehicle, setSelectedVehicle] = useState(null);
 
-    const [modalError, setModalError] = useState('');
-    const [positionToEdit, setPositionToEdit] = useState('');
+    const [openVehicle, setOpenVehicle] = useState(false);
+    const [openPos, setOpenPos] = useState(false);
+    const [openSwap, setOpenSwap] = useState(false);
+
+    const [swapMode, setSwapMode] = useState(false);
+    const [swapA, setSwapA] = useState(null);
+    const [swapB, setSwapB] = useState(null);
+
+    const [posToEdit, setPosToEdit] = useState('');
     const [assignedTire, setAssignedTire] = useState(null);
     const [selectedStockTire, setSelectedStockTire] = useState(null);
     const [oldTireDestination, setOldTireDestination] = useState('Em recapagem');
 
-    const [swapMode, setSwapMode] = useState(false);
-    const [swapFirst, setSwapFirst] = useState(null);
-    const [swapSecond, setSwapSecond] = useState(null);
-
-    const layoutRef = useRef(null);
-
-    useEffect(() => { loadVehicles(); }, []);
-
-    const sessionToken = () => localStorage.getItem('sessionToken');
+    /* ---------- load inicial ---------- */
+    useEffect(() => {
+        loadVehicles();
+        loadStockTires();
+    }, []);
 
     const loadVehicles = async () => {
         try {
-            const { data } = await api.post('/functions/getAllVeiculos', {}, {
-                headers: { 'X-Parse-Session-Token': sessionToken() }
-            });
-            setVehicles(data?.result ?? []);
-        } catch (e) { console.error(e); }
-    };
-
-    const loadVehicleTires = async (vehicleId) => {
-        try {
-            const { data } = await api.post('/functions/getAllPneus', {}, {
-                headers: { 'X-Parse-Session-Token': sessionToken() }
-            });
-            setVehicleTires((data?.result ?? []).filter(t => t.veiculoId === vehicleId));
-        } catch (e) { console.error(e); }
+            const { data } = await api.get('/vehicles');
+            setVehicles(data ?? []);
+        } catch (err) { console.error(err); }
     };
 
     const loadStockTires = async () => {
         try {
-            const { data } = await api.post('/functions/getAllPneus', {}, {
-                headers: { 'X-Parse-Session-Token': sessionToken() }
-            });
-            setStockTires((data?.result ?? []).filter(p => (p.status || '').toLowerCase() === 'em estoque'));
-        } catch (e) { console.error(e); }
+            const { data } = await api.post('/functions/getAllPneus');
+            setStockTires(
+                (data?.result ?? []).filter(
+                    p => (p.status || '').toLowerCase() === 'em estoque',
+                ),
+            );
+        } catch (err) { console.error(err); }
     };
 
-    const getKmsRodados = t => (Number(t.kmFinal) || 0) - (Number(t.kmInicial) || 0);
-    const getVehicleLayout = () =>
-        selectedVehicle?.tipo ? TIRE_LAYOUTS[selectedVehicle.tipo] || [] : [];
-
-    const handleSelectVehicle = async (v) => {
-        await loadVehicleTires(v.objectId);
-        setSelectedVehicle(v);
-        setOpenVehicleModal(true);
-    };
-
-    const openPositionDetails = (pos, current) => {
-        setPositionToEdit(pos);
-        setAssignedTire(current || null);
-        setModalError('');
-        setSelectedStockTire(null);
-        setOldTireDestination('Em recapagem');
-        loadStockTires();
-        setOpenPositionModal(true);
-    };
-
-    const handleSwapTire = async () => {
-        if (!selectedStockTire) return setModalError('Selecione um pneu do estoque primeiro.');
+    const loadVehicleTires = async (vehicleId) => {
         try {
-            const tokenHeader = { headers: { 'X-Parse-Session-Token': sessionToken() } };
+            const { data } = await api.post('/functions/getPneusByVeiculo', { vehicleId });
+            setVehicleTires(data?.result ?? []);
+        } catch (err) { console.error(err); }
+    };
+
+    /* ---------- helpers ---------- */
+    const calcKm = (t) => (Number(t.kmFinal) || 0) - (Number(t.kmInicial) || 0);
+    const layout = () => selectedVehicle?.tipo ? TIRE_LAYOUTS[selectedVehicle.tipo] || [] : [];
+
+    /* ---------- PDF ---------- */
+    const exportPdf = useCallback(() => {
+        if (!selectedVehicle) return;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const pageW = doc.internal.pageSize.getWidth();
+
+        const BOX_H = 24, MARK_W = 28, INFO_W = 28, GAP_W = 10, GAP_H = 12;
+        const FIRE = 6, FIRE_G = 1;
+        const drawFire = (x, y) => { for (let i = 0; i < 6; i++) doc.rect(x + i * (FIRE + FIRE_G), y, FIRE, FIRE); };
+        const lineField = (lab, x, y, w) => {
+            doc.text(lab, x, y); const lw = doc.getTextWidth(lab);
+            doc.line(x + lw + 2, y - 1.5, x + lw + 2 + w, y - 1.5);
+        };
+
+        /* cabeçalho */
+        doc.setFont('helvetica', 'bold').setFontSize(10);
+        doc.text('DISTRIBUIDORA PRINCESA', 10, 10);
+        doc.text('Cartão de Troca de Pneu', 10, 16);
+        doc.setFont('helvetica', 'normal').setFontSize(9);
+        lineField('Veículo:', 60, 22, 32);
+        lineField('Placa :', 105, 22, 28);
+        lineField('Km. Atual :', 145, 22, 26);
+        doc.setFontSize(8);
+        doc.text('Data ______/______/______', 10, 28);
+        doc.text('Local ______________________', 65, 28);
+        doc.text('Responsável/Borracheiro ______________________', 125, 28);
+        doc.line(10, 30, pageW - 10, 30);
+        doc.text('Preencha com Marca de Fogo do Pneu dentro das Respectivas Posições', 10, 34);
+        doc.text('Km Pneu = Total', pageW - 38, 34);
+
+        /* linhas de eixos */
+        const groupW = MARK_W + INFO_W;
+        const maxRowW = Math.max(...layout().map(ax => ax.pos.length * groupW + (ax.pos.length - 1) * GAP_W));
+        const baseX = (pageW - maxRowW) / 2;
+        const rows = []; let yOff = 38;
+
+        layout().forEach(axle => {
+            let x = baseX; const marks = [];
+            axle.pos.forEach(p => {
+                const t = vehicleTires.find(vt => vt.posicaoVeiculo === p) || {};
+                doc.rect(x, yOff, MARK_W, BOX_H);
+                doc.setFontSize(9).text(p, x + 2, yOff + 5);
+                drawFire(x + 4, yOff + 10);
+                marks.push(x + MARK_W / 2);
+
+                const infoX = x + MARK_W;
+                doc.rect(infoX, yOff, INFO_W, BOX_H);
+                doc.setFontSize(7);
+                doc.text('Nº:', infoX + 2, yOff + 8);
+                doc.text(String(t.numeroSerie || '___'), infoX + 10, yOff + 8);
+                doc.text('Km:', infoX + 2, yOff + 13);
+                doc.text(String(t.kmInicial ?? 0), infoX + 10, yOff + 13);
+                doc.text('Dim.', infoX + 2, yOff + 18);
+                doc.text(String(t.dimensao || ''), infoX + 10, yOff + 18);
+
+                x += groupW + GAP_W;
+            });
+            rows.push({ y: yOff, marks });
+            yOff += BOX_H + GAP_H;
+        });
+
+        /* ligações + quadrado */
+        doc.setLineWidth(0.4);
+        for (let i = 0; i < rows.length - 1; i++) {
+            const x = rows[0].marks[0];
+            doc.line(x, rows[i].y + BOX_H, x, rows[i + 1].y);
+        }
+        if (rows.length >= 2) {
+            const x = rows[0].marks[0];
+            const y = (rows[0].y + BOX_H + rows[1].y) / 2 - 3;
+            doc.setFillColor(0).rect(x - 3, y, 6, 6, 'F');
+        }
+        doc.setLineWidth(0.2);
+
+        /* estepe */
+        const sparePos = layout().find(ax => ax.eixo.toLowerCase().includes('estepe'))?.pos[0] || 'E1';
+        const st = vehicleTires.find(vt => vt.posicaoVeiculo === sparePos) || {};
+        const sX = baseX, sY = yOff + 5;
+        doc.rect(sX, sY, MARK_W, BOX_H);
+        doc.setFontSize(9).text(sparePos, sX + 2, sY + 5);
+        drawFire(sX + 4, sY + 10);
+        doc.rect(sX + MARK_W, sY, INFO_W, BOX_H);
+        doc.setFontSize(7);
+        doc.text('Nº:', sX + MARK_W + 2, sY + 8);
+        doc.text(String(st.numeroSerie || '***'), sX + MARK_W + 10, sY + 8);
+        doc.text('Km :', sX + MARK_W + 2, sY + 13);
+        doc.text(String(st.kmInicial ?? 0), sX + MARK_W + 10, sY + 13);
+        doc.text('Dim.', sX + MARK_W + 2, sY + 18);
+        doc.text(String(st.dimensao || ''), sX + MARK_W + 10, sY + 18);
+
+        doc.text('TL15560 / RL15560', pageW - 35, doc.internal.pageSize.getHeight() - 5);
+        doc.save(`cartao-${selectedVehicle.placa}.pdf`);
+    }, [selectedVehicle, vehicleTires]);
+
+    /* ---------- cliques ---------- */
+    const clickVehicle = async v => {
+        await loadVehicleTires(v.id || v.objectId);
+        setSelectedVehicle(v);
+        setOpenVehicle(true);
+    };
+
+    const handleTireClick = (pos, tire) => {
+        if (!swapMode) {
+            setPosToEdit(pos); setAssignedTire(tire || null); setOpenPos(true);
+        } else if (!swapA) {
+            setSwapA({ pos, tire });
+        } else if (!swapB && swapA.pos !== pos) {
+            setSwapB({ pos, tire }); setOpenSwap(true);
+        }
+    };
+
+    /* ---------- salvar atribuição ---------- */
+    const swapOrAssign = async () => {
+        if (!selectedStockTire) return alert('Selecione um pneu');
+        try {
             if (assignedTire) {
                 await api.post('/functions/editarPneu', {
-                    objectId: assignedTire.objectId, veiculoId: '', posicaoVeiculo: '',
-                    status: oldTireDestination
-                }, tokenHeader);
+                    objectId: assignedTire.objectId,
+                    veiculoId: '', posicaoVeiculo: '', status: oldTireDestination,
+                });
             }
             await api.post('/functions/editarPneu', {
                 objectId: selectedStockTire.objectId,
-                veiculoId: selectedVehicle.objectId,
-                posicaoVeiculo: positionToEdit,
-                status: 'Em uso'
-            }, tokenHeader);
-            alert('Pneu atribuído/trocado com sucesso!');
-            setOpenPositionModal(false);
-            loadVehicleTires(selectedVehicle.objectId);
-        } catch (e) {
-            console.error(e);
-            setModalError('Falha na troca de pneu.');
-        }
-    };
-
-    const exportToPdf = async () => {
-        if (!layoutRef.current) return;
-        const canvas = await html2canvas(layoutRef.current, { scale: 2 });
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({
-            orientation: 'landscape',
-            unit: 'px',
-            format: [canvas.width, canvas.height]
-        });
-        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-        pdf.save(`layout-${selectedVehicle.placa}.pdf`);
-    };
-
-    const handleCardClick = (pos, current) => {
-        if (swapMode) {
-            if (!swapFirst) {
-                setSwapFirst({ pos, current });
-            } else if (!swapSecond && swapFirst.pos !== pos) {
-                setSwapSecond({ pos, current });
-                setOpenSwapConfirm(true);
-            }
-        } else {
-            openPositionDetails(pos, current);
-        }
+                veiculoId: selectedVehicle.id || selectedVehicle.objectId,
+                posicaoVeiculo: posToEdit, status: 'Em uso',
+            });
+            await loadVehicleTires(selectedVehicle.id || selectedVehicle.objectId);
+            setOpenPos(false);
+        } catch (e) { console.error(e); alert('Falha na troca'); }
     };
 
     const confirmSwap = async () => {
         try {
-            const tokenHeader = { headers: { 'X-Parse-Session-Token': sessionToken() } };
             await api.post('/functions/editarPneu', {
-                objectId: swapFirst.current?.objectId || '',
-                veiculoId: selectedVehicle.objectId,
-                posicaoVeiculo: swapSecond.pos,
-                status: 'Em uso'
-            }, tokenHeader);
+                objectId: swapA.tire?.objectId,
+                veiculoId: selectedVehicle.id || selectedVehicle.objectId,
+                posicaoVeiculo: swapB.pos, status: 'Em uso',
+            });
             await api.post('/functions/editarPneu', {
-                objectId: swapSecond.current?.objectId || '',
-                veiculoId: selectedVehicle.objectId,
-                posicaoVeiculo: swapFirst.pos,
-                status: 'Em uso'
-            }, tokenHeader);
-            alert('Pneus trocados com sucesso!');
-            setOpenSwapConfirm(false);
-            setSwapMode(false);
-            loadVehicleTires(selectedVehicle.objectId);
-        } catch (e) {
-            console.error(e);
-            alert('Falha ao trocar posições.');
-        }
+                objectId: swapB.tire?.objectId,
+                veiculoId: selectedVehicle.id || selectedVehicle.objectId,
+                posicaoVeiculo: swapA.pos, status: 'Em uso',
+            });
+            await loadVehicleTires(selectedVehicle.id || selectedVehicle.objectId);
+            setOpenSwap(false); setSwapMode(false); setSwapA(null); setSwapB(null);
+        } catch (e) { console.error(e); }
     };
 
-    /* ─── filtro + tabela de veículos ─── */
-    const filteredVehicles = vehicles.filter(v =>
+    /* ---------- filtro ---------- */
+    const filtered = vehicles.filter(v =>
         v.placa.toLowerCase().includes(vehicleSearch.toLowerCase())
     );
 
-    const vehicleColumns = [
-        { field: 'placa', headerName: 'Placa', flex: 1 },
-        { field: 'marca', headerName: 'Marca', flex: 1 },
-        { field: 'modelo', headerName: 'Modelo', flex: 1 },
-        { field: 'tipo', headerName: 'Tipo', flex: 1 }
-    ];
+    const getKmField = (v) =>
+        v.km ?? v.kmAtual ?? v.km_atual ?? v.odometro ?? null;
 
-    const vehicleRows = filteredVehicles.map(v => ({ ...v, id: v.objectId }));
-
-    /* ────────────────────────────── */
+    /* ---------- render ---------- */
     return (
-        <Box sx={{ p: 2 }}>
-            <Typography variant="h4" sx={{ mb: 2 }}>
-                Pesquisa de Veículos por Placa
-            </Typography>
+        <div className="space-y-6">
+            {/* busca */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-2xl font-bold mb-4 flex items-center">
+                    <Search className="mr-3 h-6 w-6 text-blue-600" />
+                    Pesquisa de Veículos por Placa
+                </h2>
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="Buscar pela placa..."
+                        value={vehicleSearch}
+                        onChange={e => setVehicleSearch(e.target.value)}
+                    />
+                </div>
+            </div>
 
-            <TextField
-                label="Buscar Veículo pela Placa"
-                fullWidth
-                sx={{ mb: 2 }}
-                value={vehicleSearch}
-                onChange={e => setVehicleSearch(e.target.value)}
+            {/* tabela */}
+            <div className="bg-white rounded-lg shadow-sm">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>{['Placa', 'Marca', 'Modelo', 'Tipo', 'Km', 'Ações'].map(h => (
+                            <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
+                        ))}</tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {filtered.map(v => (
+                            <tr key={v.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 text-sm font-medium">{v.placa}</td>
+                                <td className="px-6 py-4 text-sm">{v.marca}</td>
+                                <td className="px-6 py-4 text-sm">{v.modelo}</td>
+                                <td className="px-6 py-4 text-sm">{v.tipo}</td>
+                                <td className="px-6 py-4 text-sm">
+                                    {getKmField(v)?.toLocaleString?.() ?? '—'} km
+                                </td>
+                                <td className="px-6 py-4 text-sm">
+                                    <button
+                                        onClick={() => clickVehicle(v)}
+                                        className="px-3 py-2 bg-blue-600 text-white rounded-md flex items-center"
+                                    >
+                                        <Edit2 className="mr-2 h-4 w-4" />Gerenciar Pneus
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                {filtered.length === 0 && (
+                    <div className="text-center py-12 text-gray-500">Nenhum veículo encontrado</div>
+                )}
+            </div>
+
+            {/* modais */}
+            {selectedVehicle && (
+                <VehicleModal
+                    isOpen={openVehicle} onClose={() => setOpenVehicle(false)}
+                    vehicle={selectedVehicle} layout={layout()}
+                    vehicleTires={vehicleTires} swapMode={swapMode} setSwapMode={setSwapMode}
+                    swapA={swapA} swapB={swapB}
+                    onTireClick={handleTireClick} onExportPdf={exportPdf} calculateKm={calcKm}
+                />
+            )}
+
+            <TirePositionModal
+                isOpen={openPos} onClose={() => setOpenPos(false)}
+                position={posToEdit} assignedTire={assignedTire}
+                stockTires={stockTires} selectedStockTire={selectedStockTire} setSelectedStockTire={setSelectedStockTire}
+                oldTireDestination={oldTireDestination} setOldTireDestination={setOldTireDestination}
+                onConfirm={swapOrAssign}
             />
 
-            <Box sx={{ height: 400, width: '100%' }}>
-                <DataGrid
-                    rows={vehicleRows}
-                    columns={vehicleColumns}
-                    pageSize={8}
-                    rowsPerPageOptions={[8, 16, 32]}
-                    disableSelectionOnClick
-                    onRowClick={({ row }) => handleSelectVehicle(row)}
-                    localeText={{ noRowsLabel: 'Nenhum veículo encontrado.' }}
-                    autoHeight
-                />
-            </Box>
-
-            {/* ─── Modal Veículo ─── */}
-            <Dialog open={openVehicleModal} onClose={() => setOpenVehicleModal(false)} maxWidth="md" fullWidth>
-                <DialogTitle>
-                    {selectedVehicle && `Veículo: ${selectedVehicle.placa} - ${selectedVehicle.tipo}`}
-                </DialogTitle>
-                <DialogContent dividers>
-                    <Box sx={{ mb: 2 }}>
-                        <Button
-                            variant={swapMode ? 'contained' : 'outlined'}
-                            color="secondary"
-                            onClick={() => { setSwapMode(!swapMode); setSwapFirst(null); setSwapSecond(null); }}
-                        >
-                            {swapMode ? 'Cancelar Troca' : 'Modo Troca de Posições'}
-                        </Button>
-                        <Button sx={{ ml: 2 }} variant="contained" onClick={exportToPdf}>
-                            Exportar PDF
-                        </Button>
-                    </Box>
-                    <Box ref={layoutRef} sx={{ py: 2 }}>
-                        {selectedVehicle ? (
-                            getVehicleLayout().map((axle, i) => (
-                                <Box key={i} sx={{ mt: 3 }}>
-                                    <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                        {axle.label}
-                                    </Typography>
-                                    <Grid container justifyContent="center">
-                                        {axle.positions.map(pos => {
-                                            const current = vehicleTires.find(t => t.posicaoVeiculo === pos);
-                                            const isFirst = swapFirst?.pos === pos;
-                                            const isSecond = swapSecond?.pos === pos;
-                                            return (
-                                                <Grid item key={pos}>
-                                                    <TirePositionCard
-                                                        selected={isFirst || isSecond}
-                                                        onClick={() => handleCardClick(pos, current)}
-                                                    >
-                                                        <MdOutlineTireRepair size={24} />
-                                                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{pos}</Typography>
-                                                        {current ? (
-                                                            <>
-                                                                <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{current.numeroSerie}</Typography>
-                                                                <Typography variant="body2" sx={{ fontSize: '0.7rem' }}>{current.fabricante} - {current.modelo}</Typography>
-                                                                <Typography variant="body2" sx={{ fontSize: '0.7rem' }}>{getKmsRodados(current)} km rodados</Typography>
-                                                                <Typography variant="body2" sx={{ fontSize: '0.7rem' }}>Recap: {current.recapCount || 0}</Typography>
-                                                            </>
-                                                        ) : (
-                                                            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>[Vazio]</Typography>
-                                                        )}
-                                                    </TirePositionCard>
-                                                </Grid>
-                                            );
-                                        })}
-                                    </Grid>
-                                </Box>
-                            ))
-                        ) : (
-                            <Typography sx={{ mt: 2 }}>
-                                Não há layout definido para "{selectedVehicle?.tipo}".
-                            </Typography>
-                        )}
-                    </Box>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setOpenVehicleModal(false)}>Fechar</Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* ─── Modal Posição ─── */}
-            <Dialog open={openPositionModal} onClose={() => setOpenPositionModal(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Posição: {positionToEdit}</DialogTitle>
-                <DialogContent dividers>
-                    {assignedTire && (
-                        <Box sx={{ mb: 2 }}>
-                            <Alert severity="info" sx={{ mb: 2 }}>
-                                Pneu atual: {assignedTire.numeroSerie} ({assignedTire.fabricante} {assignedTire.modelo})<br />
-                                <strong>Status:</strong> {assignedTire.status}
-                            </Alert>
-                            {[
-                                ['KM Inicial', assignedTire.kmInicial],
-                                ['KM Final', assignedTire.kmFinal],
-                                ['KM Rodados', getKmsRodados(assignedTire)],
-                                ['Dimensão', assignedTire.dimensao],
-                                ['Vida', assignedTire.vida],
-                                ['Recapagens', assignedTire.recapCount || 0],
-                            ].map(([lbl, val]) => (
-                                <Typography key={lbl} variant="body2"><strong>{lbl}:</strong> {val}</Typography>
-                            ))}
-                        </Box>
-                    )}
-                    {modalError && <Alert severity="error" sx={{ mb: 2 }}>{modalError}</Alert>}
-                    {assignedTire && (
-                        <FormControl fullWidth sx={{ mb: 3 }}>
-                            <InputLabel id="destino-label">Destino do Pneu Antigo</InputLabel>
-                            <Select
-                                labelId="destino-label"
-                                value={oldTireDestination}
-                                label="Destino do Pneu Antigo"
-                                onChange={e => setOldTireDestination(e.target.value)}
-                            >
-                                <MenuItem value="Em recapagem">Em recapagem</MenuItem>
-                                <MenuItem value="Sucata">Sucata</MenuItem>
-                                <MenuItem value="Em estoque">Em estoque</MenuItem>
-                            </Select>
-                        </FormControl>
-                    )}
-                    <FormControl fullWidth>
-                        <InputLabel id="stock-label">Selecionar Pneu do Estoque</InputLabel>
-                        <Select
-                            labelId="stock-label"
-                            value={selectedStockTire?.objectId || ''}
-                            label="Selecionar Pneu do Estoque"
-                            onChange={e => {
-                                const t = stockTires.find(s => s.objectId === e.target.value);
-                                setSelectedStockTire(t);
-                            }}
-                        >
-                            <MenuItem value=""><em>Selecione um pneu</em></MenuItem>
-                            {stockTires.map(t => (
-                                <MenuItem key={t.objectId} value={t.objectId}>
-                                    {t.numeroSerie} - {t.fabricante} {t.modelo}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setOpenPositionModal(false)}>Fechar</Button>
-                    <Button variant="contained" onClick={handleSwapTire}>Confirmar Troca/Atribuição</Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* ─── Modal Confirmação de Swap ─── */}
-            <Dialog open={openSwapConfirm} onClose={() => setOpenSwapConfirm(false)}>
-                <DialogTitle>Confirmar troca</DialogTitle>
-                <DialogContent dividers>
-                    <Typography>
-                        Trocar pneu da posição <strong>{swapFirst?.pos}</strong> com <strong>{swapSecond?.pos}</strong>?
-                    </Typography>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setOpenSwapConfirm(false)}>Cancelar</Button>
-                    <Button variant="contained" onClick={confirmSwap}>Confirmar</Button>
-                </DialogActions>
-            </Dialog>
-        </Box>
+            <SwapConfirmModal
+                isOpen={openSwap} onClose={() => setOpenSwap(false)}
+                swapA={swapA} swapB={swapB}
+                onConfirm={confirmSwap}
+            />
+        </div>
     );
 }

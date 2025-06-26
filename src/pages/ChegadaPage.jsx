@@ -1,4 +1,3 @@
-// src/pages/ChegadaPage.jsx
 import React, { useState, useRef, useEffect } from "react";
 import {
     Box,
@@ -22,7 +21,13 @@ import {
     useTheme,
     Chip,
     Divider,
-    CircularProgress
+    CircularProgress,
+    InputLabel,
+    FormControl,
+    AppBar,
+    Toolbar,
+    Container,
+    Fab
 } from "@mui/material";
 import {
     Add as AddIcon,
@@ -39,7 +44,18 @@ import {
     Note as NoteIcon,
     Flag as FlagIcon,
     AttachFile as AttachIcon,
-    BorderColor as SignatureIcon
+    BorderColor as SignatureIcon,
+    Search as SearchIcon,
+    FilterList as FilterIcon,
+    Dashboard as DashboardIcon,
+    Assessment as AssessmentIcon,
+    LocalGasStation as FuelIcon,
+    Build as BuildIcon,
+    People as PeopleIcon,
+    Assignment as AssignmentIcon,
+    Menu as MenuIcon,
+    ArrowBack as ArrowBackIcon,
+    Save as SaveIcon
 } from "@mui/icons-material";
 import Autocomplete from "@mui/material/Autocomplete";
 import SignatureCanvas from "react-signature-canvas";
@@ -74,7 +90,7 @@ const emptyForm = () => ({
     attachments: []
 });
 
-/* ─────────────────────── Componente ─────────────────────── */
+/* ─────────────────────── Componente Principal ─────────────────────── */
 export default function ChegadaPage() {
     /* Estados principais */
     const [saidas, setSaidas] = useState([]);
@@ -93,40 +109,47 @@ export default function ChegadaPage() {
     const [cmpData, setCmpData] = useState(null);
     const [compareOpen, setCompareOpen] = useState(false);
 
+    /* Estados de filtros */
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+
     /* Refs, tema, etc. */
     const sigRef = useRef(null);
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-    const userRole = localStorage.getItem("role");
+    const userRole = localStorage.getItem("role") || "admin";
 
     /* ─────────── Mini-componente para info compacta ────────── */
     const InfoItem = ({ icon: Icon, label, value, accent = "primary" }) => (
         <Paper
             elevation={2}
             sx={{
-                p: 1.5,
+                p: 2,
                 borderRadius: 2,
                 display: "flex",
                 alignItems: "center",
-                gap: 1,
-                bgcolor: theme.palette.background.paper
+                gap: 2,
+                bgcolor: theme.palette.background.paper,
+                border: `1px solid ${theme.palette[accent].light}`,
+                '&:hover': {
+                    boxShadow: theme.shadows[4]
+                }
             }}
         >
-            <Icon sx={{ color: theme.palette[accent].main }} />
+            <Icon sx={{ color: theme.palette[accent].main, fontSize: 28 }} />
             <Box>
                 <Typography
                     variant="caption"
-                    sx={{ fontWeight: "bold", color: "text.secondary" }}
+                    sx={{ fontWeight: "bold", color: "text.secondary", display: 'block' }}
                 >
                     {label}
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                <Typography variant="body1" sx={{ fontWeight: 600, color: 'text.primary' }}>
                     {value}
                 </Typography>
             </Box>
         </Paper>
     );
-    /* ──────────────────────────────────────────────────────── */
 
     /* Carregamento inicial */
     useEffect(() => {
@@ -146,6 +169,7 @@ export default function ChegadaPage() {
             setMotoristas(users);
             const placaById = Object.fromEntries(vehicles.map(v => [v.id, v.placa]));
 
+            // Process departures in transit
             setSaidas(
                 rawSaidas.map(c => {
                     const nome = c.motorista?.fullname || "";
@@ -157,21 +181,28 @@ export default function ChegadaPage() {
                         horimetro_saida: c.horimetro_saida,
                         motoristaId: mot.id || "",
                         motoristaNome: nome,
+                        destino: c.destino || 'Destino não informado',
                         checklist: c
                     };
                 })
             );
 
+            // Process arrivals
             setChegadas(
                 rawArrivals.map(a => {
                     const cl = a.checklist || {};
                     return {
                         ...a,
                         placa: cl.veiculo?.placa ?? placaById[cl.veiculo_id] ?? "—",
+                        status: 'Concluída',
+                        criadoPor: 'Sistema',
                         checklist: cl
                     };
                 })
             );
+        } catch (error) {
+            console.error('Erro ao carregar dados:', error);
+            alert('Erro ao carregar dados');
         } finally {
             setLoading(false);
         }
@@ -179,7 +210,7 @@ export default function ChegadaPage() {
 
     /* ─────────────── Helpers de formulário ─────────────── */
     function fillFromSaida(id) {
-        const s = saidas.find(x => x.id === id);
+        const s = saidas.find(x => x.id === parseInt(id));
         if (!s) return;
         setForm(f => ({
             ...f,
@@ -208,16 +239,23 @@ export default function ChegadaPage() {
             assinaturaMotorista: sigURL ?? form.assinaturaMotorista
         };
 
-        const id = editId
-            ? (await updateArrival(editId, body), editId)
-            : await createArrival(form.saidaId, body);
+        let arrivalId;
+        if (editId) {
+            await updateArrival(editId, body);
+            arrivalId = editId;
+            alert('Chegada atualizada com sucesso!');
+        } else {
+            arrivalId = await createArrival(form.saidaId, body);
+            alert('Chegada registrada com sucesso!');
+        }
 
-        if (!editId || form.attachments.length) {
-            for (const f of form.attachments) {
-                await addArrivalAttachment(id, {
-                    base64file: await fileToBase64(f),
-                    nomeArquivo: f.name,
-                    descricao: "Anexo de chegada"
+        // Add attachments if any
+        if (form.attachments.length > 0) {
+            for (const file of form.attachments) {
+                await addArrivalAttachment(arrivalId, {
+                    base64file: await fileToBase64(file),
+                    nomeArquivo: file.name,
+                    descricao: 'Anexo de chegada'
                 });
             }
         }
@@ -228,10 +266,12 @@ export default function ChegadaPage() {
     }
 
     function trySave() {
-        const s = saidas.find(x => x.id === form.saidaId);
-        if ((!s && !editId) || +form.kmChegada < +s?.km_saida)
-            return alert("Selecione saída válida e confira KM.");
+        const s = saidas.find(x => x.id === parseInt(form.saidaId));
+        if ((!s && !editId)) return alert("Selecione saída válida.");
         if (!form.motoristaId) return alert("Informe o motorista.");
+        if (s && parseInt(form.kmChegada) < parseInt(s.km_saida)) {
+            return alert('KM de chegada deve ser maior que KM de saída.');
+        }
         if (!form.assinaturaMotorista) return setSigOpen(true);
         handleUpsert();
     }
@@ -256,259 +296,521 @@ export default function ChegadaPage() {
     };
 
     const confirmDelete = async id => {
-        await deleteArrival(id);
-        loadData();
+        if (window.confirm("Quer mesmo excluir esta chegada?")) {
+            try {
+                await deleteArrival(id);
+                await loadData();
+                alert('Chegada excluída com sucesso!');
+            } catch (error) {
+                console.error('Erro ao excluir:', error);
+                alert('Erro ao excluir chegada');
+            }
+        }
     };
 
+    const openDetailsDialog = async (id) => {
+        const chegada = chegadas.find(c => c.id === id);
+        if (chegada) {
+            try {
+                // Get detailed checklist data
+                const { data: checklistData } = await api.get(`/checklists/operacao/${chegada.checklist.id}`);
+
+                const detailsWithSaida = {
+                    ...chegada,
+                    saida: {
+                        dataSaida: checklistData.data_saida,
+                        kmSaida: checklistData.km_saida,
+                        horimetroSaida: checklistData.horimetro_saida,
+                        destino: checklistData.destino || 'Não informado'
+                    }
+                };
+
+                setDetailData(detailsWithSaida);
+                setDetailOpen(true);
+            } catch (error) {
+                console.error('Erro ao carregar detalhes:', error);
+                setDetailData(chegada);
+                setDetailOpen(true);
+            }
+        }
+    };
+
+    const openCompareDialog = async (id) => {
+        const chegada = chegadas.find(c => c.id === id);
+        if (chegada) {
+            try {
+                const { data: checklistRaw } = await api.get(`/checklists/operacao/${chegada.checklist.id}`);
+                setCmpData({
+                    arrival: chegada,
+                    checklist: {
+                        data_saida: checklistRaw.data_saida,
+                        km_saida: checklistRaw.km_saida,
+                        horimetro_saida: checklistRaw.horimetro_saida,
+                        motoristaNome: checklistRaw.motorista?.fullname || ''
+                    }
+                });
+                setCompareOpen(true);
+            } catch (error) {
+                console.error('Erro ao carregar dados de comparação:', error);
+                alert('Erro ao carregar dados para comparação');
+            }
+        }
+    };
+
+    // Filtered arrivals
+    const filteredChegadas = chegadas.filter(chegada => {
+        const matchesSearch = chegada.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (chegada.motorista?.fullname || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = statusFilter === 'all' || chegada.status === statusFilter;
+        return matchesSearch && matchesStatus;
+    });
+
+    /* ──────────────────────────────────────────────────────── */
     /* ─────────────────────────── UI ────────────────────────── */
+    /* ──────────────────────────────────────────────────────── */
+
     return (
-        <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
-            <Typography variant="h4" gutterBottom>
-                Chegada de Veículos
-            </Typography>
-
-            {/* Botão Nova Chegada */}
-            <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 3 }}>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => {
-                        setForm(emptyForm());
-                        setEditId(null);
-                        setDlgOpen(true);
-                    }}
-                >
-                    Nova Chegada
-                </Button>
-            </Box>
-
-            {/* Lista/Cards de chegadas */}
-            {loading ? (
-                <Typography>Carregando...</Typography>
-            ) : !chegadas.length ? (
-                <Typography>Nenhuma chegada registrada.</Typography>
-            ) : (
-                <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-                    {chegadas.map(c => (
-                        <Card
-                            key={c.id}
+        <Box sx={{ flexGrow: 1, bgcolor: 'background.default', minHeight: '100vh' }}>
+            {/* Header */}
+            <AppBar
+                position="static"
+                sx={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    boxShadow: theme.shadows[4]
+                }}
+            >
+                <Toolbar sx={{ py: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexGrow: 1 }}>
+                        <Paper
+                            elevation={0}
                             sx={{
-                                width: isMobile ? "100%" : 300,
-                                position: "relative",
-                                overflow: "visible"
+                                p: 1.5,
+                                borderRadius: 2,
+                                bgcolor: 'rgba(255,255,255,0.15)',
+                                backdropFilter: 'blur(10px)'
                             }}
                         >
-                            <CardContent sx={{ pr: 6, pb: 6 }}>
-                                <Typography
-                                    fontWeight="bold"
-                                    color="primary"
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <InIcon sx={{ mr: 1 }} />
-                                    {c.placa}
-                                </Typography>
-                                <Typography
-                                    variant="body2"
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <TimeIcon sx={{ mr: 0.5 }} />
-                                    {c.data_chegada
-                                        ? new Date(c.data_chegada).toLocaleString("pt-BR")
-                                        : "—"}
-                                </Typography>
-                                <Typography
-                                    variant="body2"
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <SpeedIcon sx={{ mr: 0.5 }} />
-                                    KM: {c.km_chegada ?? "—"}
-                                </Typography>
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{ display: "flex", alignItems: "center" }}
-                                >
-                                    <PersonIcon sx={{ mr: 0.5 }} />
-                                    Motorista: {c.motorista?.fullname ?? "—"}
-                                </Typography>
-                            </CardContent>
+                            <ArrowBackIcon sx={{ color: 'white', fontSize: 32 }} />
+                        </Paper>
+                        <Box>
+                            <Typography variant="h4" sx={{ fontWeight: 700, color: 'white' }}>
+                                Controle de Chegada
+                            </Typography>
+                            <Typography variant="subtitle1" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                                Registro de retorno de veículos
+                            </Typography>
+                        </Box>
+                    </Box>
 
-                            {/* Ações no canto do card */}
-                            <Box
-                                sx={{
-                                    position: "absolute",
-                                    right: 4,
-                                    top: 4,
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: 0.5
-                                }}
-                            >
-                                <Tooltip title="Detalhes">
-                                    <IconButton
-                                        size="small"
-                                        onClick={() => {
-                                            setDetailData(c);
-                                            setDetailOpen(true);
-                                        }}
-                                    >
-                                        <VisibilityIcon fontSize="inherit" />
-                                    </IconButton>
-                                </Tooltip>
+                    {/* Stats */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            bgcolor: 'rgba(255,255,255,0.15)',
+                            backdropFilter: 'blur(10px)',
+                            display: { xs: 'none', md: 'block' }
+                        }}
+                    >
+                        <Grid container spacing={3} alignItems="center">
+                            <Grid item>
+                                <Typography variant="h5" sx={{ fontWeight: 700, color: 'white' }}>
+                                    {saidas.length}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                                    Em trânsito
+                                </Typography>
+                            </Grid>
+                            <Grid item>
+                                <Divider orientation="vertical" flexItem sx={{ bgcolor: 'rgba(255,255,255,0.3)' }} />
+                            </Grid>
+                            <Grid item>
+                                <Typography variant="h5" sx={{ fontWeight: 700, color: 'white' }}>
+                                    {chegadas.length}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                                    Chegadas
+                                </Typography>
+                            </Grid>
+                        </Grid>
+                    </Paper>
+                </Toolbar>
+            </AppBar>
 
-                                <Tooltip title="Comparar">
-                                    <IconButton
-                                        size="small"
-                                        onClick={async () => {
-                                            const { data: checklistRaw } = await api.get(
-                                                `/checklists/operacao/${c.checklist.id}`
-                                            );
-                                            setCmpData({
-                                                arrival: c,
-                                                checklist: {
-                                                    data_saida: checklistRaw.data_saida,
-                                                    km_saida: checklistRaw.km_saida,
-                                                    horimetro_saida: checklistRaw.horimetro_saida,
-                                                    motoristaNome:
-                                                        checklistRaw.motorista?.fullname || ""
-                                                }
-                                            });
-                                            setCompareOpen(true);
-                                        }}
-                                    >
-                                        <CompareIcon fontSize="inherit" />
-                                    </IconButton>
-                                </Tooltip>
-
-                                {userRole !== "portaria" && (
-                                    <>
-                                        <Tooltip title="Editar">
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => {
-                                                    setEditId(c.id);
-                                                    setForm({
-                                                        saidaId: c.checklist.id,
-                                                        dataChegada: c.data_chegada
-                                                            ? c.data_chegada.slice(0, 16)
-                                                            : nowISO(),
-                                                        horimetroChegada: c.horimetro_chegada,
-                                                        kmChegada: c.km_chegada,
-                                                        motoristaId: c.motorista?.id || "",
-                                                        motoristaNome: c.motorista?.fullname || "",
-                                                        editDriver: false,
-                                                        assinaturaMotorista: c.assinatura || "",
-                                                        observacoesChegada: c.observacoes || "",
-                                                        attachments: []
-                                                    });
-                                                    setDlgOpen(true);
-                                                }}
-                                            >
-                                                <EditIcon fontSize="inherit" />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Excluir">
-                                            <IconButton
-                                                size="small"
-                                                onClick={async () => {
-                                                    if (window.confirm("Quer mesmo excluir esta chegada?")) {
-                                                        await confirmDelete(c.id);
-                                                    }
-                                                }}
-                                            >
-                                                <DeleteIcon fontSize="inherit" color="error" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </>
-                                )}
-                            </Box>
-                        </Card>
-                    ))}
+            <Container maxWidth="xl" sx={{ py: 4 }}>
+                {/* Action Buttons */}
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                        Chegadas Registradas
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        size="large"
+                        startIcon={<AddIcon />}
+                        onClick={() => {
+                            setForm(emptyForm());
+                            setEditId(null);
+                            setDlgOpen(true);
+                        }}
+                        sx={{
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            boxShadow: theme.shadows[4],
+                            '&:hover': {
+                                background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                                boxShadow: theme.shadows[8]
+                            }
+                        }}
+                    >
+                        Nova Chegada
+                    </Button>
                 </Box>
-            )}
+
+                {/* Filtros */}
+                <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
+                    <Grid container spacing={3} alignItems="center">
+                        <Grid item xs={12} md={8}>
+                            <TextField
+                                fullWidth
+                                variant="outlined"
+                                placeholder="Buscar por placa ou motorista..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                InputProps={{
+                                    startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                                }}
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        borderRadius: 2
+                                    }
+                                }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                            <FormControl fullWidth>
+                                <InputLabel>Status</InputLabel>
+                                <Select
+                                    value={statusFilter}
+                                    label="Status"
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    sx={{ borderRadius: 2 }}
+                                >
+                                    <MenuItem value="all">Todos os Status</MenuItem>
+                                    <MenuItem value="Concluída">Concluída</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                    </Grid>
+                </Paper>
+
+                {/* Lista/Cards de chegadas */}
+                {loading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                        <CircularProgress size={60} sx={{ color: 'primary.main' }} />
+                    </Box>
+                ) : !filteredChegadas.length ? (
+                    <Paper elevation={2} sx={{ p: 8, textAlign: 'center', borderRadius: 3 }}>
+                        <InIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
+                        <Typography variant="h5" sx={{ fontWeight: 600, mb: 1, color: 'text.primary' }}>
+                            Nenhuma chegada encontrada
+                        </Typography>
+                        <Typography variant="body1" sx={{ color: 'text.secondary', mb: 4 }}>
+                            Registre a chegada de um veículo em trânsito
+                        </Typography>
+                        <Button
+                            variant="contained"
+                            size="large"
+                            startIcon={<AddIcon />}
+                            onClick={() => {
+                                setForm(emptyForm());
+                                setEditId(null);
+                                setDlgOpen(true);
+                            }}
+                            sx={{
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                px: 4,
+                                py: 1.5
+                            }}
+                        >
+                            Registrar Nova Chegada
+                        </Button>
+                    </Paper>
+                ) : (
+                    <Grid container spacing={3}>
+                        {filteredChegadas.map(c => (
+                            <Grid item xs={12} sm={6} lg={4} key={c.id}>
+                                <Card
+                                    elevation={3}
+                                    sx={{
+                                        borderRadius: 3,
+                                        transition: 'all 0.3s ease',
+                                        '&:hover': {
+                                            transform: 'translateY(-4px)',
+                                            boxShadow: theme.shadows[12]
+                                        },
+                                        position: 'relative',
+                                        overflow: 'visible'
+                                    }}
+                                >
+                                    <CardContent sx={{ p: 3 }}>
+                                        {/* Header do Card */}
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                                            <Box>
+                                                <Typography
+                                                    variant="h6"
+                                                    sx={{
+                                                        fontWeight: 700,
+                                                        color: 'primary.main',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 1
+                                                    }}
+                                                >
+                                                    <InIcon />
+                                                    {c.placa}
+                                                </Typography>
+                                                <Chip
+                                                    label={c.status || 'Concluída'}
+                                                    color="success"
+                                                    size="small"
+                                                    sx={{ mt: 1, fontWeight: 600 }}
+                                                />
+                                            </Box>
+
+                                            {/* Menu de Ações */}
+                                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                                <Tooltip title="Ver detalhes">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => openDetailsDialog(c.id)}
+                                                        sx={{ color: 'primary.main' }}
+                                                    >
+                                                        <VisibilityIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+
+                                                <Tooltip title="Comparar">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => openCompareDialog(c.id)}
+                                                        sx={{ color: 'info.main' }}
+                                                    >
+                                                        <CompareIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+
+                                                {userRole !== "portaria" && (
+                                                    <>
+                                                        <Tooltip title="Editar">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => {
+                                                                    setEditId(c.id);
+                                                                    setForm({
+                                                                        saidaId: c.checklist.id,
+                                                                        dataChegada: c.data_chegada ? c.data_chegada.slice(0, 16) : nowISO(),
+                                                                        horimetroChegada: c.horimetro_chegada || 0,
+                                                                        kmChegada: c.km_chegada || 0,
+                                                                        motoristaId: c.motorista?.id || "",
+                                                                        motoristaNome: c.motorista?.fullname || "",
+                                                                        editDriver: false,
+                                                                        assinaturaMotorista: c.assinatura || "",
+                                                                        observacoesChegada: c.observacoes || "",
+                                                                        attachments: []
+                                                                    });
+                                                                    setDlgOpen(true);
+                                                                }}
+                                                                sx={{ color: 'warning.main' }}
+                                                            >
+                                                                <EditIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Excluir">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => confirmDelete(c.id)}
+                                                                sx={{ color: 'error.main' }}
+                                                            >
+                                                                <DeleteIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </>
+                                                )}
+                                            </Box>
+                                        </Box>
+
+                                        {/* Informações */}
+                                        <Stack spacing={1.5}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <PersonIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                                    {c.motorista?.fullname || 'N/A'}
+                                                </Typography>
+                                            </Box>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <TimeIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                                                <Typography variant="body2">
+                                                    {c.data_chegada ? new Date(c.data_chegada).toLocaleString("pt-BR") : 'N/A'}
+                                                </Typography>
+                                            </Box>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <SpeedIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                                                <Typography variant="body2">
+                                                    KM: {c.km_chegada || 'N/A'}
+                                                </Typography>
+                                            </Box>
+                                        </Stack>
+
+                                        <Divider sx={{ my: 2 }} />
+
+                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                            Criado por {c.criadoPor || 'Sistema'}
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        ))}
+                    </Grid>
+                )}
+            </Container>
+
+            {/* FAB para mobile */}
+            <Fab
+                color="primary"
+                sx={{
+                    position: 'fixed',
+                    bottom: 24,
+                    right: 24,
+                    display: { xs: 'flex', md: 'none' },
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                }}
+                onClick={() => {
+                    setForm(emptyForm());
+                    setEditId(null);
+                    setDlgOpen(true);
+                }}
+            >
+                <AddIcon />
+            </Fab>
 
             {/* ─────────────────── Dialog Criar/Editar ─────────────────── */}
             <Dialog
                 open={dlgOpen}
                 onClose={() => setDlgOpen(false)}
-                PaperProps={{ sx: { width: isMobile ? "90%" : 600, borderRadius: 3 } }}
+                maxWidth="md"
+                fullWidth
+                fullScreen={isMobile}
+                PaperProps={{
+                    sx: {
+                        borderRadius: isMobile ? 0 : 3,
+                        maxHeight: '90vh'
+                    }
+                }}
             >
-                <DialogTitle>{editId ? "Editar Chegada" : "Nova Chegada"}</DialogTitle>
-                <DialogContent dividers>
-                    <Stack spacing={2}>
+                <DialogTitle sx={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <InIcon />
+                        {editId ? "Editar Chegada" : "Nova Chegada"}
+                    </Box>
+                    <IconButton
+                        onClick={() => setDlgOpen(false)}
+                        sx={{ color: 'white' }}
+                    >
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+
+                <DialogContent dividers sx={{ p: 3 }}>
+                    <Stack spacing={3}>
                         {!editId && (
-                            <>
-                                <Typography variant="subtitle2" fontWeight="bold">
-                                    Saída (em trânsito)
-                                </Typography>
+                            <FormControl fullWidth>
+                                <InputLabel>Saída em Trânsito *</InputLabel>
                                 <Select
-                                    fullWidth
-                                    size="small"
-                                    variant="outlined"
                                     value={form.saidaId}
+                                    label="Saída em Trânsito *"
                                     onChange={e => fillFromSaida(e.target.value)}
                                 >
                                     {saidas.map(s => (
                                         <MenuItem key={s.id} value={s.id}>
-                                            {`${s.placa} • KM ${s.km_saida} • ${s.motoristaNome}`}
+                                            {`${s.placa} • ${s.motoristaNome} • ${s.destino}`}
                                         </MenuItem>
                                     ))}
                                 </Select>
-                            </>
+                            </FormControl>
                         )}
 
-                        <Typography variant="subtitle2" fontWeight="bold">
-                            Motorista
-                        </Typography>
+                        <Box>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                                Motorista *
+                            </Typography>
 
-                        {form.editDriver ? (
-                            <Autocomplete
-                                options={motoristas}
-                                size="small"
-                                getOptionLabel={o => o.fullname}
-                                value={motoristas.find(m => m.id === form.motoristaId) || null}
-                                onChange={(_, v) =>
-                                    setForm({
-                                        ...form,
-                                        motoristaId: v?.id || "",
-                                        motoristaNome: v?.fullname || "",
-                                        editDriver: false
-                                    })
-                                }
-                                renderInput={p => <TextField {...p} variant="outlined" />}
-                            />
-                        ) : (
-                            <Box sx={{ position: "relative" }}>
+                            {form.editDriver ? (
+                                <Autocomplete
+                                    options={motoristas}
+                                    getOptionLabel={o => o.fullname}
+                                    value={motoristas.find(m => m.id === form.motoristaId) || null}
+                                    onChange={(_, v) =>
+                                        setForm({
+                                            ...form,
+                                            motoristaId: v?.id || "",
+                                            motoristaNome: v?.fullname || "",
+                                            editDriver: false
+                                        })
+                                    }
+                                    renderInput={p => <TextField {...p} variant="outlined" />}
+                                />
+                            ) : (
+                                <Box sx={{ position: "relative" }}>
+                                    <TextField
+                                        fullWidth
+                                        variant="outlined"
+                                        value={form.motoristaNome}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                    <IconButton
+                                        sx={{ position: "absolute", right: 8, top: 8 }}
+                                        onClick={() => setForm({ ...form, editDriver: true })}
+                                    >
+                                        <EditIcon />
+                                    </IconButton>
+                                </Box>
+                            )}
+                        </Box>
+
+                        <Grid container spacing={2}>
+                            <Grid item xs={12} md={6}>
                                 <TextField
                                     fullWidth
-                                    size="small"
                                     variant="outlined"
-                                    value={form.motoristaNome}
-                                    InputProps={{ readOnly: true }}
+                                    label="Data/Hora *"
+                                    type="datetime-local"
+                                    InputLabelProps={{ shrink: true }}
+                                    value={form.dataChegada}
+                                    onChange={e => setForm({ ...form, dataChegada: e.target.value })}
                                 />
-                                <IconButton
-                                    size="small"
-                                    sx={{ position: "absolute", right: 8, top: 6 }}
-                                    onClick={() => setForm({ ...form, editDriver: true })}
-                                >
-                                    <EditIcon fontSize="small" />
-                                </IconButton>
-                            </Box>
-                        )}
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    fullWidth
+                                    variant="outlined"
+                                    label="KM Chegada *"
+                                    type="number"
+                                    value={form.kmChegada}
+                                    onChange={e =>
+                                        setForm({ ...form, kmChegada: e.target.value })
+                                    }
+                                />
+                            </Grid>
+                        </Grid>
 
                         <TextField
                             fullWidth
-                            size="small"
-                            variant="outlined"
-                            label="Data/Hora"
-                            type="datetime-local"
-                            InputLabelProps={{ shrink: true }}
-                            value={form.dataChegada}
-                            onChange={e => setForm({ ...form, dataChegada: e.target.value })}
-                        />
-                        <TextField
-                            fullWidth
-                            size="small"
                             variant="outlined"
                             label="Horímetro"
                             type="number"
@@ -517,24 +819,13 @@ export default function ChegadaPage() {
                                 setForm({ ...form, horimetroChegada: e.target.value })
                             }
                         />
+
                         <TextField
                             fullWidth
-                            size="small"
-                            variant="outlined"
-                            label="KM Chegada"
-                            type="number"
-                            value={form.kmChegada}
-                            onChange={e =>
-                                setForm({ ...form, kmChegada: e.target.value })
-                            }
-                        />
-                        <TextField
-                            fullWidth
-                            size="small"
                             variant="outlined"
                             label="Observações"
                             multiline
-                            minRows={2}
+                            minRows={3}
                             value={form.observacoesChegada}
                             onChange={e =>
                                 setForm({ ...form, observacoesChegada: e.target.value })
@@ -543,55 +834,113 @@ export default function ChegadaPage() {
 
                         {/* Anexos */}
                         <Box>
-                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
                                 Anexos
                             </Typography>
-                            <Button variant="outlined" component="label" size="small">
+                            <Button
+                                variant="outlined"
+                                component="label"
+                                startIcon={<AttachIcon />}
+                                sx={{ borderRadius: 2 }}
+                            >
                                 Selecionar arquivos
                                 <input hidden multiple type="file" onChange={fileChange} />
                             </Button>
-                            <Typography variant="caption" sx={{ ml: 1 }}>
-                                {form.attachments.length} arquivo(s)
+                            <Typography variant="caption" sx={{ ml: 2, color: 'text.secondary' }}>
+                                {form.attachments.length} arquivo(s) selecionado(s)
                             </Typography>
                         </Box>
                     </Stack>
                 </DialogContent>
-                <DialogActions sx={{ pr: 3, pb: 2 }}>
-                    <Button onClick={() => setDlgOpen(false)} disabled={saving}>
+
+                <DialogActions sx={{ p: 3, gap: 1 }}>
+                    <Button
+                        onClick={() => setDlgOpen(false)}
+                        disabled={saving}
+                        variant="outlined"
+                        sx={{ borderRadius: 2 }}
+                    >
                         Cancelar
                     </Button>
                     <Button
                         variant="contained"
                         onClick={trySave}
                         disabled={!form.motoristaId || saving}
+                        startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
+                        sx={{
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            borderRadius: 2,
+                            minWidth: 120
+                        }}
                     >
-                        {saving ? <CircularProgress size={24} /> : editId ? "Salvar" : "Criar"}
+                        {saving ? "Salvando..." : editId ? "Atualizar" : "Salvar"}
                     </Button>
                 </DialogActions>
             </Dialog>
 
             {/* ─────────────────── Dialog Assinatura ─────────────────── */}
-            <Dialog open={sigOpen} onClose={() => setSigOpen(false)} fullScreen={isMobile}>
-                <DialogTitle>Assinatura</DialogTitle>
-                <DialogContent dividers>
-                    <SignatureCanvas
-                        ref={sigRef}
-                        penColor="black"
-                        canvasProps={{
-                            width: isMobile ? window.innerWidth - 20 : 300,
-                            height: 200
-                        }}
-                    />
-                    <Button sx={{ mt: 1 }} onClick={() => sigRef.current.clear()} disabled={saving}>
-                        Limpar
-                    </Button>
+            <Dialog
+                open={sigOpen}
+                onClose={() => setSigOpen(false)}
+                fullScreen={isMobile}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                }}>
+                    <SignatureIcon />
+                    Assinatura do Motorista
+                </DialogTitle>
+                <DialogContent dividers sx={{ p: 3, textAlign: 'center' }}>
+                    <Typography variant="body1" sx={{ mb: 3, color: 'text.secondary' }}>
+                        Por favor, assine no campo abaixo:
+                    </Typography>
+                    <Paper elevation={2} sx={{ p: 2, borderRadius: 2, display: 'inline-block' }}>
+                        <SignatureCanvas
+                            ref={sigRef}
+                            penColor="black"
+                            canvasProps={{
+                                width: isMobile ? window.innerWidth - 80 : 400,
+                                height: 200
+                            }}
+                        />
+                    </Paper>
+                    <Box sx={{ mt: 2 }}>
+                        <Button
+                            onClick={() => sigRef.current?.clear()}
+                            disabled={saving}
+                            variant="outlined"
+                            sx={{ borderRadius: 2 }}
+                        >
+                            Limpar
+                        </Button>
+                    </Box>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setSigOpen(false)} disabled={saving}>
+                <DialogActions sx={{ p: 3, gap: 1 }}>
+                    <Button
+                        onClick={() => setSigOpen(false)}
+                        disabled={saving}
+                        variant="outlined"
+                        sx={{ borderRadius: 2 }}
+                    >
                         Cancelar
                     </Button>
-                    <Button variant="contained" onClick={confirmSig} disabled={saving}>
-                        {saving ? <CircularProgress size={24} /> : "Confirmar"}
+                    <Button
+                        variant="contained"
+                        onClick={confirmSig}
+                        disabled={saving}
+                        startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
+                        sx={{
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            borderRadius: 2
+                        }}
+                    >
+                        {saving ? "Confirmando..." : "Confirmar"}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -601,189 +950,292 @@ export default function ChegadaPage() {
                 open={detailOpen}
                 onClose={() => setDetailOpen(false)}
                 fullWidth
-                maxWidth="md"
+                maxWidth="lg"
+                fullScreen={isMobile}
             >
                 {detailData && (
                     <>
                         <DialogTitle
                             sx={{
-                                backgroundColor: theme.palette.primary.main,
-                                color: "#fff",
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                color: 'white',
                                 display: "flex",
-                                alignItems: "center"
+                                alignItems: "center",
+                                justifyContent: 'space-between'
                             }}
                         >
-                            <InIcon sx={{ mr: 1 }} />
-                            Detalhes — {detailData.placa}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <InIcon />
+                                <Box>
+                                    <Typography variant="h6">
+                                        Detalhes — {detailData.placa}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                                        {detailData.data_chegada ? new Date(detailData.data_chegada).toLocaleString("pt-BR") : 'N/A'}
+                                    </Typography>
+                                </Box>
+                            </Box>
                             <IconButton
                                 onClick={() => setDetailOpen(false)}
-                                sx={{ position: "absolute", right: 8, top: 8, color: "#fff" }}
+                                sx={{ color: 'white' }}
                             >
                                 <CloseIcon />
                             </IconButton>
                         </DialogTitle>
 
-                        <DialogContent dividers>
-                            <Stack spacing={2}>
-                                {/* Data/Hora */}
-                                <InfoItem
-                                    icon={TimeIcon}
-                                    label="Data/Hora"
-                                    value={new Date(detailData.data_chegada).toLocaleString("pt-BR")}
-                                    accent="secondary"
-                                />
-
-                                {/* KM e Horímetro */}
-                                <Grid container spacing={2}>
-                                    <Grid item xs={6}>
-                                        <InfoItem
-                                            icon={SpeedIcon}
-                                            label="KM Chegada"
-                                            value={`${detailData.km_chegada ?? "—"} km`}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={6}>
-                                        <InfoItem
-                                            icon={SpeedIcon}
-                                            label="Horímetro"
-                                            value={detailData.horimetro_chegada ?? "—"}
-                                        />
-                                    </Grid>
+                        <DialogContent dividers sx={{ p: 3 }}>
+                            <Grid container spacing={3}>
+                                {/* Informações da Chegada */}
+                                <Grid item xs={12} md={6}>
+                                    <Paper elevation={2} sx={{ p: 3, borderRadius: 3, height: '100%' }}>
+                                        <Typography variant="h6" sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 1,
+                                            mb: 3,
+                                            color: 'primary.main',
+                                            fontWeight: 600
+                                        }}>
+                                            <InIcon />
+                                            Informações da Chegada
+                                        </Typography>
+                                        <Stack spacing={2}>
+                                            <InfoItem
+                                                icon={PersonIcon}
+                                                label="Motorista"
+                                                value={detailData.motorista?.fullname || 'N/A'}
+                                                accent="primary"
+                                            />
+                                            <InfoItem
+                                                icon={SpeedIcon}
+                                                label="KM Chegada"
+                                                value={`${detailData.km_chegada || 'N/A'} km`}
+                                                accent="success"
+                                            />
+                                            <InfoItem
+                                                icon={TimeIcon}
+                                                label="Horímetro"
+                                                value={`${detailData.horimetro_chegada || 'N/A'}h`}
+                                                accent="info"
+                                            />
+                                        </Stack>
+                                    </Paper>
                                 </Grid>
 
-                                {/* Motorista */}
-                                <InfoItem
-                                    icon={PersonIcon}
-                                    label="Motorista"
-                                    value={detailData.motorista?.fullname ?? "—"}
-                                />
-
-                                {/* Motivo / Destino */}
-                                {detailData.checklist?.motivo_saida && (
-                                    <InfoItem
-                                        icon={NoteIcon}
-                                        label="Motivo"
-                                        value={detailData.checklist.motivo_saida}
-                                        accent="warning"
-                                    />
+                                {/* Dados da Saída */}
+                                {detailData.saida && (
+                                    <Grid item xs={12} md={6}>
+                                        <Paper elevation={2} sx={{ p: 3, borderRadius: 3, height: '100%' }}>
+                                            <Typography variant="h6" sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1,
+                                                mb: 3,
+                                                color: 'secondary.main',
+                                                fontWeight: 600
+                                            }}>
+                                                <OutIcon />
+                                                Dados da Saída
+                                            </Typography>
+                                            <Stack spacing={2}>
+                                                <InfoItem
+                                                    icon={TimeIcon}
+                                                    label="Data Saída"
+                                                    value={detailData.saida.dataSaida ? new Date(detailData.saida.dataSaida).toLocaleString("pt-BR") : 'N/A'}
+                                                    accent="secondary"
+                                                />
+                                                <InfoItem
+                                                    icon={SpeedIcon}
+                                                    label="KM Saída"
+                                                    value={`${detailData.saida.kmSaida || 'N/A'} km`}
+                                                    accent="warning"
+                                                />
+                                                <InfoItem
+                                                    icon={FlagIcon}
+                                                    label="Destino"
+                                                    value={detailData.saida.destino || 'N/A'}
+                                                    accent="info"
+                                                />
+                                            </Stack>
+                                        </Paper>
+                                    </Grid>
                                 )}
 
-                                {detailData.checklist?.destino && (
-                                    <InfoItem
-                                        icon={FlagIcon}
-                                        label="Destino"
-                                        value={detailData.checklist.destino}
-                                        accent="success"
-                                    />
+                                {/* Resumo da Viagem */}
+                                {detailData.saida && (
+                                    <Grid item xs={12}>
+                                        <Paper
+                                            elevation={2}
+                                            sx={{
+                                                p: 3,
+                                                borderRadius: 3,
+                                                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                                                border: '1px solid rgba(16, 185, 129, 0.2)'
+                                            }}
+                                        >
+                                            <Typography variant="h6" sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1,
+                                                mb: 3,
+                                                color: 'success.main',
+                                                fontWeight: 600
+                                            }}>
+                                                <AssessmentIcon />
+                                                Resumo da Viagem
+                                            </Typography>
+                                            <Grid container spacing={3}>
+                                                <Grid item xs={12} sm={6}>
+                                                    <Box sx={{ textAlign: 'center' }}>
+                                                        <Typography variant="h4" sx={{
+                                                            fontWeight: 700,
+                                                            color: 'success.main',
+                                                            mb: 1
+                                                        }}>
+                                                            {(detailData.km_chegada || 0) - (detailData.saida.kmSaida || 0)}
+                                                        </Typography>
+                                                        <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+                                                            Quilômetros percorridos
+                                                        </Typography>
+                                                    </Box>
+                                                </Grid>
+                                                <Grid item xs={12} sm={6}>
+                                                    <Box sx={{ textAlign: 'center' }}>
+                                                        <Typography variant="h4" sx={{
+                                                            fontWeight: 700,
+                                                            color: 'info.main',
+                                                            mb: 1
+                                                        }}>
+                                                            {(detailData.horimetro_chegada || 0) - (detailData.saida.horimetroSaida || 0)}
+                                                        </Typography>
+                                                        <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+                                                            Horas de operação
+                                                        </Typography>
+                                                    </Box>
+                                                </Grid>
+                                            </Grid>
+                                        </Paper>
+                                    </Grid>
                                 )}
 
                                 {/* Observações */}
                                 {detailData.observacoes && (
-                                    <Paper
-                                        elevation={0}
-                                        sx={{
-                                            p: 2,
-                                            borderRadius: 2,
-                                            bgcolor: theme.palette.grey[100]
-                                        }}
-                                    >
-                                        <Typography
-                                            sx={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                mb: 1
-                                            }}
-                                        >
-                                            <NoteIcon
-                                                sx={{ mr: 1, color: theme.palette.info.main }}
-                                            />{" "}
-                                            <strong>Observações</strong>
-                                        </Typography>
-                                        <Typography whiteSpace="pre-wrap">
-                                            {detailData.observacoes}
-                                        </Typography>
-                                    </Paper>
+                                    <Grid item xs={12}>
+                                        <Paper elevation={2} sx={{ p: 3, borderRadius: 3 }}>
+                                            <Typography variant="h6" sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1,
+                                                mb: 2,
+                                                color: 'warning.main',
+                                                fontWeight: 600
+                                            }}>
+                                                <NoteIcon />
+                                                Observações
+                                            </Typography>
+                                            <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
+                                                {detailData.observacoes}
+                                            </Typography>
+                                        </Paper>
+                                    </Grid>
                                 )}
 
                                 {/* Assinatura */}
                                 {detailData.assinatura && (
-                                    <Paper elevation={0} sx={{ p: 2, borderRadius: 2 }}>
-                                        <Typography
-                                            sx={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                mb: 1
-                                            }}
-                                        >
-                                            <SignatureIcon
+                                    <Grid item xs={12}>
+                                        <Paper elevation={2} sx={{ p: 3, borderRadius: 3, textAlign: 'center' }}>
+                                            <Typography variant="h6" sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: 1,
+                                                mb: 3,
+                                                color: 'success.main',
+                                                fontWeight: 600
+                                            }}>
+                                                <SignatureIcon />
+                                                Assinatura do Motorista
+                                            </Typography>
+                                            <Box
+                                                component="img"
+                                                src={detailData.assinatura}
+                                                alt="assinatura"
                                                 sx={{
-                                                    mr: 1,
-                                                    color: theme.palette.success.main
+                                                    maxWidth: "100%",
+                                                    borderRadius: 2,
+                                                    border: "2px solid",
+                                                    borderColor: 'divider',
+                                                    boxShadow: theme.shadows[2]
                                                 }}
-                                            />{" "}
-                                            <strong>Assinatura</strong>
-                                        </Typography>
-                                        <Box
-                                            component="img"
-                                            src={detailData.assinatura}
-                                            alt="assinatura"
-                                            sx={{
-                                                maxWidth: "100%",
-                                                borderRadius: 1,
-                                                border: "1px solid",
-                                                borderColor: theme.palette.divider
-                                            }}
-                                        />
-                                    </Paper>
+                                            />
+                                        </Paper>
+                                    </Grid>
                                 )}
 
                                 {/* Anexos */}
-                                <Paper elevation={0} sx={{ p: 2, borderRadius: 2 }}>
-                                    <Typography
-                                        sx={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            mb: 1
-                                        }}
-                                    >
-                                        <AttachIcon
-                                            sx={{ mr: 1, color: theme.palette.primary.main }}
-                                        />{" "}
-                                        <strong>Anexos</strong>
-                                    </Typography>
+                                <Grid item xs={12}>
+                                    <Paper elevation={2} sx={{ p: 3, borderRadius: 3 }}>
+                                        <Typography variant="h6" sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 1,
+                                            mb: 3,
+                                            color: 'primary.main',
+                                            fontWeight: 600
+                                        }}>
+                                            <AttachIcon />
+                                            Anexos
+                                        </Typography>
 
-                                    {!detailData.anexos?.length ? (
-                                        <Typography variant="body2">Sem anexos.</Typography>
-                                    ) : (
-                                        <Grid container spacing={1}>
-                                            {detailData.anexos.map(ar => (
-                                                <Grid item key={ar.id} xs={4}>
-                                                    {/\.(jpe?g|png|gif)$/i.test(ar.nome_arquivo) ? (
-                                                        <Box
-                                                            component="img"
-                                                            src={ar.url}
-                                                            alt={ar.nome_arquivo}
-                                                            sx={{ width: "100%", borderRadius: 1 }}
-                                                        />
-                                                    ) : (
-                                                        <Chip
-                                                            label={ar.nome_arquivo}
-                                                            clickable
-                                                            onClick={() =>
-                                                                window.open(ar.url, "_blank")
-                                                            }
-                                                        />
-                                                    )}
-                                                </Grid>
-                                            ))}
-                                        </Grid>
-                                    )}
-                                </Paper>
-                            </Stack>
+                                        {!detailData.anexos?.length ? (
+                                            <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 2 }}>
+                                                Nenhum anexo disponível.
+                                            </Typography>
+                                        ) : (
+                                            <Grid container spacing={2}>
+                                                {detailData.anexos.map(ar => (
+                                                    <Grid item xs={6} sm={4} md={3} key={ar.id}>
+                                                        {/\.(jpe?g|png|gif)$/i.test(ar.nome_arquivo) ? (
+                                                            <Box
+                                                                component="img"
+                                                                src={ar.url}
+                                                                alt={ar.nome_arquivo}
+                                                                sx={{
+                                                                    width: "100%",
+                                                                    borderRadius: 2,
+                                                                    boxShadow: theme.shadows[2]
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <Chip
+                                                                label={ar.nome_arquivo}
+                                                                clickable
+                                                                onClick={() =>
+                                                                    window.open(ar.url, "_blank")
+                                                                }
+                                                                sx={{ width: '100%' }}
+                                                            />
+                                                        )}
+                                                    </Grid>
+                                                ))}
+                                            </Grid>
+                                        )}
+                                    </Paper>
+                                </Grid>
+                            </Grid>
                         </DialogContent>
 
-                        <DialogActions>
-                            <Button onClick={() => setDetailOpen(false)}>Fechar</Button>
+                        <DialogActions sx={{ p: 3 }}>
+                            <Button
+                                onClick={() => setDetailOpen(false)}
+                                variant="contained"
+                                sx={{
+                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    borderRadius: 2
+                                }}
+                            >
+                                Fechar
+                            </Button>
                         </DialogActions>
                     </>
                 )}
@@ -797,104 +1249,214 @@ export default function ChegadaPage() {
                     setCmpData(null);
                 }}
                 fullWidth
-                maxWidth="xs"
-                PaperProps={{ sx: { borderRadius: 3 } }}
+                maxWidth="md"
+                fullScreen={isMobile}
             >
                 <DialogTitle
                     sx={{
-                        backgroundColor: theme.palette.secondary.main,
-                        color: "#fff",
+                        background: 'linear-gradient(135deg, #9333ea 0%, #7c3aed 100%)',
+                        color: 'white',
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between"
                     }}
                 >
-                    <Box sx={{ display: "flex", alignItems: "center" }}>
-                        <CompareIcon sx={{ mr: 1 }} /> Comparar Saída × Chegada
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CompareIcon />
+                        Comparar Saída × Chegada
                     </Box>
                     <IconButton
                         onClick={() => {
                             setCompareOpen(false);
                             setCmpData(null);
                         }}
-                        sx={{ color: "#fff" }}
+                        sx={{ color: 'white' }}
                     >
                         <CloseIcon />
                     </IconButton>
                 </DialogTitle>
 
                 {cmpData && (
-                    <DialogContent dividers>
-                        <Stack spacing={2}>
+                    <DialogContent dividers sx={{ p: 3 }}>
+                        <Grid container spacing={3}>
                             {/* Saída */}
-                            <Box>
-                                <Typography
-                                    variant="subtitle2"
-                                    fontWeight="bold"
-                                    sx={{ display: "flex", alignItems: "center" }}
+                            <Grid item xs={12} md={6}>
+                                <Paper
+                                    elevation={2}
+                                    sx={{
+                                        p: 3,
+                                        borderRadius: 3,
+                                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)',
+                                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                                        height: '100%'
+                                    }}
                                 >
-                                    <OutIcon sx={{ mr: 1 }} /> Saída
-                                </Typography>
-                                <Typography sx={{ display: "flex", alignItems: "center" }}>
-                                    <TimeIcon sx={{ mr: 0.5 }} />
-                                    {new Date(cmpData.checklist.data_saida).toLocaleString("pt-BR")}
-                                </Typography>
-                                <Typography sx={{ display: "flex", alignItems: "center" }}>
-                                    <SpeedIcon sx={{ mr: 0.5 }} /> KM: {cmpData.checklist.km_saida}
-                                </Typography>
-                                <Typography sx={{ display: "flex", alignItems: "center" }}>
-                                    <SpeedIcon
-                                        sx={{ mr: 0.5, transform: "rotate(90deg)" }}
-                                    />{" "}
-                                    Horímetro: {cmpData.checklist.horimetro_saida}
-                                </Typography>
-                                <Typography sx={{ display: "flex", alignItems: "center" }}>
-                                    <PersonIcon sx={{ mr: 0.5 }} /> Motorista:{" "}
-                                    {cmpData.checklist.motoristaNome}
-                                </Typography>
-                            </Box>
-
-                            <Divider />
+                                    <Typography
+                                        variant="h6"
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                            mb: 3,
+                                            color: 'primary.main',
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        <OutIcon />
+                                        Saída
+                                    </Typography>
+                                    <Stack spacing={2}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <TimeIcon sx={{ color: 'text.secondary' }} />
+                                            <Typography variant="body2">
+                                                {new Date(cmpData.checklist.data_saida).toLocaleString("pt-BR")}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <SpeedIcon sx={{ color: 'text.secondary' }} />
+                                            <Typography variant="body2">
+                                                KM: {cmpData.checklist.km_saida}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <SpeedIcon sx={{ color: 'text.secondary', transform: "rotate(90deg)" }} />
+                                            <Typography variant="body2">
+                                                Horímetro: {cmpData.checklist.horimetro_saida}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <PersonIcon sx={{ color: 'text.secondary' }} />
+                                            <Typography variant="body2">
+                                                {cmpData.checklist.motoristaNome}
+                                            </Typography>
+                                        </Box>
+                                    </Stack>
+                                </Paper>
+                            </Grid>
 
                             {/* Chegada */}
-                            <Box>
-                                <Typography
-                                    variant="subtitle2"
-                                    fontWeight="bold"
-                                    sx={{ display: "flex", alignItems: "center" }}
+                            <Grid item xs={12} md={6}>
+                                <Paper
+                                    elevation={2}
+                                    sx={{
+                                        p: 3,
+                                        borderRadius: 3,
+                                        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                                        border: '1px solid rgba(16, 185, 129, 0.2)',
+                                        height: '100%'
+                                    }}
                                 >
-                                    <InIcon
-                                        sx={{ mr: 1, color: theme.palette.success.main }}
-                                    />{" "}
-                                    Chegada
-                                </Typography>
-                                <Typography sx={{ display: "flex", alignItems: "center" }}>
-                                    <TimeIcon sx={{ mr: 0.5 }} />
-                                    {new Date(cmpData.arrival.data_chegada).toLocaleString("pt-BR")}
-                                </Typography>
-                                <Typography sx={{ display: "flex", alignItems: "center" }}>
-                                    <SpeedIcon sx={{ mr: 0.5 }} /> KM: {cmpData.arrival.km_chegada}
-                                </Typography>
-                                <Typography sx={{ display: "flex", alignItems: "center" }}>
-                                    <SpeedIcon
-                                        sx={{ mr: 0.5, transform: "rotate(90deg)" }}
-                                    />{" "}
-                                    Horímetro: {cmpData.arrival.horimetro_chegada}
-                                </Typography>
-                                <Typography sx={{ display: "flex", alignItems: "center" }}>
-                                    <PersonIcon sx={{ mr: 0.5 }} /> Motorista:{" "}
-                                    {cmpData.arrival.motorista?.fullname}
-                                </Typography>
-                            </Box>
-                        </Stack>
+                                    <Typography
+                                        variant="h6"
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                            mb: 3,
+                                            color: 'success.main',
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        <InIcon />
+                                        Chegada
+                                    </Typography>
+                                    <Stack spacing={2}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <TimeIcon sx={{ color: 'text.secondary' }} />
+                                            <Typography variant="body2">
+                                                {new Date(cmpData.arrival.data_chegada).toLocaleString("pt-BR")}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <SpeedIcon sx={{ color: 'text.secondary' }} />
+                                            <Typography variant="body2">
+                                                KM: {cmpData.arrival.km_chegada}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <SpeedIcon sx={{ color: 'text.secondary', transform: "rotate(90deg)" }} />
+                                            <Typography variant="body2">
+                                                Horímetro: {cmpData.arrival.horimetro_chegada}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <PersonIcon sx={{ color: 'text.secondary' }} />
+                                            <Typography variant="body2">
+                                                {cmpData.arrival.motorista?.fullname}
+                                            </Typography>
+                                        </Box>
+                                    </Stack>
+                                </Paper>
+                            </Grid>
+
+                            {/* Resumo */}
+                            <Grid item xs={12}>
+                                <Paper
+                                    elevation={2}
+                                    sx={{
+                                        p: 3,
+                                        borderRadius: 3,
+                                        background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%)',
+                                        border: '1px solid rgba(245, 158, 11, 0.2)'
+                                    }}
+                                >
+                                    <Typography variant="h6" sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1,
+                                        mb: 3,
+                                        color: 'warning.main',
+                                        fontWeight: 600
+                                    }}>
+                                        <AssessmentIcon />
+                                        Resumo da Viagem
+                                    </Typography>
+                                    <Grid container spacing={3}>
+                                        <Grid item xs={12} sm={6}>
+                                            <Box sx={{ textAlign: 'center' }}>
+                                                <Typography variant="h4" sx={{
+                                                    fontWeight: 700,
+                                                    color: 'success.main',
+                                                    mb: 1
+                                                }}>
+                                                    {cmpData.arrival.km_chegada - cmpData.checklist.km_saida}
+                                                </Typography>
+                                                <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+                                                    Quilômetros percorridos
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <Box sx={{ textAlign: 'center' }}>
+                                                <Typography variant="h4" sx={{
+                                                    fontWeight: 700,
+                                                    color: 'info.main',
+                                                    mb: 1
+                                                }}>
+                                                    {cmpData.arrival.horimetro_chegada - cmpData.checklist.horimetro_saida}
+                                                </Typography>
+                                                <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+                                                    Horas de operação
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
+                                    </Grid>
+                                </Paper>
+                            </Grid>
+                        </Grid>
                     </DialogContent>
                 )}
 
-                <DialogActions>
+                <DialogActions sx={{ p: 3 }}>
                     <Button
                         onClick={() => {
                             setCompareOpen(false);
                             setCmpData(null);
+                        }}
+                        variant="contained"
+                        sx={{
+                            background: 'linear-gradient(135deg, #9333ea 0%, #7c3aed 100%)',
+                            borderRadius: 2
                         }}
                     >
                         Fechar
