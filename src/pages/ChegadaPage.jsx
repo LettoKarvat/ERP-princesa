@@ -181,7 +181,7 @@ export default function ChegadaPage() {
                         horimetro_saida: c.horimetro_saida,
                         motoristaId: mot.id || "",
                         motoristaNome: nome,
-                        destino: c.destino || 'Destino não informado',
+                        destino: c.destino?.nome ?? 'Destino não informado',
                         checklist: c
                     };
                 })
@@ -321,7 +321,7 @@ export default function ChegadaPage() {
                         dataSaida: checklistData.data_saida,
                         kmSaida: checklistData.km_saida,
                         horimetroSaida: checklistData.horimetro_saida,
-                        destino: checklistData.destino || 'Não informado'
+                        destino: checklistData.destino?.nome ?? 'Não informado'
                     }
                 };
 

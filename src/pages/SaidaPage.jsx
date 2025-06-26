@@ -416,14 +416,12 @@ export default function VehicleDepartureSystem() {
         }
     };
 
-    /* ←── Faltava ESTA função */
     const handleAttachments = (e) => {
         const files = Array.from(e.target.files || []);
         if (files.length) {
             setNewSaida((p) => ({ ...p, attachments: [...p.attachments, ...files] }));
         }
     };
-    /* ───────────────────────── */
 
     const handleSave = () => {
         if (!newSaida.motorista1) return alert('Selecione o Motorista.');
@@ -431,7 +429,7 @@ export default function VehicleDepartureSystem() {
         if (!newSaida.motivoSaida.trim()) return alert('Explique o Motivo.');
         if (!newSaida.origem) return alert('Selecione a Origem.');
         if (!newSaida.destino) return alert('Selecione o Destino.');
-        if (!isEditing && !newSaida.attachments.length) return alert('Anexos obrigatórios!');
+        // anexos agora são opcionais
         if (+newSaida.kmSaida < +initialKm) return alert('KM não pode ser menor.');
         if (!newSaida.assinaturaMotorista.trim()) {
             setOpenSignature(true);
@@ -466,7 +464,7 @@ export default function VehicleDepartureSystem() {
             else res = await api.post('/checklists/operacao', payload);
 
             const cid = res.data.id || editingId;
-            if (!isEditing) {
+            if (!isEditing && newSaida.attachments.length) {
                 for (const file of newSaida.attachments) {
                     await api.post(`/checklists/operacao/${cid}/attachments`, {
                         base64file: await toBase64(file),
@@ -629,21 +627,7 @@ export default function VehicleDepartureSystem() {
                             >
                                 Registrar Nova Saída
                             </Button>
-                            <Button
-                                onClick={() => setOpenOriginModal(true)}
-                                variant="outlined"
-                                startIcon={<LocationOnIcon />}
-                                sx={{
-                                    borderColor: 'rgba(59,130,246,0.5)',
-                                    color: 'rgba(219,234,254,0.9)',
-                                    px: 3,
-                                    py: 1.5,
-                                    borderRadius: 3,
-                                    '&:hover': { bgcolor: 'rgba(59,130,246,0.2)', borderColor: 'rgba(59,130,246,0.7)' },
-                                }}
-                            >
-                                Configurações
-                            </Button>
+
                         </Box>
                     </Box>
                 </Box>
@@ -1211,7 +1195,7 @@ export default function VehicleDepartureSystem() {
                         {!isEditing && (
                             <Grid item xs={12}>
                                 <Typography variant="subtitle2" gutterBottom sx={{ color: '#94a3b8' }}>
-                                    Anexos *
+                                    Anexos
                                 </Typography>
                                 <TextField
                                     fullWidth
