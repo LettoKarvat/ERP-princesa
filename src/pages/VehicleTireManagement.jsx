@@ -80,98 +80,180 @@ export default function VehicleTireManagement() {
     const calcKm = (t) => (Number(t.kmFinal) || 0) - (Number(t.kmInicial) || 0);
     const layout = () => selectedVehicle?.tipo ? TIRE_LAYOUTS[selectedVehicle.tipo] || [] : [];
 
-    /* ---------- PDF ---------- */
+    /* ---------- PDF - LAYOUT EXATO DO MODELO ---------- */
     const exportPdf = useCallback(() => {
         if (!selectedVehicle) return;
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        const pageW = doc.internal.pageSize.getWidth();
 
-        const BOX_H = 24, MARK_W = 28, INFO_W = 28, GAP_W = 10, GAP_H = 12;
-        const FIRE = 6, FIRE_G = 1;
-        const drawFire = (x, y) => { for (let i = 0; i < 6; i++) doc.rect(x + i * (FIRE + FIRE_G), y, FIRE, FIRE); };
-        const lineField = (lab, x, y, w) => {
-            doc.text(lab, x, y); const lw = doc.getTextWidth(lab);
-            doc.line(x + lw + 2, y - 1.5, x + lw + 2 + w, y - 1.5);
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth(); // 297mm
+        const pageHeight = doc.internal.pageSize.getHeight(); // 210mm
+
+        // ═══════════════════════════════════════════════════════════
+        // CABEÇALHO
+        // ═══════════════════════════════════════════════════════════
+
+        // Título principal
+        doc.setFont('helvetica', 'bold').setFontSize(12);
+        doc.text('DISTRIBUIDORA PRINCESA', 15, 15);
+
+        // Data e página no canto direito
+        doc.setFont('helvetica', 'normal').setFontSize(9);
+        doc.text('Data: ___/___/______', pageWidth - 80, 15);
+        doc.text('Pág.: 1 / 1', pageWidth - 80, 22);
+
+        // Subtítulo
+        doc.setFont('helvetica', 'bold').setFontSize(11);
+        doc.text('Cartão de Troca de Pneu', 15, 25);
+
+        // Campos do cabeçalho com linhas
+        doc.setFont('helvetica', 'normal').setFontSize(9);
+        const drawFieldLine = (label, x, y, lineWidth) => {
+            doc.text(label, x, y);
+            const labelWidth = doc.getTextWidth(label);
+            doc.setLineWidth(0.3);
+            doc.line(x + labelWidth + 2, y + 1, x + labelWidth + 2 + lineWidth, y + 1);
         };
 
-        /* cabeçalho */
-        doc.setFont('helvetica', 'bold').setFontSize(10);
-        doc.text('DISTRIBUIDORA PRINCESA', 10, 10);
-        doc.text('Cartão de Troca de Pneu', 10, 16);
+        drawFieldLine('Veículo:', 70, 35, 60);
+        drawFieldLine('Placa:', 150, 35, 50);
+        drawFieldLine('Km. Atual:', 220, 35, 50);
+
+        // Segunda linha do cabeçalho
+        doc.setFont('helvetica', 'normal').setFontSize(8);
+        doc.text('Data ____________', 15, 45);
+        doc.text('Local ________________________', 80, 45);
+        doc.text('Responsável/Borracheiro ________________________', 160, 45);
+
+        // Linha separadora
+        doc.setLineWidth(0.5);
+        doc.line(15, 50, pageWidth - 15, 50);
+
+        // Instruções
         doc.setFont('helvetica', 'normal').setFontSize(9);
-        lineField('Veículo:', 60, 22, 32);
-        lineField('Placa :', 105, 22, 28);
-        lineField('Km. Atual :', 145, 22, 26);
-        doc.setFontSize(8);
-        doc.text('Data ______/______/______', 10, 28);
-        doc.text('Local ______________________', 65, 28);
-        doc.text('Responsável/Borracheiro ______________________', 125, 28);
-        doc.line(10, 30, pageW - 10, 30);
-        doc.text('Preencha com Marca de Fogo do Pneu dentro das Respectivas Posições', 10, 34);
-        doc.text('Km Pneu = Total', pageW - 38, 34);
+        doc.text('Preencha com Marca de Fogo do Pneu dentro das Respectivas Posições', 15, 58);
+        doc.text('Km Pneu = Total', pageWidth - 50, 58);
 
-        /* linhas de eixos */
-        const groupW = MARK_W + INFO_W;
-        const maxRowW = Math.max(...layout().map(ax => ax.pos.length * groupW + (ax.pos.length - 1) * GAP_W));
-        const baseX = (pageW - maxRowW) / 2;
-        const rows = []; let yOff = 38;
+        // ═══════════════════════════════════════════════════════════
+        // LAYOUT ESPECÍFICO BASEADO NO PDF DE REFERÊNCIA
+        // ═══════════════════════════════════════════════════════════
 
-        layout().forEach(axle => {
-            let x = baseX; const marks = [];
-            axle.pos.forEach(p => {
-                const t = vehicleTires.find(vt => vt.posicaoVeiculo === p) || {};
-                doc.rect(x, yOff, MARK_W, BOX_H);
-                doc.setFontSize(9).text(p, x + 2, yOff + 5);
-                drawFire(x + 4, yOff + 10);
-                marks.push(x + MARK_W / 2);
+        const TIRE_BOX = { width: 80, height: 50 };
+        const FIRE_SQUARES = { size: 4, gap: 1, count: 5 };
 
-                const infoX = x + MARK_W;
-                doc.rect(infoX, yOff, INFO_W, BOX_H);
-                doc.setFontSize(7);
-                doc.text('Nº:', infoX + 2, yOff + 8);
-                doc.text(String(t.numeroSerie || '___'), infoX + 10, yOff + 8);
-                doc.text('Km:', infoX + 2, yOff + 13);
-                doc.text(String(t.kmInicial ?? 0), infoX + 10, yOff + 13);
-                doc.text('Dim.', infoX + 2, yOff + 18);
-                doc.text(String(t.dimensao || ''), infoX + 10, yOff + 18);
+        // Helper para desenhar marcas de fogo
+        const drawFireMarks = (x, y) => {
+            doc.setFillColor(255, 255, 255);
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.3);
+            for (let i = 0; i < FIRE_SQUARES.count; i++) {
+                const markX = x + 5 + i * (FIRE_SQUARES.size + FIRE_SQUARES.gap);
+                const markY = y + 20;
+                doc.rect(markX, markY, FIRE_SQUARES.size, FIRE_SQUARES.size);
+            }
+        };
 
-                x += groupW + GAP_W;
+        // Helper para desenhar um pneu completo
+        const drawTire = (x, y, position, tire) => {
+            // Caixa principal
+            doc.setLineWidth(0.5);
+            doc.setDrawColor(0, 0, 0);
+            doc.rect(x, y, TIRE_BOX.width, TIRE_BOX.height);
+
+            // Posição do pneu
+            doc.setFont('helvetica', 'bold').setFontSize(10);
+            doc.text(position, x + 5, y + 12);
+
+            // Marcas de fogo
+            drawFireMarks(x, y);
+
+            // Informações do pneu
+            doc.setFont('helvetica', 'normal').setFontSize(8);
+            doc.text('Nº:', x + 45, y + 12);
+            doc.text(String(tire.numeroSerie || '___'), x + 55, y + 12);
+            doc.text('Km:', x + 45, y + 22);
+            doc.text(String(tire.kmInicial || '0'), x + 55, y + 22);
+            doc.text('Dim.:', x + 45, y + 32);
+            doc.text(String(tire.dimensao || ''), x + 55, y + 32);
+        };
+
+        // ═══════════════════════════════════════════════════════════
+        // POSICIONAMENTO DOS PNEUS CONFORME O MODELO
+        // ═══════════════════════════════════════════════════════════
+
+        const vehicleLayout = layout().filter(axle => !axle.eixo.toLowerCase().includes('estepe'));
+
+        if (vehicleLayout.length > 0) {
+            // Posições específicas baseadas no PDF de referência
+            const positions = {
+                // Eixo dianteiro - parte superior
+                '1E': { x: 50, y: 80 },
+                '2DE': { x: 150, y: 80 },
+
+                // Chassi central com quadrado
+                chassis: { x: 100, y: 130, width: 80, height: 8 },
+                square: { x: 135, y: 125, size: 18 },
+
+                // Eixo traseiro - parte inferior
+                '1D': { x: 50, y: 150 },
+                '2DI': { x: 150, y: 150 },
+
+                // Estepe - canto inferior esquerdo
+                'E': { x: 30, y: 220 }
+            };
+
+            // Desenhar pneus nas posições específicas
+            vehicleLayout.forEach(axle => {
+                axle.pos.forEach(position => {
+                    const tire = vehicleTires.find(vt => vt.posicaoVeiculo === position) || {};
+                    const pos = positions[position];
+
+                    if (pos) {
+                        drawTire(pos.x, pos.y, position, tire);
+                    }
+                });
             });
-            rows.push({ y: yOff, marks });
-            yOff += BOX_H + GAP_H;
-        });
 
-        /* ligações + quadrado */
-        doc.setLineWidth(0.4);
-        for (let i = 0; i < rows.length - 1; i++) {
-            const x = rows[0].marks[0];
-            doc.line(x, rows[i].y + BOX_H, x, rows[i + 1].y);
+            // Desenhar chassi (linha horizontal)
+            doc.setLineWidth(3);
+            doc.setDrawColor(0, 0, 0);
+            doc.line(positions.chassis.x, positions.chassis.y,
+                positions.chassis.x + positions.chassis.width, positions.chassis.y);
+
+            // Desenhar quadrado central sólido
+            doc.setFillColor(0, 0, 0);
+            doc.rect(positions.square.x, positions.square.y,
+                positions.square.size, positions.square.size, 'F');
+
+            // Linhas de conexão verticais
+            doc.setLineWidth(2);
+            doc.line(positions.square.x + positions.square.size / 2, positions.square.y,
+                positions.square.x + positions.square.size / 2, positions.square.y - 15);
+            doc.line(positions.square.x + positions.square.size / 2, positions.square.y + positions.square.size,
+                positions.square.x + positions.square.size / 2, positions.square.y + positions.square.size + 15);
         }
-        if (rows.length >= 2) {
-            const x = rows[0].marks[0];
-            const y = (rows[0].y + BOX_H + rows[1].y) / 2 - 3;
-            doc.setFillColor(0).rect(x - 3, y, 6, 6, 'F');
+
+        // ═══════════════════════════════════════════════════════════
+        // ESTEPE
+        // ═══════════════════════════════════════════════════════════
+
+        const spareAxle = layout().find(axle => axle.eixo.toLowerCase().includes('estepe'));
+        if (spareAxle && spareAxle.pos.length > 0) {
+            const sparePosition = spareAxle.pos[0];
+            const spareTire = vehicleTires.find(vt => vt.posicaoVeiculo === sparePosition) || {};
+
+            // Posicionar estepe conforme o modelo
+            drawTire(30, 220, sparePosition, spareTire);
         }
-        doc.setLineWidth(0.2);
 
-        /* estepe */
-        const sparePos = layout().find(ax => ax.eixo.toLowerCase().includes('estepe'))?.pos[0] || 'E1';
-        const st = vehicleTires.find(vt => vt.posicaoVeiculo === sparePos) || {};
-        const sX = baseX, sY = yOff + 5;
-        doc.rect(sX, sY, MARK_W, BOX_H);
-        doc.setFontSize(9).text(sparePos, sX + 2, sY + 5);
-        drawFire(sX + 4, sY + 10);
-        doc.rect(sX + MARK_W, sY, INFO_W, BOX_H);
-        doc.setFontSize(7);
-        doc.text('Nº:', sX + MARK_W + 2, sY + 8);
-        doc.text(String(st.numeroSerie || '***'), sX + MARK_W + 10, sY + 8);
-        doc.text('Km :', sX + MARK_W + 2, sY + 13);
-        doc.text(String(st.kmInicial ?? 0), sX + MARK_W + 10, sY + 13);
-        doc.text('Dim.', sX + MARK_W + 2, sY + 18);
-        doc.text(String(st.dimensao || ''), sX + MARK_W + 10, sY + 18);
+        // ═══════════════════════════════════════════════════════════
+        // RODAPÉ
+        // ═══════════════════════════════════════════════════════════
 
-        doc.text('TL15560 / RL15560', pageW - 35, doc.internal.pageSize.getHeight() - 5);
-        doc.save(`cartao-${selectedVehicle.placa}.pdf`);
+        doc.setFont('helvetica', 'normal').setFontSize(8);
+        doc.text('TL15560 / RL15560', pageWidth - 60, pageHeight - 10);
+
+        // Salvar o arquivo
+        doc.save(`cartao-${selectedVehicle.placa || 'veiculo'}.pdf`);
     }, [selectedVehicle, vehicleTires]);
 
     /* ---------- cliques ---------- */

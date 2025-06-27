@@ -21,7 +21,7 @@ const roleToRoute = {
   abastecimento: "/refueling",
   manutencao: "/parts-replacement/maintenance",
   motorista: "/driver-checklists",
-  portaria: "/checklist",
+  portaria: "/portaria/saida",
 };
 
 export default function LoginPage() {
