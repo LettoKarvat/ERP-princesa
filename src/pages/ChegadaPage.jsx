@@ -894,7 +894,7 @@ export default function ChegadaPage() {
                     gap: 1
                 }}>
                     <SignatureIcon />
-                    Assinatura do Motorista
+                    Assinatura
                 </DialogTitle>
                 <DialogContent dividers sx={{ p: 3, textAlign: 'center' }}>
                     <Typography variant="body1" sx={{ mb: 3, color: 'text.secondary' }}>
@@ -1154,7 +1154,7 @@ export default function ChegadaPage() {
                                                 fontWeight: 600
                                             }}>
                                                 <SignatureIcon />
-                                                Assinatura do Motorista
+                                                Assinatura
                                             </Typography>
                                             <Box
                                                 component="img"
