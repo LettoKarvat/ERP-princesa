@@ -735,22 +735,41 @@ export default function ChegadaPage() {
                 <DialogContent dividers sx={{ p: 3 }}>
                     <Stack spacing={3}>
                         {!editId && (
-                            <TextField
-                                select
+                            <Autocomplete
+                                freeSolo                     // permite digitar qualquer coisa
                                 fullWidth
-                                label="Saída em Trânsito *"
-                                value={form.saidaId}
-                                onChange={e => fillFromSaida(e.target.value)}
-                                InputLabelProps={{ shrink: Boolean(form.saidaId) }}
-                            >
-                                {saidas.map(s => (
-                                    <MenuItem key={s.id} value={s.id}>
-                                        {`${s.placa} • ${s.motoristaNome} • ${s.destino}`}
-                                    </MenuItem>
-                                ))}
-                            </TextField>
-
+                                options={saidas}             // sua lista de objetos { id, placa, motoristaNome, destino, ... }
+                                getOptionLabel={opt =>
+                                    // exibe como “placa • motorista • destino”
+                                    typeof opt === 'string'
+                                        ? opt
+                                        : `${opt.placa} • ${opt.motoristaNome} • ${opt.destino}`
+                                }
+                                value={saidas.find(s => s.id === form.saidaId) || null}
+                                onChange={(_, selected) => {
+                                    // disparado ao clicar numa opção
+                                    if (selected) fillFromSaida(selected.id);
+                                }}
+                                onInputChange={(_, input) => {
+                                    // dispara mesmo digitando
+                                    // opcional: se quiser disparar fillFromSaida ao pressionar Enter, trate aqui
+                                }}
+                                renderInput={params => (
+                                    <TextField
+                                        {...params}
+                                        label="Saída em Trânsito *"
+                                        variant="outlined"
+                                        InputLabelProps={{ shrink: Boolean(form.saidaId) }}
+                                    />
+                                )}
+                                renderOption={(props, opt) => (
+                                    <li {...props} key={opt.id}>
+                                        {`${opt.placa} • ${opt.motoristaNome} • ${opt.destino}`}
+                                    </li>
+                                )}
+                            />
                         )}
+
 
                         <Box>
                             <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
