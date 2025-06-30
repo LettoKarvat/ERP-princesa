@@ -732,9 +732,13 @@ export default function ChegadaPage() {
                             <TextField
                                 select
                                 fullWidth
-                                label="Saída em Trânsito *"
+                                variant="outlined"
+                                label="Saída em Trânsito"
                                 value={form.saidaId}
-                                onChange={e => fillFromSaida(e.target.value)}
+                                onChange={e => {
+                                    console.log(">> selecionou saída:", e.target.value);
+                                    fillFromSaida(e.target.value);
+                                }}
                                 InputLabelProps={{ shrink: Boolean(form.saidaId) }}
                             >
                                 {saidas.map(s => (
@@ -743,7 +747,6 @@ export default function ChegadaPage() {
                                     </MenuItem>
                                 ))}
                             </TextField>
-
                         )}
 
                         <Box>
