@@ -729,41 +729,20 @@ export default function ChegadaPage() {
                 <DialogContent dividers sx={{ p: 3 }}>
                     <Stack spacing={3}>
                         {!editId && (
-                            <Autocomplete
+                            <TextField
+                                select
                                 fullWidth
-                                disablePortal        // evita “menu fora do Dialog”
-                                disableClearable
-                                options={saidas}
-                                getOptionLabel={(opt) =>
-                                    opt && opt.placa
-                                        ? `${opt.placa} • ${opt.motoristaNome} • ${opt.destino}`
-                                        : ""
-                                }
-                                filterOptions={(opts, { inputValue }) =>
-                                    opts.filter((o) =>
-                                        `${o.placa} ${o.motoristaNome} ${o.destino}`
-                                            .toLowerCase()
-                                            .includes(inputValue.toLowerCase())
-                                    )
-                                }
-                                value={saidas.find((s) => s.id === Number(form.saidaId)) || null}
-                                onChange={(_, opt) => {
-                                    if (opt) {
-                                        fillFromSaida(opt.id); // preenche km, horímetro, motorista etc.
-                                    } else {
-                                        setForm((f) => ({
-                                            ...f,
-                                            saidaId: "",
-                                            motoristaId: "",
-                                            motoristaNome: "",
-                                        }));
-                                    }
-                                }}
-                                renderInput={(params) => (
-                                    <TextField {...params} label="Saída em Trânsito *" variant="outlined" />
-                                )}
-                            />
-
+                                label="Saída em Trânsito *"
+                                value={form.saidaId}
+                                onChange={e => fillFromSaida(e.target.value)}
+                                InputLabelProps={{ shrink: Boolean(form.saidaId) }}
+                            >
+                                {saidas.map(s => (
+                                    <MenuItem key={s.id} value={String(s.id)}>
+                                        {`${s.placa} • ${s.motoristaNome} • ${s.destino}`}
+                                    </MenuItem>
+                                ))}
+                            </TextField>
 
                         )}
 
