@@ -736,38 +736,25 @@ export default function ChegadaPage() {
                     <Stack spacing={3}>
                         {!editId && (
                             <Autocomplete
-                                freeSolo                     // permite digitar qualquer coisa
+                                freeSolo
                                 fullWidth
-                                options={saidas}             // sua lista de objetos { id, placa, motoristaNome, destino, ... }
+                                options={saidas}
                                 getOptionLabel={opt =>
-                                    // exibe como “placa • motorista • destino”
                                     typeof opt === 'string'
                                         ? opt
                                         : `${opt.placa} • ${opt.motoristaNome} • ${opt.destino}`
                                 }
-                                value={saidas.find(s => s.id === form.saidaId) || null}
-                                onChange={(_, selected) => {
-                                    // disparado ao clicar numa opção
-                                    if (selected) fillFromSaida(selected.id);
-                                }}
-                                onInputChange={(_, input) => {
-                                    // dispara mesmo digitando
-                                    // opcional: se quiser disparar fillFromSaida ao pressionar Enter, trate aqui
-                                }}
+                                onChange={(_, sel) => sel && fillFromSaida(sel.id)}
                                 renderInput={params => (
                                     <TextField
                                         {...params}
                                         label="Saída em Trânsito *"
                                         variant="outlined"
-                                        InputLabelProps={{ shrink: Boolean(form.saidaId) }}
+                                        InputLabelProps={{ shrink: true }}   // aqui, sempre flutua
                                     />
                                 )}
-                                renderOption={(props, opt) => (
-                                    <li {...props} key={opt.id}>
-                                        {`${opt.placa} • ${opt.motoristaNome} • ${opt.destino}`}
-                                    </li>
-                                )}
                             />
+
                         )}
 
 
