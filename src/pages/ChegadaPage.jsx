@@ -733,10 +733,14 @@ export default function ChegadaPage() {
                                 <InputLabel>Saída em Trânsito *</InputLabel>
                                 <Select
                                     value={form.saidaId}
-                                    label="Saída em Trânsito *"
+                                    label="Saída em Trânsito"
                                     onChange={e => fillFromSaida(e.target.value)}
-                                    /* 👇 força o menu a ficar dentro do próprio Dialog */
-                                    MenuProps={{ disablePortal: true }}
+                                    MenuProps={{
+                                        /* 1️⃣ não crie portal fora do Dialog */
+                                        disablePortal: true,
+                                        /* 2️⃣ não aplique o scroll-lock no body */
+                                        disableScrollLock: true,
+                                    }}
                                 >
                                     {saidas.map(s => (
                                         <MenuItem key={s.id} value={s.id}>
@@ -745,6 +749,7 @@ export default function ChegadaPage() {
                                     ))}
                                 </Select>
                             </FormControl>
+
                         )}
 
                         <Box>
