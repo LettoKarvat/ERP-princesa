@@ -209,19 +209,25 @@ export default function ChegadaPage() {
     }
 
     /* ─────────────── Helpers de formulário ─────────────── */
-    function fillFromSaida(id) {
-        const s = saidas.find(x => x.id === parseInt(id));
-        if (!s) return;
+    function fillFromSaida(idStr) {
+        console.log("fillFromSaida recebeu:", idStr);
+        // encontre exatamente pela string
+        const s = saidas.find(x => x.id === idStr);
+        if (!s) {
+            console.warn("Saída não encontrada pra id", idStr);
+            return;
+        }
         setForm(f => ({
             ...f,
-            saidaId: id,
+            saidaId: idStr,
             kmChegada: s.km_saida,
             horimetroChegada: s.horimetro_saida,
-            motoristaId: s.motoristaId,
+            motoristaId: String(s.motoristaId),
             motoristaNome: s.motoristaNome,
             editDriver: false
         }));
     }
+
 
     const fileChange = e =>
         setForm(f => ({
@@ -732,21 +738,18 @@ export default function ChegadaPage() {
                             <TextField
                                 select
                                 fullWidth
-                                variant="outlined"
-                                label="Saída em Trânsito"
+                                label="Saída em Trânsito *"
                                 value={form.saidaId}
-                                onChange={e => {
-                                    console.log(">> selecionou saída:", e.target.value);
-                                    fillFromSaida(e.target.value);
-                                }}
+                                onChange={e => fillFromSaida(e.target.value)}
                                 InputLabelProps={{ shrink: Boolean(form.saidaId) }}
                             >
                                 {saidas.map(s => (
-                                    <MenuItem key={s.id} value={String(s.id)}>
+                                    <MenuItem key={s.id} value={s.id}>
                                         {`${s.placa} • ${s.motoristaNome} • ${s.destino}`}
                                     </MenuItem>
                                 ))}
                             </TextField>
+
                         )}
 
                         <Box>
