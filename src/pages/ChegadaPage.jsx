@@ -735,6 +735,8 @@ export default function ChegadaPage() {
                                     value={form.saidaId}
                                     label="Saída em Trânsito *"
                                     onChange={e => fillFromSaida(e.target.value)}
+                                    /* 👇 força o menu a ficar dentro do próprio Dialog */
+                                    MenuProps={{ disablePortal: true }}
                                 >
                                     {saidas.map(s => (
                                         <MenuItem key={s.id} value={s.id}>
