@@ -1,3 +1,4 @@
+// src/services/refuelingService.js
 import api from "./apiFlask";
 
 /* cabeçalhos extras, se um dia precisar */
@@ -18,16 +19,20 @@ const buildFormData = (payload, attachments = [], signatureBlob = null) => {
     if (payload.invoiceNumber) fd.append("invoice_number", payload.invoiceNumber);
     if (payload.unitPrice) fd.append("unit_price", payload.unitPrice);
 
-    if (signatureBlob)
+    if (signatureBlob) {
         fd.append("signature", signatureBlob, "signature.png");
+    }
 
-    attachments.forEach((f) => fd.append("attachments", f, f.name));
+    attachments.forEach(f => fd.append("attachments", f, f.name));
     return fd;
 };
 
 /* ——— chamadas ——— */
 export const fetchRefuelings = (params = {}) =>
-    api.get("/refuelings/", { params, headers: authHeaders() }).then(r => r.data);
+    api
+        // sem barra no final
+        .get("/refuelings", { params, headers: authHeaders() })
+        .then(r => r.data);
 
 export const createRefueling = (
     payload,
@@ -35,7 +40,9 @@ export const createRefueling = (
     signatureBlob = null
 ) => {
     const fd = buildFormData(payload, attachments, signatureBlob);
-    return api.post("/refuelings/", fd, { headers: authHeaders() }).then(r => r.data);
+    return api
+        .post("/refuelings", fd, { headers: authHeaders() }) // sem barra
+        .then(r => r.data);
 };
 
 export const updateRefueling = (
@@ -45,8 +52,22 @@ export const updateRefueling = (
     signatureBlob = null
 ) => {
     const fd = buildFormData(payload, attachments, signatureBlob);
-    return api.patch(`/refuelings/${id}`, fd, { headers: authHeaders() }).then(r => r.data);
+    return api
+        .patch(`/refuelings/${id}`, fd, { headers: authHeaders() })
+        .then(r => r.data);
 };
 
 export const deleteRefueling = (id) =>
-    api.delete(`/refuelings/${id}`, { headers: authHeaders() });
+    api
+        .delete(`/refuelings/${id}`, { headers: authHeaders() });  // sem barra
+
+/* ——— nova chamada para consultar estoque de produtos ——— */
+export const fetchProductStock = (codprods = []) => {
+    const codString = codprods.join(",");
+    return api
+        .get("/refuelings/product-stock", {   // sem barra no final
+            params: { codprod: codString },
+            headers: authHeaders(),
+        })
+        .then(r => r.data.rows);
+};

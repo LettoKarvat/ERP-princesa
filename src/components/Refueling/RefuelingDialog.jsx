@@ -1,407 +1,454 @@
-import React, { useEffect, useState } from "react";
+// src/components/Refueling/RefuelingDialog.jsx
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Button,
-  Typography,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  Button,
   TextField,
+  Grid,
   FormControl,
   FormLabel,
   RadioGroup,
   FormControlLabel,
   Radio,
-  Select,
-  MenuItem,
-  InputLabel,
-  Input,
-  Autocomplete,
-  IconButton,
+  Box,
+  Typography,
+  Paper,
   List,
   ListItem,
   ListItemIcon,
   ListItemText,
-} from "@mui/material";
-import { Controller, useForm } from "react-hook-form";
-import { InputError } from "../InputError";
-import api from "../../services/apiFlask";
+  ListItemSecondaryAction,
+  IconButton,
+  Autocomplete,
+  MenuItem,
+} from '@mui/material';
 import {
-  Delete as DeleteIcon,
+  CloudUpload as UploadIcon,
   Image as ImageIcon,
-  PictureAsPdf as PictureAsPdfIcon,
-  InsertDriveFile as InsertDriveFileIcon,
-} from "@mui/icons-material";
+  PictureAsPdf as PdfIcon,
+  InsertDriveFile as FileIcon,
+  Delete as DeleteIcon,
+} from '@mui/icons-material';
+import api from '../../services/apiFlask';
 
-export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
-  /* ───────────── state ───────────── */
+// Mapeamento de bomba padrão conforme tipo de combustível
+const pumpMap = {
+  DIESEL: 'B1',
+  ARLA: 'B2',
+};
+
+export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
-  const [attachments, setAttachments] = useState(selectedItem?.attachments ?? []);
-  const [userRole, setUserRole] = useState("");
-  const [kmLabel, setKmLabel] = useState("Quilometragem atual");
+  const [attachments, setAttachments] = useState([]);
+  const [formData, setFormData] = useState({
+    vehicle_id: '',
+    fuelType: 'DIESEL',
+    date: '',
+    post: 'interno',
+    pump: pumpMap['DIESEL'],
+    invoiceNumber: '',
+    unitPrice: '',
+    liters: '',
+    mileage: '',
+    observation: '',
+  });
+  const [errors, setErrors] = useState({});
+  const fileInputRef = useRef(null);
 
-  /* ───────────── role ───────────── */
-  useEffect(() => {
-    const storedRole = localStorage.getItem("role");
-    if (storedRole) setUserRole(storedRole);
-  }, []);
-
-  const isAdmin = userRole === "admin";
-  const isCreating = selectedItem?.id === undefined;
-  const isDisabled = !isAdmin && !isCreating;
-
-  /* ───────────── form ───────────── */
-  const {
-    register,
-    handleSubmit,
-    reset,
-    control,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm();
-
-  const postValue = watch("post");
-  const isInternal = postValue === "interno";
-  const kmValue = watch("mileage");
-
-  useEffect(() => {
-    setKmLabel(kmValue ? "" : "Quilometragem atual");
-  }, [kmValue]);
-
-  /* ───────────── load vehicles ───────────── */
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await api.get("/vehicles/available");
-        setVehicles(data);
-      } catch (err) {
-        console.error("Erro ao buscar veículos:", err);
-      }
-    })();
-  }, []);
-
-  /* ───────────── open / edit ───────────── */
+  // Carrega veículos disponíveis
   useEffect(() => {
     if (!open) return;
-    setSelectedVehicle(null);
-    setAttachments(selectedItem?.attachments ?? []);
-    setTimeout(() => {
-      [
-        "vehicle_id",
-        "fuelType",
-        "date",
-        "invoiceNumber",
-        "unitPrice",
-        "liters",
-        "mileage",
-        "observation",
-        "post",
-        "pump",
-      ].forEach((f) => setValue(f, selectedItem?.[f] ?? ""));
-    });
-  }, [open, selectedItem, setValue]);
+    api.get('/vehicles/available')
+      .then(({ data }) => setVehicles(data))
+      .catch(console.error);
+  }, [open]);
 
-  /* ───────────── handlers ───────────── */
-  const handleClose = () => {
-    setSelectedVehicle(null);
-    reset();
-    onClose();
-  };
+  // Inicializa o form ao abrir
+  useEffect(() => {
+    if (!open) return;
 
-  const handleNumberField = (e, field) => {
-    let value = e.target.value.replace(/[^0-9.]/g, "");
-    const parts = value.split(".");
-    if (parts.length > 2) value = `${parts[0]}.${parts.slice(1).join("")}`;
-    setValue(field, value, { shouldValidate: true });
-  };
-
-  const handleFileChange = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    const upd = [...attachments, ...files];
-    setAttachments(upd);
-    // não enviamos attachments via react-hook-form; só validamos quantidade
-    setValue("attachments", upd, { shouldValidate: true });
-    e.target.value = "";
-  };
-
-  const onSubmitReal = (data) => {
-    if (!data.vehicle_id) {
-      alert("Selecione o veículo na lista antes de salvar.");
-      return;
+    if (selectedItem) {
+      const veh = vehicles.find(v => v.id === selectedItem.vehicle_id) || null;
+      setSelectedVehicle(veh);
+      setFormData({
+        vehicle_id: selectedItem.vehicle_id,
+        fuelType: selectedItem.fuelType,
+        date: selectedItem.date.split('T')[0],
+        post: selectedItem.post,
+        pump: selectedItem.pump || pumpMap[selectedItem.fuelType],
+        invoiceNumber: selectedItem.invoiceNumber || '',
+        unitPrice: selectedItem.unitPrice?.toString() || '',
+        liters: selectedItem.liters.toString(),
+        mileage: selectedItem.mileage.toString(),
+        observation: selectedItem.observation || '',
+      });
+      setAttachments(selectedItem.attachments || []);
+    } else {
+      setSelectedVehicle(null);
+      setFormData({
+        vehicle_id: '',
+        fuelType: 'DIESEL',
+        date: '',
+        post: 'interno',
+        pump: pumpMap['DIESEL'],
+        invoiceNumber: '',
+        unitPrice: '',
+        liters: '',
+        mileage: '',
+        observation: '',
+      });
+      setAttachments([]);
     }
+    setErrors({});
+  }, [open, selectedItem, vehicles]);
 
-    /*  ① Mantém anexos já salvos
-        ② Envia apenas arquivos novos ao backend  */
-    const newFiles = attachments.filter((f) => f instanceof File);
-    onSubmit(data, newFiles);
+  // Atualiza valor de campo genérico
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }));
   };
 
-  /* ───────────── render ───────────── */
+  // Troca de combustível ajusta bomba
+  const handleFuelTypeChange = e => {
+    const fuelType = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      fuelType,
+      pump: pumpMap[fuelType],
+    }));
+    setErrors(prev => ({ ...prev, fuelType: '', pump: '' }));
+  };
+
+  // Seleção de veículo via Autocomplete
+  const handleVehicleChange = (_, vehicle) => {
+    setSelectedVehicle(vehicle);
+    handleInputChange('vehicle_id', vehicle?.id || '');
+    if (vehicle?.quilometragem) {
+      handleInputChange('mileage', vehicle.quilometragem.toString());
+    }
+  };
+
+  // Adiciona arquivos
+  const handleFileChange = e => {
+    const files = Array.from(e.target.files || []);
+    if (files.length) setAttachments(prev => [...prev, ...files]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Remove anexo
+  const removeAttachment = idx => {
+    setAttachments(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const getFileIcon = file => {
+    const type = file.mimeType ?? file.type;
+    if (type.includes('image')) return <ImageIcon />;
+    if (type.includes('pdf')) return <PdfIcon />;
+    return <FileIcon />;
+  };
+  const getFileName = file => file.fileName ?? file.name;
+  const getFileSize = file => `${(file.size / 1024).toFixed(1)} KB`;
+
+  // Validação básica dos campos
+  const validateForm = () => {
+    const errs = {};
+    if (!formData.vehicle_id) errs.vehicle_id = 'Selecione um veículo';
+    if (!formData.date) errs.date = 'Informe a data';
+    if (!formData.liters) errs.liters = 'Informe os litros';
+    if (!formData.mileage) errs.mileage = 'Informe a quilometragem';
+    if (formData.post === 'interno' && !formData.pump) {
+      errs.pump = 'Informe a bomba';
+    }
+    if (formData.post === 'externo') {
+      if (!formData.invoiceNumber) errs.invoiceNumber = 'Informe número da nota';
+      if (!formData.unitPrice) errs.unitPrice = 'Informe preço unitário';
+    }
+    // precisa de pelo menos 1 anexo (antigo ou novo)
+    const hasOld = attachments.filter(a => !('size' in a)).length > 0;
+    const hasNew = attachments.filter(a => 'size' in a).length > 0;
+    if (!hasOld && !hasNew) {
+      alert('Anexe pelo menos um arquivo');
+      return false;
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  // SUBMIT: monta FormData com os nomes corretos e envia
+  const handleSubmit = e => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    const fd = new FormData();
+    fd.append("vehicle_id", formData.vehicle_id);
+    fd.append("fuel_type", formData.fuelType);
+    fd.append("date", formData.date);
+    fd.append("post", formData.post);
+    fd.append("liters", formData.liters);
+    fd.append("mileage", formData.mileage);
+    fd.append("pump", formData.pump || "");
+    fd.append("observation", formData.observation || "");
+    if (formData.post === "externo") {
+      fd.append("invoice_number", formData.invoiceNumber);
+      fd.append("unit_price", formData.unitPrice);
+    }
+    // anexos novos
+    attachments
+      .filter(f => f instanceof File)
+      .forEach(f => fd.append("attachments", f, f.name));
+
+    const call = selectedItem
+      ? api.patch(`/refuelings/${selectedItem.id}`, fd, {
+        headers: { "Content-Type": "multipart/form-data" }
+      })
+      : api.post('/refuelings', fd, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+
+    call
+      .then(() => {
+        onSubmit();  // re-fetch na página
+        onClose();
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Erro ao salvar abastecimento');
+      });
+  };
+
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>
-        {selectedItem?.id ? "Editar abastecimento" : "Novo abastecimento"}
+        {selectedItem ? 'Editar Abastecimento' : 'Novo Abastecimento'}
       </DialogTitle>
+      <DialogContent>
+        <form onSubmit={handleSubmit}>
+          <Box mt={2}>
+            <Grid container spacing={3}>
 
-      <DialogContent className="!pt-2 pb-6">
-        <form
-          onSubmit={handleSubmit(onSubmitReal)}
-          className="w-full flex flex-col gap-6 md:grid grid-cols-2"
-        >
-          {/* ───────────────────────── veículo ───────────────────────── */}
-          <Autocomplete
-            className="col-span-2"
-            readOnly={isDisabled}
-            value={
-              selectedVehicle ||
-              vehicles.find((v) => v.id === watch("vehicle_id")) ||
-              null
-            }
-            onChange={(_, newValue) => {
-              const vObj = newValue || null;
-              setSelectedVehicle(vObj);
-              setValue("vehicle_id", vObj?.id || "", { shouldValidate: true });
-              if (vObj?.quilometragem) setValue("mileage", vObj.quilometragem);
-              setKmLabel("");
-            }}
-            options={vehicles}
-            getOptionLabel={(opt) =>
-              opt?.placa
-                ? `${opt.placa} - ${opt.marca || ""} ${opt.modelo || ""}`
-                : ""
-            }
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Placa ou nome do Veículo"
-                variant="outlined"
-                error={!!errors.vehicle_id}
-                helperText={errors.vehicle_id?.message}
-              />
-            )}
-          />
+              {/* VEÍCULO */}
+              <Grid item xs={12}>
+                <Autocomplete
+                  options={vehicles}
+                  getOptionLabel={v =>
+                    v.placa ? `${v.placa} – ${v.marca} ${v.modelo}` : ''
+                  }
+                  value={selectedVehicle}
+                  onChange={handleVehicleChange}
+                  renderInput={params => (
+                    <TextField
+                      {...params}
+                      label="Veículo"
+                      error={!!errors.vehicle_id}
+                      helperText={errors.vehicle_id}
+                      required
+                    />
+                  )}
+                  fullWidth
+                />
+              </Grid>
 
-          {/* ───────────────────────── combustível ───────────────────── */}
-          <FormControl className="col-span-2">
-            <FormLabel>Combustível</FormLabel>
-            <Controller
-              name="fuelType"
-              control={control}
-              disabled={isDisabled}
-              rules={{ required: "Selecione o tipo de combustível" }}
-              render={({ field }) => (
-                <RadioGroup row {...field} value={field.value || ""}>
-                  <FormControlLabel value="ARLA" control={<Radio />} label="ARLA" />
-                  <FormControlLabel value="DIESEL" control={<Radio />} label="DIESEL" />
-                </RadioGroup>
-              )}
-            />
-            {errors.fuelType && <InputError>{errors.fuelType.message}</InputError>}
-          </FormControl>
+              {/* COMBUSTÍVEL */}
+              <Grid item xs={12}>
+                <FormControl component="fieldset">
+                  <FormLabel>Combustível</FormLabel>
+                  <RadioGroup
+                    row
+                    value={formData.fuelType}
+                    onChange={handleFuelTypeChange}
+                  >
+                    <FormControlLabel
+                      value="DIESEL"
+                      control={<Radio />}
+                      label="DIESEL"
+                    />
+                    <FormControlLabel
+                      value="ARLA"
+                      control={<Radio />}
+                      label="ARLA"
+                    />
+                  </RadioGroup>
+                </FormControl>
+              </Grid>
 
-          {/* ───────────────────────── data ──────────────────────────── */}
-          <FormControl className="col-span-2">
-            <FormLabel htmlFor="date">Data do abastecimento</FormLabel>
-            <Input
-              type="datetime-local"
-              readOnly={isDisabled}
-              {...register("date", { required: "Insira a data do abastecimento" })}
-            />
-            {errors.date && <InputError>{errors.date.message}</InputError>}
-          </FormControl>
+              {/* DATA */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Data"
+                  value={formData.date}
+                  onChange={e => handleInputChange('date', e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  error={!!errors.date}
+                  helperText={errors.date}
+                  required
+                />
+              </Grid>
 
-          {/* ───────────────────────── posto ─────────────────────────── */}
-          <FormControl className="col-span-2">
-            <InputLabel id="post-label">Posto</InputLabel>
-            <Controller
-              name="post"
-              control={control}
-              disabled={isDisabled}
-              rules={{ required: "Selecione se o posto é interno ou externo" }}
-              render={({ field }) => (
-                <Select {...field} labelId="post-label" label="Posto" value={field.value || ""}>
+              {/* POSTO */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  select
+                  label="Posto"
+                  value={formData.post}
+                  onChange={e => handleInputChange('post', e.target.value)}
+                >
                   <MenuItem value="interno">Interno</MenuItem>
                   <MenuItem value="externo">Externo</MenuItem>
-                </Select>
+                </TextField>
+              </Grid>
+
+              {/* BOMBA ou NOTA+PREÇO */}
+              {formData.post === 'interno' ? (
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Bomba"
+                    value={formData.pump}
+                    onChange={e => handleInputChange('pump', e.target.value)}
+                    error={!!errors.pump}
+                    helperText={errors.pump}
+                    required
+                  />
+                </Grid>
+              ) : (
+                <>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Nota"
+                      value={formData.invoiceNumber}
+                      onChange={e => handleInputChange('invoiceNumber', e.target.value)}
+                      error={!!errors.invoiceNumber}
+                      helperText={errors.invoiceNumber}
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      inputProps={{ step: 0.01 }}
+                      label="Preço unitário"
+                      value={formData.unitPrice}
+                      onChange={e => handleInputChange('unitPrice', e.target.value)}
+                      error={!!errors.unitPrice}
+                      helperText={errors.unitPrice}
+                      required
+                    />
+                  </Grid>
+                </>
               )}
-            />
-            {errors.post && <InputError>{errors.post.message}</InputError>}
-          </FormControl>
 
-          {/* ───────────────────────── bomba (interno) ───────────────── */}
-          {isInternal && (
-            <FormControl>
-              <InputLabel>Bomba</InputLabel>
-              <Input
-                readOnly={isDisabled}
-                {...register("pump", { required: "Insira a bomba" })}
-              />
-              {errors.pump && <InputError>{errors.pump.message}</InputError>}
-            </FormControl>
-          )}
-
-          {/* ───────────────────────── nota / preço (externo) ────────── */}
-          {!isInternal && (
-            <>
-              <FormControl>
-                <InputLabel htmlFor="invoiceNumber">Número da nota</InputLabel>
-                <Input
-                  disabled={isDisabled}
-                  {...register("invoiceNumber", { required: "Insira o número da nota" })}
+              {/* LITROS */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  inputProps={{ step: 0.1 }}
+                  label="Litros"
+                  value={formData.liters}
+                  onChange={e => handleInputChange('liters', e.target.value)}
+                  error={!!errors.liters}
+                  helperText={errors.liters}
+                  required
                 />
-                {errors.invoiceNumber && <InputError>{errors.invoiceNumber.message}</InputError>}
-              </FormControl>
+              </Grid>
 
-              <FormControl>
-                <InputLabel htmlFor="unitPrice">Preço unitário</InputLabel>
-                <Input
-                  disabled={isDisabled}
-                  {...register("unitPrice", { required: "Insira o preço unitário" })}
-                  onChange={(e) => handleNumberField(e, "unitPrice")}
+              {/* QUILOMETRAGEM */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Quilometragem"
+                  value={formData.mileage}
+                  onChange={e => handleInputChange('mileage', e.target.value)}
+                  error={!!errors.mileage}
+                  helperText={errors.mileage}
+                  required
                 />
-                {errors.unitPrice && <InputError>{errors.unitPrice.message}</InputError>}
-              </FormControl>
-            </>
-          )}
+              </Grid>
 
-          {/* ───────────────────────── litros ────────────────────────── */}
-          <FormControl className="self-end">
-            <InputLabel htmlFor="liters">Litros abastecidos</InputLabel>
-            <Input
-              readOnly={isDisabled}
-              {...register("liters", { required: "Insira quantos litros foram abastecidos" })}
-              onChange={(e) => handleNumberField(e, "liters")}
-            />
-            {errors.liters && <InputError>{errors.liters.message}</InputError>}
-          </FormControl>
+              {/* OBSERVAÇÃO */}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  label="Observação"
+                  value={formData.observation}
+                  onChange={e => handleInputChange('observation', e.target.value)}
+                />
+              </Grid>
 
-          {/* ───────────────────────── quilometragem ─────────────────── */}
-          <FormControl>
-            <InputLabel htmlFor="mileage">{kmLabel}</InputLabel>
-            <Input
-              type="number"
-              readOnly={isDisabled}
-              {...register("mileage", {
-                required: "Insira a quilometragem atual",
-                min: {
-                  value: selectedItem?.mileage,
-                  message: "A quilometragem não pode ser menor que a atual",
-                },
-              })}
-            />
-            {errors.mileage && <InputError>{errors.mileage.message}</InputError>}
-          </FormControl>
+              {/* ANEXOS */}
+              <Grid item xs={12}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Anexos (pelo menos 1)
+                </Typography>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<UploadIcon />}
+                  fullWidth
+                  sx={{ mb: 2 }}
+                >
+                  Adicionar Arquivos
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,application/pdf"
+                    onChange={handleFileChange}
+                    hidden
+                  />
+                </Button>
+                {attachments.length > 0 && (
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <List dense>
+                      {attachments.map((file, i) => (
+                        <ListItem key={i} divider>
+                          <ListItemIcon>{getFileIcon(file)}</ListItemIcon>
+                          <ListItemText
+                            primary={getFileName(file)}
+                            secondary={'size' in file ? getFileSize(file) : ''}
+                          />
+                          <ListItemSecondaryAction>
+                            <IconButton
+                              edge="end"
+                              color="error"
+                              onClick={() => removeAttachment(i)}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </ListItemSecondaryAction>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Paper>
+                )}
+              </Grid>
 
-          {/* ───────────────────────── observação ────────────────────── */}
-          <FormControl className="col-span-2">
-            <InputLabel htmlFor="observation">Observação</InputLabel>
-            <Input readOnly={isDisabled} {...register("observation")} />
-          </FormControl>
+              {/* Ações */}
+              <Grid item xs={12}>
+                <DialogActions>
+                  <Button onClick={onClose}>Cancelar</Button>
+                  <Button type="submit" variant="contained">
+                    {selectedItem ? 'Atualizar' : 'Salvar'}
+                  </Button>
+                </DialogActions>
+              </Grid>
 
-          {/* ───────────────────────── anexos ────────────────────────── */}
-          <FormControl className="col-span-2">
-            <label htmlFor="attachments">
-              <Button variant="contained" component="span" disabled={isDisabled}>
-                Adicionar Arquivos
-              </Button>
-            </label>
-            <Input
-              id="attachments"
-              type="file"
-              sx={{ display: "none" }}
-              onChange={handleFileChange}
-              disabled={isDisabled}
-              inputProps={{ multiple: true, accept: "image/*,application/pdf" }}
-            />
-            <Typography variant="caption">Necessário pelo menos 1</Typography>
-          </FormControl>
-
-          {/* ───────────────────────── lista anexos ──────────────────── */}
-          {attachments.length > 0 && (
-            <div className="col-span-2">
-              <Typography variant="subtitle2" gutterBottom>
-                Arquivos anexados:
-              </Typography>
-
-              <List dense className="w-full md:grid grid-cols-2 gap-4">
-                {attachments.map((file, idx) => {
-                  /* File novo × objeto da API */
-                  const isNew = file instanceof File;
-                  const isObj = !isNew && typeof file === "object";
-
-                  const mime = isNew
-                    ? file.type
-                    : isObj
-                      ? file.mimeType || ""
-                      : "";
-
-                  const icon =
-                    mime.includes("image") ? (
-                      <ImageIcon />
-                    ) : mime.includes("pdf") ? (
-                      <PictureAsPdfIcon />
-                    ) : (
-                      <InsertDriveFileIcon />
-                    );
-
-                  const displayName = isNew
-                    ? file.name
-                    : isObj
-                      ? file.fileName
-                      : String(file);
-
-                  const sizeLabel = isNew ? `${(file.size / 1024).toFixed(2)} KB` : "";
-
-                  return (
-                    <ListItem
-                      key={isObj ? file.id : idx}
-                      secondaryAction={
-                        !isDisabled && (
-                          <IconButton
-                            edge="end"
-                            onClick={() => {
-                              const upd = attachments.filter((_, i) => i !== idx);
-                              setAttachments(upd);
-                              setValue("attachments", upd, { shouldValidate: true });
-                            }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        )
-                      }
-                      sx={{
-                        backgroundColor: "#f5f5f5",
-                        borderRadius: 1,
-                        mb: 1,
-                        p: "8px 16px",
-                      }}
-                    >
-                      <ListItemIcon>{icon}</ListItemIcon>
-                      <ListItemText primary={displayName} secondary={sizeLabel} />
-                    </ListItem>
-                  );
-                })}
-              </List>
-            </div>
-          )}
-
-          {/* campo oculto vehicle_id */}
-          <input type="hidden" {...register("vehicle_id", { required: true })} />
-
-          {/* ───────────────────────── ações ─────────────────────────── */}
-          <div className="flex justify-end col-span-2">
-            <DialogActions>
-              <Button onClick={onClose}>Cancelar</Button>
-              <Button variant="contained" type="submit" disabled={isDisabled}>
-                Salvar
-              </Button>
-            </DialogActions>
-          </div>
+            </Grid>
+          </Box>
         </form>
       </DialogContent>
     </Dialog>
   );
-}
+};
