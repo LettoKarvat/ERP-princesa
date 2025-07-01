@@ -66,18 +66,6 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
         return <FileIcon />;
     };
 
-    const getFuelGradient = (fuel) => {
-        return fuel === 'DIESEL'
-            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-            : 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)';
-    };
-
-    const getPostGradient = (post) => {
-        return post === 'interno'
-            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-            : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
-    };
-
     return (
         <>
             <Dialog
@@ -87,52 +75,53 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        borderRadius: 4,
-                        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+                        borderRadius: 3,
+                        border: '1px solid #e2e8f0',
                         maxHeight: '90vh'
                     }
                 }}
             >
                 <DialogTitle sx={{
-                    background: getFuelGradient(item.fuelType),
+                    bgcolor: item.fuelType === 'DIESEL' ? '#1e293b' : '#166534',
                     color: 'white',
                     textAlign: 'center',
-                    borderRadius: '16px 16px 0 0',
+                    borderRadius: '12px 12px 0 0',
                     py: 3
                 }}>
-                    <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                    <Typography variant="h4" component="h2" sx={{ fontWeight: 700, mb: 1 }}>
                         Detalhes do Abastecimento
                     </Typography>
-                    <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+                    <Typography variant="subtitle1" sx={{ opacity: 0.9, fontWeight: 500 }}>
                         {item.vehicleLabel}
                     </Typography>
                 </DialogTitle>
 
-                <DialogContent sx={{ p: 4 }}>
+                <DialogContent sx={{ p: 4, bgcolor: '#f8fafc' }}>
                     {/* Cards de informações principais */}
                     <Grid container spacing={3} sx={{ mb: 4 }}>
                         {/* Card Quilometragem */}
                         <Grid item xs={12} md={3}>
                             <Card sx={{
-                                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                                color: 'white',
+                                bgcolor: 'white',
                                 borderRadius: 3,
-                                height: '100%'
+                                border: '1px solid #e2e8f0',
+                                height: '100%',
+                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                             }}>
                                 <CardContent sx={{ textAlign: 'center', py: 3 }}>
                                     <Avatar sx={{
-                                        bgcolor: 'rgba(255,255,255,0.2)',
+                                        bgcolor: '#1e293b',
                                         mx: 'auto',
                                         mb: 2,
                                         width: 56,
                                         height: 56
                                     }}>
-                                        <SpeedIcon sx={{ fontSize: 32 }} />
+                                        <SpeedIcon sx={{ fontSize: 28 }} />
                                     </Avatar>
-                                    <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                    <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, color: '#1e293b' }}>
                                         {item.mileage?.toLocaleString()}
                                     </Typography>
-                                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                                    <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
                                         Quilômetros
                                     </Typography>
                                 </CardContent>
@@ -142,25 +131,26 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                         {/* Card Volume */}
                         <Grid item xs={12} md={3}>
                             <Card sx={{
-                                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                                color: 'white',
+                                bgcolor: 'white',
                                 borderRadius: 3,
-                                height: '100%'
+                                border: '1px solid #e2e8f0',
+                                height: '100%',
+                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                             }}>
                                 <CardContent sx={{ textAlign: 'center', py: 3 }}>
                                     <Avatar sx={{
-                                        bgcolor: 'rgba(255,255,255,0.2)',
+                                        bgcolor: '#166534',
                                         mx: 'auto',
                                         mb: 2,
                                         width: 56,
                                         height: 56
                                     }}>
-                                        <FuelIcon sx={{ fontSize: 32 }} />
+                                        <FuelIcon sx={{ fontSize: 28 }} />
                                     </Avatar>
-                                    <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                    <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, color: '#1e293b' }}>
                                         {item.liters}
                                     </Typography>
-                                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                                    <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
                                         Litros
                                     </Typography>
                                 </CardContent>
@@ -170,25 +160,26 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                         {/* Card Data */}
                         <Grid item xs={12} md={3}>
                             <Card sx={{
-                                background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-                                color: 'white',
+                                bgcolor: 'white',
                                 borderRadius: 3,
-                                height: '100%'
+                                border: '1px solid #e2e8f0',
+                                height: '100%',
+                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                             }}>
                                 <CardContent sx={{ textAlign: 'center', py: 3 }}>
                                     <Avatar sx={{
-                                        bgcolor: 'rgba(255,255,255,0.2)',
+                                        bgcolor: '#64748b',
                                         mx: 'auto',
                                         mb: 2,
                                         width: 56,
                                         height: 56
                                     }}>
-                                        <CalendarIcon sx={{ fontSize: 32 }} />
+                                        <CalendarIcon sx={{ fontSize: 28 }} />
                                     </Avatar>
-                                    <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: '#1e293b' }}>
                                         {formatDate(item.date)}
                                     </Typography>
-                                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                                    <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
                                         Data/Hora
                                     </Typography>
                                 </CardContent>
@@ -199,25 +190,26 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                         {isExternal && total && (
                             <Grid item xs={12} md={3}>
                                 <Card sx={{
-                                    background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-                                    color: '#333',
+                                    bgcolor: 'white',
                                     borderRadius: 3,
-                                    height: '100%'
+                                    border: '1px solid #e2e8f0',
+                                    height: '100%',
+                                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                                 }}>
                                     <CardContent sx={{ textAlign: 'center', py: 3 }}>
                                         <Avatar sx={{
-                                            bgcolor: 'rgba(0,0,0,0.1)',
+                                            bgcolor: '#dc2626',
                                             mx: 'auto',
                                             mb: 2,
                                             width: 56,
                                             height: 56
                                         }}>
-                                            <MoneyIcon sx={{ fontSize: 32 }} />
+                                            <MoneyIcon sx={{ fontSize: 28 }} />
                                         </Avatar>
-                                        <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                        <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, color: '#1e293b' }}>
                                             R$ {total}
                                         </Typography>
-                                        <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                                        <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
                                             Valor Total
                                         </Typography>
                                     </CardContent>
@@ -232,9 +224,9 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                             icon={<FuelIcon />}
                             label={item.fuelType}
                             sx={{
-                                background: getFuelGradient(item.fuelType),
+                                bgcolor: item.fuelType === 'DIESEL' ? '#1e293b' : '#166534',
                                 color: 'white',
-                                fontWeight: 'bold',
+                                fontWeight: 600,
                                 fontSize: '1rem',
                                 height: 40,
                                 '& .MuiChip-icon': { color: 'white' }
@@ -244,9 +236,9 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                             icon={<LocationIcon />}
                             label={`Posto ${item.post.toUpperCase()}`}
                             sx={{
-                                background: getPostGradient(item.post),
+                                bgcolor: '#64748b',
                                 color: 'white',
-                                fontWeight: 'bold',
+                                fontWeight: 600,
                                 fontSize: '1rem',
                                 height: 40,
                                 '& .MuiChip-icon': { color: 'white' }
@@ -259,14 +251,13 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                         p: 3,
                         mb: 4,
                         borderRadius: 3,
-                        background: isExternal
-                            ? 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)'
-                            : 'linear-gradient(135deg, #d299c2 0%, #fef9d7 100%)',
-                        border: 'none'
+                        bgcolor: 'white',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                     }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                            {isExternal ? <ReceiptIcon /> : <InventoryIcon />}
-                            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                            {isExternal ? <ReceiptIcon sx={{ color: '#1e293b' }} /> : <InventoryIcon sx={{ color: '#1e293b' }} />}
+                            <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
                                 {isExternal ? 'Informações do Posto Externo' : 'Informações do Posto Interno'}
                             </Typography>
                         </Box>
@@ -274,23 +265,23 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                         {isExternal ? (
                             <Grid container spacing={2}>
                                 <Grid item xs={12} md={6}>
-                                    <Typography variant="body1" sx={{ mb: 1 }}>
+                                    <Typography variant="body1" sx={{ mb: 1, color: '#334155' }}>
                                         <strong>Número da Nota:</strong> {item.invoiceNumber}
                                     </Typography>
-                                    <Typography variant="body1">
+                                    <Typography variant="body1" sx={{ color: '#334155' }}>
                                         <strong>Preço Unitário:</strong> R$ {Number(item.unitPrice).toFixed(2)}/L
                                     </Typography>
                                 </Grid>
                                 {total && (
                                     <Grid item xs={12} md={6}>
-                                        <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#d84315' }}>
+                                        <Typography variant="h5" sx={{ fontWeight: 700, color: '#dc2626' }}>
                                             Total: R$ {total}
                                         </Typography>
                                     </Grid>
                                 )}
                             </Grid>
                         ) : (
-                            <Typography variant="body1">
+                            <Typography variant="body1" sx={{ color: '#334155' }}>
                                 <strong>Bomba utilizada:</strong> {item.pump || 'Não informado'}
                             </Typography>
                         )}
@@ -302,16 +293,17 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                             p: 3,
                             mb: 4,
                             borderRadius: 3,
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            color: 'white'
+                            bgcolor: 'white',
+                            border: '1px solid #e2e8f0',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                         }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                                <DescriptionIcon />
-                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                <DescriptionIcon sx={{ color: '#1e293b' }} />
+                                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
                                     Observações
                                 </Typography>
                             </Box>
-                            <Typography variant="body1" sx={{ lineHeight: 1.6 }}>
+                            <Typography variant="body1" sx={{ lineHeight: 1.6, color: '#334155' }}>
                                 {item.observation}
                             </Typography>
                         </Paper>
@@ -319,8 +311,22 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
 
                     {/* Imagens */}
                     {imageFiles.length > 0 && (
-                        <Paper sx={{ p: 3, mb: 4, borderRadius: 3, background: 'rgba(255,255,255,0.8)' }}>
-                            <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Paper sx={{
+                            p: 3,
+                            mb: 4,
+                            borderRadius: 3,
+                            bgcolor: 'white',
+                            border: '1px solid #e2e8f0',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                        }}>
+                            <Typography variant="h6" sx={{
+                                mb: 3,
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                color: '#1e293b'
+                            }}>
                                 <ImageIcon />
                                 Imagens Anexadas ({imageFiles.length})
                             </Typography>
@@ -333,15 +339,15 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                                             loading="lazy"
                                             style={{
                                                 cursor: 'pointer',
-                                                borderRadius: 12,
+                                                borderRadius: 8,
                                                 height: 150,
                                                 objectFit: 'cover',
-                                                transition: 'transform 0.3s ease',
-                                                '&:hover': {
-                                                    transform: 'scale(1.05)'
-                                                }
+                                                transition: 'transform 0.2s ease',
+                                                border: '1px solid #e2e8f0'
                                             }}
                                             onClick={() => setZoomImage(img.preview || img.url)}
+                                            onMouseEnter={(e) => e.target.style.transform = 'scale(1.02)'}
+                                            onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
                                         />
                                     </ImageListItem>
                                 ))}
@@ -351,8 +357,22 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
 
                     {/* Outros arquivos */}
                     {otherFiles.length > 0 && (
-                        <Paper sx={{ p: 3, mb: 4, borderRadius: 3, background: 'rgba(255,255,255,0.8)' }}>
-                            <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Paper sx={{
+                            p: 3,
+                            mb: 4,
+                            borderRadius: 3,
+                            bgcolor: 'white',
+                            border: '1px solid #e2e8f0',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                        }}>
+                            <Typography variant="h6" sx={{
+                                mb: 3,
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                color: '#1e293b'
+                            }}>
                                 <FileIcon />
                                 Outros Anexos ({otherFiles.length})
                             </Typography>
@@ -365,25 +385,29 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         sx={{
-                                            background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+                                            bgcolor: '#f8fafc',
                                             borderRadius: 2,
                                             mb: 1,
                                             textDecoration: 'none',
                                             color: 'inherit',
-                                            transition: 'all 0.3s ease',
+                                            border: '1px solid #e2e8f0',
+                                            transition: 'all 0.2s ease',
                                             '&:hover': {
-                                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                bgcolor: '#1e293b',
                                                 color: 'white',
-                                                transform: 'translateX(8px)'
+                                                transform: 'translateX(4px)',
+                                                '& .MuiListItemIcon-root': {
+                                                    color: 'white'
+                                                }
                                             }
                                         }}
                                     >
-                                        <ListItemIcon>
+                                        <ListItemIcon sx={{ color: '#64748b' }}>
                                             {getFileIcon(file.mimeType)}
                                         </ListItemIcon>
                                         <ListItemText
                                             primary={file.fileName}
-                                            primaryTypographyProps={{ fontWeight: 'medium' }}
+                                            primaryTypographyProps={{ fontWeight: 500 }}
                                         />
                                     </ListItem>
                                 ))}
@@ -396,21 +420,23 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                         <Paper sx={{
                             p: 3,
                             borderRadius: 3,
-                            background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+                            bgcolor: 'white',
+                            border: '1px solid #e2e8f0',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
                             textAlign: 'center'
                         }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 3 }}>
-                                <SignatureIcon />
-                                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                <SignatureIcon sx={{ color: '#1e293b' }} />
+                                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
                                     Assinatura do Responsável
                                 </Typography>
                             </Box>
                             <Box sx={{
-                                background: 'white',
+                                bgcolor: '#f8fafc',
                                 borderRadius: 2,
                                 p: 2,
                                 display: 'inline-block',
-                                boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+                                border: '1px solid #e2e8f0'
                             }}>
                                 <img
                                     src={item.signatureData || item.signatureUrl}
@@ -427,17 +453,19 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                     )}
                 </DialogContent>
 
-                <DialogActions sx={{ p: 3, justifyContent: 'center' }}>
+                <DialogActions sx={{ p: 3, justifyContent: 'center', bgcolor: '#f8fafc' }}>
                     <Button
                         onClick={onClose}
                         variant="contained"
                         size="large"
                         sx={{
-                            borderRadius: 3,
+                            borderRadius: 2,
                             px: 4,
-                            background: 'linear-gradient(45deg, #667eea, #764ba2)',
+                            bgcolor: '#1e293b',
+                            textTransform: 'none',
+                            fontWeight: 600,
                             '&:hover': {
-                                background: 'linear-gradient(45deg, #5a6fd8, #6a4190)',
+                                bgcolor: '#334155',
                             }
                         }}
                     >
@@ -456,7 +484,7 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                     sx: {
                         bgcolor: 'rgba(0, 0, 0, 0.95)',
                         boxShadow: 'none',
-                        borderRadius: 4
+                        borderRadius: 3
                     }
                 }}
             >
@@ -489,7 +517,7 @@ export const RefuelingDetails = ({ item, open, onClose }) => {
                                 height: 'auto',
                                 maxHeight: '85vh',
                                 objectFit: 'contain',
-                                borderRadius: 16
+                                borderRadius: 12
                             }}
                         />
                     )}

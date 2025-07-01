@@ -1,3 +1,4 @@
+// src/pages/Refueling.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Container,
@@ -17,18 +18,11 @@ import {
   DialogActions,
   Paper,
   Divider,
-  Alert,
   FormControl,
   FormLabel,
   RadioGroup,
   FormControlLabel,
   Radio,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  ListItemSecondaryAction,
-  Fab,
   AppBar,
   Toolbar,
   Stack,
@@ -47,12 +41,15 @@ import {
   Image as ImageIcon,
   PictureAsPdf as PdfIcon,
   InsertDriveFile as FileIcon,
-  Close as CloseIcon,
   Clear as ClearIcon,
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
   Info as InfoIcon,
 } from '@mui/icons-material';
+import SignatureCanvas from 'react-signature-canvas';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
+
 import { RefuelingDialog } from '../components/Refueling/RefuelingDialog';
 import { RefuelingDetails } from '../components/Refueling/RefuelingDetails';
 import {
@@ -64,36 +61,38 @@ import {
 } from '../services/refuelingService';
 
 export default function Refueling() {
-  // Estados principais
+  // principais estados
   const [refuelings, setRefuelings] = useState([]);
   const [selectedItem, setSelected] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
 
-  // Anexos + assinatura
-  const [formState, setFormState] = useState({});
-  const [dialogFiles, setDialogFiles] = useState([]);
-  const [openSignature, setOpenSignature] = useState(false);
+  // para payload pendente e arquivos antes da assinatura
+  const pendingSaveRef = useRef({ payload: null, files: [] });
   const sigRef = useRef(null);
+  const [openSignature, setOpenSignature] = useState(false);
 
-  // Detalhes
+  // diálogo e detalhes
+  const [dialogFiles, setDialogFiles] = useState([]);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
 
-  // Filtros
+  // filtros
   const [search, setSearch] = useState('');
   const [fuel, setFuel] = useState('');
   const [dIni, setDIni] = useState('');
   const [dFim, setDFim] = useState('');
 
-  // Estoques
+  // estoques
   const [stockDiesel, setStockDiesel] = useState(0);
   const [stockArla, setStockArla] = useState(0);
 
-  // Carregar lista + estoques
+  // breakpoint para fullScreen dialog de assinatura
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down('md'));
+
   useEffect(() => {
     fetchRefuelings().then(setRefuelings);
-
     fetchProductStock([33940, 34345])
       .then(rows => {
         rows.forEach(r => {
@@ -101,70 +100,34 @@ export default function Refueling() {
           if (r.CODPROD === 34345) setStockArla(r.QTESTGER);
         });
       })
-      .catch(err => console.error('Falha ao buscar estoque:', err));
+      .catch(console.error);
   }, []);
 
-  // Handler de exclusão
-  const handleDelete = async (id) => {
+  const handleDelete = async id => {
     if (!window.confirm('Confirma exclusão deste abastecimento?')) return;
     try {
       await deleteRefueling(id);
-      const updated = await fetchRefuelings();
-      setRefuelings(updated);
+      setRefuelings(await fetchRefuelings());
     } catch (err) {
       console.error(err);
       alert('Erro ao excluir: ' + (err.response?.data?.error || err.message));
     }
   };
 
-  // Filtro de pesquisa
-  const normalize = (s = '') =>
+  const normalize = s =>
     s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-
   const dataFiltered = refuelings.filter(r => {
     const label = r.vehicleLabel || r.vehicle_id;
     const vMatch = normalize(label).includes(normalize(search));
     const fMatch = !fuel || r.fuelType === fuel;
-    const d = r.date.split('T')[0];
-    const dMatch = (!dIni || d >= dIni) && (!dFim || d <= dFim);
+    const date = r.date.split('T')[0];
+    const dMatch = (!dIni || date >= dIni) && (!dFim || date <= dFim);
     return vMatch && fMatch && dMatch;
   });
 
-  // Abrir/fechar formulário
   function openForm(item = null) {
-    if (item) {
-      setIsEditing(true);
-      setSelected(item);
-      setFormState({
-        vehicle_id: item.vehicle_id,
-        fuelType: item.fuelType,
-        date: item.date.split('T')[0],
-        post: item.post,
-        pump: item.pump || '',
-        invoiceNumber: item.invoiceNumber || '',
-        unitPrice: item.unitPrice || '',
-        liters: item.liters,
-        mileage: item.mileage,
-        observation: item.observation || '',
-        signature: item.signatureUrl || '',
-      });
-    } else {
-      setIsEditing(false);
-      setSelected(null);
-      setFormState({
-        vehicle_id: '',
-        fuelType: 'DIESEL',
-        date: '',
-        post: 'interno',
-        pump: '',
-        invoiceNumber: '',
-        unitPrice: '',
-        liters: '',
-        mileage: '',
-        observation: '',
-        signature: '',
-      });
-    }
+    setIsEditing(!!item);
+    setSelected(item);
     setDialogFiles([]);
     setOpenDialog(true);
   }
@@ -174,12 +137,11 @@ export default function Refueling() {
     setIsEditing(false);
     setSelected(null);
     setDialogFiles([]);
-    setFormState({});
   }
 
-  // Salvar
+  // salva payload e arquivos no ref; abre assinatura ou grava direto
   function handleSave(data, newFiles) {
-    const persisted = isEditing ? (selectedItem?.attachments?.length || 0) : 0;
+    const persisted = isEditing ? selectedItem?.attachments?.length || 0 : 0;
     if (persisted === 0 && newFiles.length === 0)
       return alert('Anexe pelo menos um arquivo.');
     if (data.post === 'interno' && !data.pump)
@@ -187,67 +149,73 @@ export default function Refueling() {
     if (data.post === 'externo' && (!data.invoiceNumber || !data.unitPrice))
       return alert('Informe nota e preço.');
 
-    setFormState({ ...data });
-    setDialogFiles(newFiles);
-    if (!data.signature) setOpenSignature(true);
-    else doSave(data, newFiles, data.signature);
+    // guarda no ref
+    pendingSaveRef.current = { payload: data, files: newFiles };
+
+    // se não tiver assinatura, abre o diálogo dela
+    if (!data.signature) {
+      setOpenSignature(true);
+    } else {
+      doSave(data, newFiles, data.signature);
+    }
   }
+  const [isSaving, setIsSaving] = useState(false);
 
   async function doSave(payload, files, sigUrl) {
+    setIsSaving(true);
     try {
       const sigBlob = sigUrl?.startsWith('data:')
         ? await fetch(sigUrl).then(r => r.blob())
         : null;
-      if (isEditing)
-        await updateRefueling(selectedItem.id, payload, files, sigBlob);
-      else
-        await createRefueling(payload, files, sigBlob);
 
-      const updated = await fetchRefuelings();
-      setRefuelings(updated);
+      if (isEditing) {
+        await updateRefueling(selectedItem.id, payload, files, sigBlob);
+      } else {
+        await createRefueling(payload, files, sigBlob);
+      }
+
+      setRefuelings(await fetchRefuelings());
       closeForm();
+      setOpenSignature(false);
+
     } catch (err) {
       console.error(err);
       alert('Erro: ' + (err.response?.data?.error || err.message));
     }
   }
 
-  // Assinatura
+  // dispara ao confirmar assinatura
   const confirmSignature = () => {
-    if (sigRef.current?.isEmpty())
+    if (sigRef.current.isEmpty()) {
       return alert('Assine antes de confirmar.');
+    }
     const url = sigRef.current.toDataURL();
     setOpenSignature(false);
-    doSave(formState, dialogFiles, url);
+    const { payload, files } = pendingSaveRef.current;
+    doSave(payload, files, url);
   };
 
-  // Detalhes
   const openDetails = item => {
     setDetailItem(item);
     setDetailOpen(true);
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
+  const formatDate = d =>
+    new Date(d).toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
+
+  const getStockStatus = stock => {
+    if (stock > 1000) return { color: '#2E7D32', icon: CheckCircleIcon, label: 'Normal' };
+    if (stock > 500) return { color: '#F57C00', icon: WarningIcon, label: 'Atenção' };
+    return { color: '#C62828', icon: WarningIcon, label: 'Crítico' };
   };
-
-  // Função para determinar status do estoque
-  const getStockStatus = (stock, fuelType) => {
-    // Critérios mais conservadores para status
-    if (stock > 1000) return { color: '#2E7D32', icon: CheckCircleIcon, status: 'Normal' };
-    if (stock > 500) return { color: '#F57C00', icon: WarningIcon, status: 'Atenção' };
-    return { color: '#C62828', icon: WarningIcon, status: 'Crítico' };
-  };
-
-  const dieselStatus = getStockStatus(stockDiesel, 'DIESEL');
-  const arlaStatus = getStockStatus(stockArla, 'ARLA');
-
+  const dieselStatus = getStockStatus(stockDiesel);
+  const arlaStatus = getStockStatus(stockArla);
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f8fafc' }}>
       <AppBar
@@ -845,92 +813,36 @@ export default function Refueling() {
         />
 
         {/* Assinatura */}
+        {/* assinatura */}
         <Dialog
           open={openSignature}
           onClose={() => setOpenSignature(false)}
-          maxWidth="sm"
-          fullWidth
-          PaperProps={{
-            sx: {
-              borderRadius: 3,
-              border: '1px solid #e2e8f0'
-            }
-          }}
+          fullScreen={fullScreen}
         >
-          <DialogTitle sx={{ textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>
-            Assinatura do Responsável
-          </DialogTitle>
-          <DialogContent>
-            <Box sx={{ mt: 2 }}>
-              <Paper
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: '#f8fafc',
-                  border: '2px dashed #cbd5e1'
-                }}
-              >
-                <canvas
-                  ref={sigRef}
-                  width={400}
-                  height={200}
-                  style={{
-                    backgroundColor: 'white',
-                    borderRadius: '8px',
-                    touchAction: 'none',
-                    width: '100%',
-                    maxWidth: '400px',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-                  }}
-                />
-              </Paper>
-              <Box sx={{ mt: 2, textAlign: 'center' }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => sigRef.current?.clear?.()}
-                  startIcon={<ClearIcon />}
-                  sx={{
-                    borderRadius: 2,
-                    borderColor: '#cbd5e1',
-                    color: '#64748b',
-                    textTransform: 'none',
-                    '&:hover': {
-                      borderColor: '#94a3b8',
-                      bgcolor: '#f8fafc'
-                    }
-                  }}
-                >
-                  Limpar Assinatura
-                </Button>
-              </Box>
-            </Box>
-          </DialogContent>
-          <DialogActions sx={{ p: 3, gap: 2 }}>
-            <Button
-              onClick={() => setOpenSignature(false)}
-              sx={{
-                borderRadius: 2,
-                textTransform: 'none',
-                color: '#64748b'
+          <DialogTitle>Assinatura do Responsável</DialogTitle>
+          <DialogContent dividers>
+            <SignatureCanvas
+              ref={sigRef}
+              penColor="black"
+              canvasProps={{
+                width: fullScreen ? window.innerWidth - 20 : 400,
+                height: 200,
               }}
-            >
-              Cancelar
+            />
+            <Button onClick={() => sigRef.current.clear()} sx={{ mt: 1 }}>
+              Limpar
             </Button>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenSignature(false)}>Cancelar</Button>
             <Button
               variant="contained"
               onClick={confirmSignature}
-              sx={{
-                borderRadius: 2,
-                bgcolor: '#1e293b',
-                textTransform: 'none',
-                fontWeight: 500,
-                '&:hover': {
-                  bgcolor: '#334155',
-                }
-              }}
+              disabled={isSaving}
             >
-              Confirmar Assinatura
+              {isSaving ? 'Salvando...' : 'Confirmar'}
             </Button>
+
           </DialogActions>
         </Dialog>
       </Container>

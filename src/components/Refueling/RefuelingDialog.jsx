@@ -34,13 +34,12 @@ import {
 } from '@mui/icons-material';
 import api from '../../services/apiFlask';
 
-// Mapeamento de bomba padrão conforme tipo de combustível
 const pumpMap = {
   DIESEL: 'B1',
   ARLA: 'B2',
 };
 
-export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
+export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [attachments, setAttachments] = useState([]);
@@ -49,35 +48,36 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
     fuelType: 'DIESEL',
     date: '',
     post: 'interno',
-    pump: pumpMap['DIESEL'],
+    pump: pumpMap.DIESEL,
     invoiceNumber: '',
     unitPrice: '',
     liters: '',
     mileage: '',
     observation: '',
+    signature: '',
   });
   const [errors, setErrors] = useState({});
   const fileInputRef = useRef(null);
 
-  // Carrega veículos disponíveis
+  // Carrega veículos disponíveis quando abre o dialog
   useEffect(() => {
     if (!open) return;
     api.get('/vehicles/available')
-      .then(({ data }) => setVehicles(data))
+      .then(resp => setVehicles(resp.data))
       .catch(console.error);
   }, [open]);
 
-  // Inicializa o form ao abrir
+  // Inicializa formulário para edição ou criação
   useEffect(() => {
     if (!open) return;
-
     if (selectedItem) {
-      const veh = vehicles.find(v => v.id === selectedItem.vehicle_id) || null;
-      setSelectedVehicle(veh);
+      setSelectedVehicle(
+        vehicles.find(v => v.id === selectedItem.vehicle_id) || null
+      );
       setFormData({
         vehicle_id: selectedItem.vehicle_id,
         fuelType: selectedItem.fuelType,
-        date: selectedItem.date.split('T')[0],
+        date: selectedItem.date.slice(0, 16),
         post: selectedItem.post,
         pump: selectedItem.pump || pumpMap[selectedItem.fuelType],
         invoiceNumber: selectedItem.invoiceNumber || '',
@@ -85,6 +85,7 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
         liters: selectedItem.liters.toString(),
         mileage: selectedItem.mileage.toString(),
         observation: selectedItem.observation || '',
+        signature: selectedItem.signatureUrl || '',
       });
       setAttachments(selectedItem.attachments || []);
     } else {
@@ -94,36 +95,33 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
         fuelType: 'DIESEL',
         date: '',
         post: 'interno',
-        pump: pumpMap['DIESEL'],
+        pump: pumpMap.DIESEL,
         invoiceNumber: '',
         unitPrice: '',
         liters: '',
         mileage: '',
         observation: '',
+        signature: '',
       });
       setAttachments([]);
     }
     setErrors({});
   }, [open, selectedItem, vehicles]);
 
-  // Atualiza valor de campo genérico
+  // Atualiza campo genérico
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }));
+    setErrors(prev => ({ ...prev, [field]: '' }));
   };
 
-  // Troca de combustível ajusta bomba
-  const handleFuelTypeChange = e => {
-    const fuelType = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      fuelType,
-      pump: pumpMap[fuelType],
-    }));
+  // Quando troca combustível, reseta a bomba
+  const handleFuelChange = e => {
+    const ft = e.target.value;
+    setFormData(prev => ({ ...prev, fuelType: ft, pump: pumpMap[ft] }));
     setErrors(prev => ({ ...prev, fuelType: '', pump: '' }));
   };
 
-  // Seleção de veículo via Autocomplete
+  // Seleção de veículo
   const handleVehicleChange = (_, vehicle) => {
     setSelectedVehicle(vehicle);
     handleInputChange('vehicle_id', vehicle?.id || '');
@@ -132,92 +130,39 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
     }
   };
 
-  // Adiciona arquivos
+  // Gestão de anexos
   const handleFileChange = e => {
     const files = Array.from(e.target.files || []);
     if (files.length) setAttachments(prev => [...prev, ...files]);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    fileInputRef.current.value = '';
   };
-
-  // Remove anexo
-  const removeAttachment = idx => {
+  const removeAttachment = idx =>
     setAttachments(prev => prev.filter((_, i) => i !== idx));
-  };
 
-  const getFileIcon = file => {
-    const type = file.mimeType ?? file.type;
-    if (type.includes('image')) return <ImageIcon />;
-    if (type.includes('pdf')) return <PdfIcon />;
-    return <FileIcon />;
-  };
-  const getFileName = file => file.fileName ?? file.name;
-  const getFileSize = file => `${(file.size / 1024).toFixed(1)} KB`;
-
-  // Validação básica dos campos
+  // Validação mínima
   const validateForm = () => {
-    const errs = {};
-    if (!formData.vehicle_id) errs.vehicle_id = 'Selecione um veículo';
-    if (!formData.date) errs.date = 'Informe a data';
-    if (!formData.liters) errs.liters = 'Informe os litros';
-    if (!formData.mileage) errs.mileage = 'Informe a quilometragem';
-    if (formData.post === 'interno' && !formData.pump) {
-      errs.pump = 'Informe a bomba';
-    }
+    const err = {};
+    if (!formData.vehicle_id) err.vehicle_id = 'Selecione veículo';
+    if (!formData.date) err.date = 'Informe data e hora';
+    if (!formData.liters) err.liters = 'Informe litros';
+    if (!formData.mileage) err.mileage = 'Informe quilometragem';
+    if (formData.post === 'interno' && !formData.pump) err.pump = 'Informe bomba';
     if (formData.post === 'externo') {
-      if (!formData.invoiceNumber) errs.invoiceNumber = 'Informe número da nota';
-      if (!formData.unitPrice) errs.unitPrice = 'Informe preço unitário';
+      if (!formData.invoiceNumber) err.invoiceNumber = 'Informe nota';
+      if (!formData.unitPrice) err.unitPrice = 'Informe preço';
     }
-    // precisa de pelo menos 1 anexo (antigo ou novo)
-    const hasOld = attachments.filter(a => !('size' in a)).length > 0;
-    const hasNew = attachments.filter(a => 'size' in a).length > 0;
-    if (!hasOld && !hasNew) {
-      alert('Anexe pelo menos um arquivo');
-      return false;
-    }
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
+    setErrors(err);
+    return Object.keys(err).length === 0;
   };
 
-  // SUBMIT: monta FormData com os nomes corretos e envia
+  // Só dispara dados pro pai, sem tocar na API aqui
   const handleSubmit = e => {
     e.preventDefault();
     if (!validateForm()) return;
-
-    const fd = new FormData();
-    fd.append("vehicle_id", formData.vehicle_id);
-    fd.append("fuel_type", formData.fuelType);
-    fd.append("date", formData.date);
-    fd.append("post", formData.post);
-    fd.append("liters", formData.liters);
-    fd.append("mileage", formData.mileage);
-    fd.append("pump", formData.pump || "");
-    fd.append("observation", formData.observation || "");
-    if (formData.post === "externo") {
-      fd.append("invoice_number", formData.invoiceNumber);
-      fd.append("unit_price", formData.unitPrice);
-    }
-    // anexos novos
-    attachments
-      .filter(f => f instanceof File)
-      .forEach(f => fd.append("attachments", f, f.name));
-
-    const call = selectedItem
-      ? api.patch(`/refuelings/${selectedItem.id}`, fd, {
-        headers: { "Content-Type": "multipart/form-data" }
-      })
-      : api.post('/refuelings', fd, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
-
-    call
-      .then(() => {
-        onSubmit();  // re-fetch na página
-        onClose();
-      })
-      .catch(err => {
-        console.error(err);
-        alert('Erro ao salvar abastecimento');
-      });
+    // coleta apenas arquivos novos (File instances)
+    const newFiles = attachments.filter(f => f instanceof File);
+    onSubmit(formData, newFiles);
+    onClose();
   };
 
   return (
@@ -229,8 +174,7 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
         <form onSubmit={handleSubmit}>
           <Box mt={2}>
             <Grid container spacing={3}>
-
-              {/* VEÍCULO */}
+              {/* Veículo */}
               <Grid item xs={12}>
                 <Autocomplete
                   options={vehicles}
@@ -252,35 +196,31 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
                 />
               </Grid>
 
-              {/* COMBUSTÍVEL */}
+              {/* Combustível */}
               <Grid item xs={12}>
                 <FormControl component="fieldset">
                   <FormLabel>Combustível</FormLabel>
                   <RadioGroup
                     row
                     value={formData.fuelType}
-                    onChange={handleFuelTypeChange}
+                    onChange={handleFuelChange}
                   >
                     <FormControlLabel
-                      value="DIESEL"
-                      control={<Radio />}
-                      label="DIESEL"
+                      value="DIESEL" control={<Radio />} label="DIESEL"
                     />
                     <FormControlLabel
-                      value="ARLA"
-                      control={<Radio />}
-                      label="ARLA"
+                      value="ARLA" control={<Radio />} label="ARLA"
                     />
                   </RadioGroup>
                 </FormControl>
               </Grid>
 
-              {/* DATA */}
+              {/* Data/Hora */}
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
-                  type="date"
-                  label="Data"
+                  type="datetime-local"
+                  label="Data e hora"
                   value={formData.date}
                   onChange={e => handleInputChange('date', e.target.value)}
                   InputLabelProps={{ shrink: true }}
@@ -290,7 +230,7 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
                 />
               </Grid>
 
-              {/* POSTO */}
+              {/* Posto */}
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
@@ -304,7 +244,7 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
                 </TextField>
               </Grid>
 
-              {/* BOMBA ou NOTA+PREÇO */}
+              {/* Bomba ou Nota+Preço */}
               {formData.post === 'interno' ? (
                 <Grid item xs={12} md={6}>
                   <TextField
@@ -322,7 +262,7 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="Nota"
+                      label="Número da nota"
                       value={formData.invoiceNumber}
                       onChange={e => handleInputChange('invoiceNumber', e.target.value)}
                       error={!!errors.invoiceNumber}
@@ -346,7 +286,7 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
                 </>
               )}
 
-              {/* LITROS */}
+              {/* Litros */}
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
@@ -361,7 +301,7 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
                 />
               </Grid>
 
-              {/* QUILOMETRAGEM */}
+              {/* Quilometragem */}
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
@@ -375,7 +315,7 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
                 />
               </Grid>
 
-              {/* OBSERVAÇÃO */}
+              {/* Observação */}
               <Grid item xs={12}>
                 <TextField
                   fullWidth
@@ -387,11 +327,9 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
                 />
               </Grid>
 
-              {/* ANEXOS */}
+              {/* Anexos */}
               <Grid item xs={12}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Anexos (pelo menos 1)
-                </Typography>
+                <Typography variant="subtitle1">Anexos</Typography>
                 <Button
                   variant="outlined"
                   component="label"
@@ -402,30 +340,29 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
                   Adicionar Arquivos
                   <input
                     ref={fileInputRef}
+                    hidden
                     type="file"
                     multiple
                     accept="image/*,application/pdf"
                     onChange={handleFileChange}
-                    hidden
                   />
                 </Button>
                 {attachments.length > 0 && (
                   <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
                     <List dense>
-                      {attachments.map((file, i) => (
+                      {attachments.map((f, i) => (
                         <ListItem key={i} divider>
-                          <ListItemIcon>{getFileIcon(file)}</ListItemIcon>
+                          <ListItemIcon>
+                            {f.type?.startsWith('image') ? <ImageIcon /> :
+                              f.type?.includes('pdf') ? <PdfIcon /> : <FileIcon />}
+                          </ListItemIcon>
                           <ListItemText
-                            primary={getFileName(file)}
-                            secondary={'size' in file ? getFileSize(file) : ''}
+                            primary={f.name}
+                            secondary={`${(f.size / 1024).toFixed(1)} KB`}
                           />
                           <ListItemSecondaryAction>
-                            <IconButton
-                              edge="end"
-                              color="error"
-                              onClick={() => removeAttachment(i)}
-                            >
-                              <DeleteIcon />
+                            <IconButton onClick={() => removeAttachment(i)}>
+                              <DeleteIcon color="error" />
                             </IconButton>
                           </ListItemSecondaryAction>
                         </ListItem>
@@ -444,11 +381,10 @@ export const RefuelingDialog = ({ open, onClose, selectedItem, onSubmit }) => {
                   </Button>
                 </DialogActions>
               </Grid>
-
             </Grid>
           </Box>
         </form>
       </DialogContent>
     </Dialog>
   );
-};
+}
