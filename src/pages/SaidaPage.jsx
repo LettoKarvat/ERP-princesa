@@ -1066,23 +1066,43 @@ export default function VehicleDepartureSystem() {
                         </Grid>
 
                         {/* destino */}
+                        {/* destino com Autocomplete */}
                         <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth required>
-                                <InputLabel sx={{ color: '#94a3b8' }}>Destino *</InputLabel>
-                                <Select
-                                    value={newSaida.destino}
-                                    label="Destino *"
-                                    onChange={(e) => setNewSaida((p) => ({ ...p, destino: e.target.value }))}
-                                    sx={{ bgcolor: '#334155', color: 'white', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#475569' } }}
-                                >
-                                    {destinations.map((d) => (
-                                        <MenuItem key={d.id} value={d.id}>
-                                            {d.nome}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                            <Autocomplete
+                                options={destinations}
+                                getOptionLabel={o => o.nome}
+                                /* para mostrar o label correto no controle */
+                                value={destinations.find(d => d.id === newSaida.destino) || null}
+                                onChange={(_, v) => {
+                                    setNewSaida(p => ({ ...p, destino: v?.id || '' }));
+                                }}
+                                autoHighlight           /* já deixa o primeiro item destacado ao digitar */
+                                clearOnEscape           /* ESC limpa o campo */
+                                disableClearable={false}
+                                renderInput={params => (
+                                    <TextField
+                                        {...params}
+                                        label="Destino *"
+                                        required
+                                        InputProps={{
+                                            ...params.InputProps,
+                                            sx: {
+                                                bgcolor: '#334155',
+                                                color: 'white',
+                                                '& .MuiOutlinedInput-notchedOutline': { borderColor: '#475569' },
+                                            }
+                                        }}
+                                        InputLabelProps={{ sx: { color: '#94a3b8' } }}
+                                    />
+                                )}
+                                sx={{
+                                    '& .MuiAutocomplete-popupIndicator': { color: '#94a3b8' },
+                                    '& .MuiAutocomplete-clearIndicator': { color: '#94a3b8' },
+                                    width: '100%',
+                                }}
+                            />
                         </Grid>
+
 
                         {/* km */}
                         <Grid item xs={12} sm={6}>
