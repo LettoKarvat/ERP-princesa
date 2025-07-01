@@ -272,7 +272,7 @@ export default function ChegadaPage() {
     }
 
     function trySave() {
-        const s = saidas.find(x => x.id === parseInt(form.saidaId));
+        const s = saidas.find(x => x.id === form.saidaId);
         if ((!s && !editId)) return alert("Selecione saída válida.");
         if (!form.motoristaId) return alert("Informe o motorista.");
         if (s && parseInt(form.kmChegada) < parseInt(s.km_saida)) {
