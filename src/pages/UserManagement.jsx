@@ -18,7 +18,7 @@ import {
 } from "@mui/material";
 import api from "../services/apiFlask"; // Axios configurado para o Flask
 
-// Lista de roles disponíveis
+/* --------- ROLES DISPONÍVEIS ---------- */
 const roleOptions = [
     { value: "admin", label: "Administrador" },
     { value: "abastecimento", label: "Abastecimento" },
@@ -28,35 +28,26 @@ const roleOptions = [
 ];
 
 export default function UserManagement() {
-    // ---------------------------
-    // ESTADOS PARA CRIAR USUÁRIO
-    // ---------------------------
+    /* ---------- ESTADOS: CRIAÇÃO --------- */
     const [fullname, setFullname] = useState("");
-    const [email, setEmail] = useState(""); // usado quando role = admin
-    const [matricula, setMatricula] = useState(""); // usado quando role != admin
+    const [email, setEmail] = useState("");
+    const [matricula, setMatricula] = useState("");
     const [password, setPassword] = useState("");
     const [role, setRole] = useState("");
     const [error, setError] = useState("");
 
-    // ---------------------------
-    // LISTA DE USUÁRIOS
-    // ---------------------------
+    /* ---------- ESTADOS: LISTA ----------- */
     const [users, setUsers] = useState([]);
 
-    // ---------------------------
-    // CAMPO DE BUSCA
-    // ---------------------------
+    /* ---------- BUSCA & FILTRO ----------- */
     const [searchTerm, setSearchTerm] = useState("");
+    const [filterRole, setFilterRole] = useState(""); // <— NOVO
 
-    // ---------------------------
-    // MODAL DE CREDENCIAIS (PÓS-CRIAÇÃO)
-    // ---------------------------
+    /* ---------- MODAL CREDENCIAIS -------- */
     const [modalCredOpen, setModalCredOpen] = useState(false);
     const [createdUser, setCreatedUser] = useState(null);
 
-    // ---------------------------
-    // MODAL DE EDIÇÃO
-    // ---------------------------
+    /* ---------- MODAL EDIÇÃO ------------- */
     const [modalEditOpen, setModalEditOpen] = useState(false);
     const [editUserId, setEditUserId] = useState("");
     const [editFullname, setEditFullname] = useState("");
@@ -65,24 +56,18 @@ export default function UserManagement() {
     const [editPassword, setEditPassword] = useState("");
     const [editRole, setEditRole] = useState("");
 
-    // ---------------------------
-    // MODAL DE EXCLUSÃO
-    // ---------------------------
+    /* ---------- MODAL EXCLUSÃO ----------- */
     const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
     const [deleteUserId, setDeleteUserId] = useState("");
 
-    // Carrega usuários ao montar
+    /* ---------- CARREGAR USUÁRIOS -------- */
     useEffect(() => {
         loadUsers();
     }, []);
 
-    // ---------------------------
-    // CARREGAR LISTA DE USUÁRIOS
-    // ---------------------------
     const loadUsers = async () => {
         try {
-            // Chama GET /users no Flask (retorna só is_active=true)
-            const response = await api.get("/users");
+            const response = await api.get("/users"); // is_active=true
             setUsers(response.data);
         } catch (err) {
             console.error("Erro ao listar usuários:", err);
@@ -90,61 +75,41 @@ export default function UserManagement() {
         }
     };
 
-    // ---------------------------
-    // CRIAR NOVO USUÁRIO
-    // ---------------------------
+    /* ---------- CRIAR USUÁRIO ------------ */
     const handleCreateUser = async (e) => {
         e.preventDefault();
         setError("");
 
-        // Verificação básica
         if (!fullname || !password || !role) {
             setError("Preencha nome completo, senha e tipo de usuário.");
             return;
         }
-
-        // Se for admin, exigimos email. Se não for, exigimos matrícula
         if (role === "admin" && !email) {
             setError("Para criar um Admin, informe o email.");
             return;
-        } else if (role !== "admin" && !matricula) {
+        }
+        if (role !== "admin" && !matricula) {
             setError("Para criar usuários não-admin, informe a matrícula.");
             return;
         }
 
         try {
-            // Monta o payload conforme a role
-            const payload = {
-                fullname,
-                password,
-                role,
-            };
+            const payload = { fullname, password, role };
+            if (role === "admin") payload.email = email.trim().toLowerCase();
+            else payload.matricula = matricula.trim();
 
-            if (role === "admin") {
-                payload.email = email.trim().toLowerCase();
-            } else {
-                payload.matricula = matricula.trim();
-            }
-
-            // Chama POST /users para criar usuário no Flask
             const response = await api.post("/users", payload);
-
-            // Supondo que o Flask retorne o objeto criado em { id, fullname, role, username }
             const newUser = response.data;
-            const created = {
+
+            setCreatedUser({
                 fullname: newUser.fullname,
                 role: newUser.role,
                 password,
                 username: newUser.username,
-            };
-
-            setCreatedUser(created);
+            });
             setModalCredOpen(true);
 
-            // Recarrega a lista de usuários
             loadUsers();
-
-            // Limpa os campos
             setFullname("");
             setEmail("");
             setMatricula("");
@@ -156,40 +121,27 @@ export default function UserManagement() {
         }
     };
 
-    // ---------------------------
-    // COPIAR CREDENCIAIS
-    // ---------------------------
+    /* ---------- CÓPIA DE CREDENCIAIS ----- */
     const handleCopy = () => {
-        if (createdUser) {
-            const creds =
-                `Nome: ${createdUser.fullname}\n` +
-                `Usuário: ${createdUser.username}\n` +
-                `Tipo: ${createdUser.role}\n` +
-                `Senha: ${createdUser.password}`;
-            navigator.clipboard.writeText(creds).then(() => {
-                alert("Credenciais copiadas para a área de transferência!");
-            });
-        }
+        if (!createdUser) return;
+        const creds = `Nome: ${createdUser.fullname}\nUsuário: ${createdUser.username}\nTipo: ${createdUser.role}\nSenha: ${createdUser.password}`;
+        navigator.clipboard.writeText(creds).then(() =>
+            alert("Credenciais copiadas para a área de transferência!")
+        );
     };
 
-    // ---------------------------
-    // FECHAR MODAL DE CREDENCIAIS
-    // ---------------------------
+    /* ---------- ABERTURA/FECHO MODAIS ---- */
     const handleCloseCredModal = () => {
         setModalCredOpen(false);
         setCreatedUser(null);
     };
 
-    // ---------------------------
-    // ABRIR MODAL DE EDIÇÃO
-    // ---------------------------
     const openEditModal = (user) => {
         setEditUserId(user.id);
         setEditFullname(user.fullname);
-        setEditPassword(""); // começa vazio, se não quiser alterar
+        setEditPassword("");
         setEditRole(user.role);
 
-        // Se for admin, usamos .username (que é o e-mail); se não for, também `username`
         if (user.role === "admin") {
             setEditEmail(user.username || "");
             setEditMatricula("");
@@ -197,13 +149,9 @@ export default function UserManagement() {
             setEditEmail("");
             setEditMatricula(user.username || "");
         }
-
         setModalEditOpen(true);
     };
 
-    // ---------------------------
-    // FECHAR MODAL DE EDIÇÃO
-    // ---------------------------
     const closeEditModal = () => {
         setModalEditOpen(false);
         setEditUserId("");
@@ -214,13 +162,8 @@ export default function UserManagement() {
         setEditRole("");
     };
 
-    // ---------------------------
-    // SALVAR EDIÇÃO
-    // ---------------------------
     const handleSaveEdit = async () => {
         if (!editUserId) return;
-
-        // Se for admin, precisamos de e-mail; se não for admin, precisamos de matrícula
         if (editRole === "admin" && !editEmail) {
             alert("Admin precisa de e-mail");
             return;
@@ -231,25 +174,13 @@ export default function UserManagement() {
         }
 
         try {
-            // Monta o payload
-            const payload = {
-                fullname: editFullname,
-                role: editRole,
-            };
-
-            if (editPassword) {
-                payload.password = editPassword;
-            }
-
-            if (editRole === "admin") {
+            const payload = { fullname: editFullname, role: editRole };
+            if (editPassword) payload.password = editPassword;
+            if (editRole === "admin")
                 payload.email = editEmail.trim().toLowerCase();
-            } else {
-                payload.matricula = editMatricula.trim();
-            }
+            else payload.matricula = editMatricula.trim();
 
-            // Chama PUT /users/:id para atualizar usuário no Flask
             await api.put(`/users/${editUserId}`, payload);
-
             closeEditModal();
             loadUsers();
         } catch (err) {
@@ -258,29 +189,17 @@ export default function UserManagement() {
         }
     };
 
-    // ---------------------------
-    // ABRIR MODAL DE EXCLUSÃO
-    // ---------------------------
     const openDeleteModal = (userId) => {
         setDeleteUserId(userId);
         setModalDeleteOpen(true);
     };
-
-    // ---------------------------
-    // FECHAR MODAL DE EXCLUSÃO
-    // ---------------------------
     const closeDeleteModal = () => {
         setDeleteUserId("");
         setModalDeleteOpen(false);
     };
-
-    // ---------------------------
-    // CONFIRMAR EXCLUSÃO (SOFT DELETE)
-    // ---------------------------
     const handleConfirmDelete = async () => {
         if (!deleteUserId) return;
         try {
-            // Chama DELETE /users/:id no Flask
             await api.delete(`/users/${deleteUserId}`);
             closeDeleteModal();
             loadUsers();
@@ -290,23 +209,21 @@ export default function UserManagement() {
         }
     };
 
-    // ---------------------------
-    // FILTRO DE USUÁRIOS ATIVOS E BUSCA
-    // ---------------------------
+    /* ---------- FILTRO & BUSCA ----------- */
     const activeUsers = users.filter((u) => u.is_active);
     const filteredUsers = activeUsers.filter((u) => {
-        const identifierValue = u.username || "";
         const lowerSearch = searchTerm.toLowerCase();
         const matchesFullname = u.fullname.toLowerCase().includes(lowerSearch);
-        const matchesIdentifier = identifierValue.toLowerCase().includes(lowerSearch);
-        return matchesFullname || matchesIdentifier;
+        const matchesIdentifier = (u.username || "")
+            .toLowerCase()
+            .includes(lowerSearch);
+        const matchesRole = filterRole ? u.role === filterRole : true; // <— NOVO
+        return (matchesFullname || matchesIdentifier) && matchesRole;
     });
 
-    // ======================
-    // RENDER
-    // ======================
+    /* ================ RENDER =============== */
     return (
-        <Box sx={{ maxWidth: 900, margin: "0 auto", mt: 4 }}>
+        <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
             <Typography variant="h5" sx={{ mb: 2 }}>
                 Gerenciamento de Usuários
             </Typography>
@@ -317,16 +234,11 @@ export default function UserManagement() {
                 </Alert>
             )}
 
-            {/* FORM DE CRIAR NOVO USUÁRIO */}
+            {/* -------- FORM: CRIAR USUÁRIO -------- */}
             <Box
                 component="form"
                 onSubmit={handleCreateUser}
-                sx={{
-                    p: 2,
-                    mb: 3,
-                    border: "1px solid #ccc",
-                    borderRadius: 2,
-                }}
+                sx={{ p: 2, mb: 3, border: "1px solid #ccc", borderRadius: 2 }}
             >
                 <Typography variant="h6" sx={{ mb: 2 }}>
                     Criar Novo Usuário
@@ -341,7 +253,6 @@ export default function UserManagement() {
                     onChange={(e) => setFullname(e.target.value)}
                 />
 
-                {/* Se role=admin => pede email; senão => pede matrícula */}
                 {role === "admin" ? (
                     <TextField
                         label="Email"
@@ -390,12 +301,12 @@ export default function UserManagement() {
                     </Select>
                 </FormControl>
 
-                <Button type="submit" variant="contained" color="primary">
+                <Button type="submit" variant="contained">
                     Criar Usuário
                 </Button>
             </Box>
 
-            {/* CAMPO DE BUSCA */}
+            {/* -------- BUSCA & FILTRO -------- */}
             <TextField
                 label="Pesquisar usuário por nome ou usuário"
                 variant="outlined"
@@ -405,7 +316,24 @@ export default function UserManagement() {
                 onChange={(e) => setSearchTerm(e.target.value)}
             />
 
-            {/* LISTA DE USUÁRIOS */}
+            <FormControl fullWidth sx={{ mb: 3 }}>
+                <InputLabel id="filter-role-label">Filtrar por Tipo</InputLabel>
+                <Select
+                    labelId="filter-role-label"
+                    label="Filtrar por Tipo"
+                    value={filterRole}
+                    onChange={(e) => setFilterRole(e.target.value)}
+                >
+                    <MenuItem value="">Todos</MenuItem>
+                    {roleOptions.map((r) => (
+                        <MenuItem key={r.value} value={r.value}>
+                            {r.label}
+                        </MenuItem>
+                    ))}
+                </Select>
+            </FormControl>
+
+            {/* -------- LISTA DE USUÁRIOS ------- */}
             <Typography variant="h6" sx={{ mb: 2 }}>
                 Usuários Ativos
             </Typography>
@@ -447,9 +375,9 @@ export default function UserManagement() {
                 </Paper>
             ))}
 
-            {/* MODAL DE CREDENCIAIS (criação) */}
+            {/* -------- MODAL CREDENCIAIS ------- */}
             <Dialog open={modalCredOpen} onClose={handleCloseCredModal}>
-                <DialogTitle sx={{ bgcolor: "#1976d2", color: "#fff" }}>
+                <DialogTitle sx={{ bgcolor: "primary.main", color: "#fff" }}>
                     Credenciais do Usuário
                 </DialogTitle>
                 <DialogContent dividers sx={{ bgcolor: "#f0f4ff" }}>
@@ -474,14 +402,14 @@ export default function UserManagement() {
                     )}
                 </DialogContent>
                 <DialogActions sx={{ bgcolor: "#f0f4ff" }}>
-                    <Button onClick={handleCopy} variant="contained" sx={{ bgcolor: "#1976d2" }}>
+                    <Button onClick={handleCopy} variant="contained">
                         Copiar Credenciais
                     </Button>
                     <Button onClick={handleCloseCredModal}>Fechar</Button>
                 </DialogActions>
             </Dialog>
 
-            {/* MODAL DE EDIÇÃO */}
+            {/* -------- MODAL EDIÇÃO ----------- */}
             <Dialog open={modalEditOpen} onClose={closeEditModal}>
                 <DialogTitle>Editar Usuário</DialogTitle>
                 <DialogContent dividers>
@@ -494,7 +422,6 @@ export default function UserManagement() {
                         onChange={(e) => setEditFullname(e.target.value)}
                     />
 
-                    {/* Se editRole=admin => Email, senão => Matrícula */}
                     {editRole === "admin" ? (
                         <TextField
                             label="Email"
@@ -551,7 +478,7 @@ export default function UserManagement() {
                 </DialogActions>
             </Dialog>
 
-            {/* MODAL DE EXCLUSÃO */}
+            {/* -------- MODAL EXCLUSÃO --------- */}
             <Dialog open={modalDeleteOpen} onClose={closeDeleteModal}>
                 <DialogTitle>Excluir Usuário</DialogTitle>
                 <DialogContent dividers>
