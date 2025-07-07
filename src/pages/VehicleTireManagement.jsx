@@ -342,7 +342,7 @@ export default function VehicleTireManagement() {
             <div className="bg-white rounded-lg shadow-sm">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
-                        <tr>{['Placa', 'Marca', 'Modelo', 'Tipo', 'Km', 'Ações'].map(h => (
+                        <tr>{['Placa', 'Marca', 'Modelo', 'Tipo', 'Ações'].map(h => (
                             <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
                         ))}</tr>
                     </thead>
@@ -353,9 +353,7 @@ export default function VehicleTireManagement() {
                                 <td className="px-6 py-4 text-sm">{v.marca}</td>
                                 <td className="px-6 py-4 text-sm">{v.modelo}</td>
                                 <td className="px-6 py-4 text-sm">{v.tipo}</td>
-                                <td className="px-6 py-4 text-sm">
-                                    {getKmField(v)?.toLocaleString?.() ?? '—'} km
-                                </td>
+
                                 <td className="px-6 py-4 text-sm">
                                     <button
                                         onClick={() => clickVehicle(v)}
