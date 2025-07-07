@@ -1,52 +1,38 @@
 // src/components/Refueling/RefuelingDialog.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Grid,
-  FormControl,
-  FormLabel,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
-  Box,
-  Typography,
-  Paper,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  ListItemSecondaryAction,
-  IconButton,
-  Autocomplete,
-  MenuItem,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  Button, TextField, Grid, FormControl, FormLabel,
+  RadioGroup, FormControlLabel, Radio, Box, Typography,
+  Paper, List, ListItem, ListItemIcon, ListItemText,
+  ListItemSecondaryAction, IconButton, Autocomplete, MenuItem,
 } from '@mui/material';
 import {
-  CloudUpload as UploadIcon,
-  Image as ImageIcon,
-  PictureAsPdf as PdfIcon,
-  InsertDriveFile as FileIcon,
+  CloudUpload as UploadIcon, Image as ImageIcon,
+  PictureAsPdf as PdfIcon, InsertDriveFile as FileIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import api from '../../services/apiFlask';
 
-const pumpMap = {
-  DIESEL: 'B1',
-  ARLA: 'B2',
+/* data+hora local no formato YYYY-MM-DDTHH:MM */
+const nowLocalISO = () => {
+  const d = new Date();
+  const off = d.getTimezoneOffset() * 60000;
+  return new Date(d - off).toISOString().slice(0, 16);
 };
+
+const pumpMap = { DIESEL: 'B1', ARLA: 'B2' };
 
 export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
+
   const [attachments, setAttachments] = useState([]);
-  const [formData, setFormData] = useState({
+
+  const initialForm = {
     vehicle_id: '',
     fuelType: 'DIESEL',
-    date: '',
+    date: nowLocalISO(),        // já vem com “agora”
     post: 'interno',
     pump: pumpMap.DIESEL,
     invoiceNumber: '',
@@ -55,21 +41,23 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
     mileage: '',
     observation: '',
     signature: '',
-  });
+  };
+  const [formData, setFormData] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const fileInputRef = useRef(null);
 
-  // Carrega veículos disponíveis quando abre o dialog
+  /* carrega veículos ao abrir */
   useEffect(() => {
     if (!open) return;
     api.get('/vehicles/available')
-      .then(resp => setVehicles(resp.data))
+      .then(res => setVehicles(res.data))
       .catch(console.error);
   }, [open]);
 
-  // Inicializa formulário para edição ou criação
+  /* inicializa edição / novo */
   useEffect(() => {
     if (!open) return;
+
     if (selectedItem) {
       setSelectedVehicle(
         vehicles.find(v => v.id === selectedItem.vehicle_id) || null
@@ -90,47 +78,34 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
       setAttachments(selectedItem.attachments || []);
     } else {
       setSelectedVehicle(null);
-      setFormData({
-        vehicle_id: '',
-        fuelType: 'DIESEL',
-        date: '',
-        post: 'interno',
-        pump: pumpMap.DIESEL,
-        invoiceNumber: '',
-        unitPrice: '',
-        liters: '',
-        mileage: '',
-        observation: '',
-        signature: '',
-      });
+      setFormData(initialForm);          // sempre “reset” com data/hora atual
       setAttachments([]);
     }
     setErrors({});
   }, [open, selectedItem, vehicles]);
 
-  // Atualiza campo genérico
+  /* genérico */
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    setErrors(prev => ({ ...prev, [field]: '' }));
+    setFormData(p => ({ ...p, [field]: value }));
+    setErrors(e => ({ ...e, [field]: '' }));
   };
 
-  // Quando troca combustível, reseta a bomba
+  /* troca combustível → ajusta bomba */
   const handleFuelChange = e => {
     const ft = e.target.value;
-    setFormData(prev => ({ ...prev, fuelType: ft, pump: pumpMap[ft] }));
-    setErrors(prev => ({ ...prev, fuelType: '', pump: '' }));
+    setFormData(p => ({ ...p, fuelType: ft, pump: pumpMap[ft] }));
+    setErrors(e => ({ ...e, fuelType: '', pump: '' }));
   };
 
-  // Seleção de veículo
-  const handleVehicleChange = (_, vehicle) => {
-    setSelectedVehicle(vehicle);
-    handleInputChange('vehicle_id', vehicle?.id || '');
-    if (vehicle?.quilometragem) {
-      handleInputChange('mileage', vehicle.quilometragem.toString());
-    }
+  /* seleção veículo */
+  const handleVehicleChange = (_, v) => {
+    setSelectedVehicle(v);
+    handleInputChange('vehicle_id', v?.id || '');
+    if (v?.quilometragem)
+      handleInputChange('mileage', v.quilometragem.toString());
   };
 
-  // Gestão de anexos
+  /* anexos */
   const handleFileChange = e => {
     const files = Array.from(e.target.files || []);
     if (files.length) setAttachments(prev => [...prev, ...files]);
@@ -139,11 +114,11 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
   const removeAttachment = idx =>
     setAttachments(prev => prev.filter((_, i) => i !== idx));
 
-  // Validação mínima
-  const validateForm = () => {
+  /* validação mínima */
+  const validate = () => {
     const err = {};
     if (!formData.vehicle_id) err.vehicle_id = 'Selecione veículo';
-    if (!formData.date) err.date = 'Informe data e hora';
+    if (!formData.date) err.date = 'Informe data/hora';
     if (!formData.liters) err.liters = 'Informe litros';
     if (!formData.mileage) err.mileage = 'Informe quilometragem';
     if (formData.post === 'interno' && !formData.pump) err.pump = 'Informe bomba';
@@ -155,26 +130,27 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
     return Object.keys(err).length === 0;
   };
 
-  // Só dispara dados pro pai, sem tocar na API aqui
+  /* submit */
   const handleSubmit = e => {
     e.preventDefault();
-    if (!validateForm()) return;
-    // coleta apenas arquivos novos (File instances)
-    const newFiles = attachments.filter(f => f instanceof File);
+    if (!validate()) return;
+    const newFiles = attachments.filter(f => f instanceof File); // só arquivos novos
     onSubmit(formData, newFiles);
     onClose();
   };
 
+  /* --- JSX --- */
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>
         {selectedItem ? 'Editar Abastecimento' : 'Novo Abastecimento'}
       </DialogTitle>
+
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <Box mt={2}>
             <Grid container spacing={3}>
-              {/* Veículo */}
+              {/* veículo */}
               <Grid item xs={12}>
                 <Autocomplete
                   options={vehicles}
@@ -196,7 +172,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                 />
               </Grid>
 
-              {/* Combustível */}
+              {/* combustível */}
               <Grid item xs={12}>
                 <FormControl component="fieldset">
                   <FormLabel>Combustível</FormLabel>
@@ -206,16 +182,20 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                     onChange={handleFuelChange}
                   >
                     <FormControlLabel
-                      value="DIESEL" control={<Radio />} label="DIESEL"
+                      value="DIESEL"
+                      control={<Radio />}
+                      label="DIESEL"
                     />
                     <FormControlLabel
-                      value="ARLA" control={<Radio />} label="ARLA"
+                      value="ARLA"
+                      control={<Radio />}
+                      label="ARLA"
                     />
                   </RadioGroup>
                 </FormControl>
               </Grid>
 
-              {/* Data/Hora */}
+              {/* data/hora */}
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
@@ -230,7 +210,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                 />
               </Grid>
 
-              {/* Posto */}
+              {/* posto */}
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
@@ -244,7 +224,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                 </TextField>
               </Grid>
 
-              {/* Bomba ou Nota+Preço */}
+              {/* bomba OU nota+preço */}
               {formData.post === 'interno' ? (
                 <Grid item xs={12} md={6}>
                   <TextField
@@ -264,7 +244,9 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                       fullWidth
                       label="Número da nota"
                       value={formData.invoiceNumber}
-                      onChange={e => handleInputChange('invoiceNumber', e.target.value)}
+                      onChange={e =>
+                        handleInputChange('invoiceNumber', e.target.value)
+                      }
                       error={!!errors.invoiceNumber}
                       helperText={errors.invoiceNumber}
                       required
@@ -277,7 +259,9 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                       inputProps={{ step: 0.01 }}
                       label="Preço unitário"
                       value={formData.unitPrice}
-                      onChange={e => handleInputChange('unitPrice', e.target.value)}
+                      onChange={e =>
+                        handleInputChange('unitPrice', e.target.value)
+                      }
                       error={!!errors.unitPrice}
                       helperText={errors.unitPrice}
                       required
@@ -286,7 +270,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                 </>
               )}
 
-              {/* Litros */}
+              {/* litros */}
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
@@ -301,7 +285,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                 />
               </Grid>
 
-              {/* Quilometragem */}
+              {/* quilometragem */}
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
@@ -315,7 +299,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                 />
               </Grid>
 
-              {/* Observação */}
+              {/* observação */}
               <Grid item xs={12}>
                 <TextField
                   fullWidth
@@ -323,11 +307,13 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                   rows={3}
                   label="Observação"
                   value={formData.observation}
-                  onChange={e => handleInputChange('observation', e.target.value)}
+                  onChange={e =>
+                    handleInputChange('observation', e.target.value)
+                  }
                 />
               </Grid>
 
-              {/* Anexos */}
+              {/* anexos */}
               <Grid item xs={12}>
                 <Typography variant="subtitle1">Anexos</Typography>
                 <Button
@@ -347,14 +333,20 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                     onChange={handleFileChange}
                   />
                 </Button>
+
                 {attachments.length > 0 && (
                   <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
                     <List dense>
                       {attachments.map((f, i) => (
                         <ListItem key={i} divider>
                           <ListItemIcon>
-                            {f.type?.startsWith('image') ? <ImageIcon /> :
-                              f.type?.includes('pdf') ? <PdfIcon /> : <FileIcon />}
+                            {f.type?.startsWith('image') ? (
+                              <ImageIcon />
+                            ) : f.type?.includes('pdf') ? (
+                              <PdfIcon />
+                            ) : (
+                              <FileIcon />
+                            )}
                           </ListItemIcon>
                           <ListItemText
                             primary={f.name}
@@ -372,7 +364,7 @@ export function RefuelingDialog({ open, onClose, selectedItem, onSubmit }) {
                 )}
               </Grid>
 
-              {/* Ações */}
+              {/* ações */}
               <Grid item xs={12}>
                 <DialogActions>
                   <Button onClick={onClose}>Cancelar</Button>
