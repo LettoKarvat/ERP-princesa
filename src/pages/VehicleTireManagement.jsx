@@ -86,9 +86,12 @@ export default function VehicleTireManagement() {
     }, []);
 
     const calculateKm = useCallback(tire => {
-        if (!tire?.kmInicial || !tire?.kmAtual) return '–';
-        return tire.kmAtual - tire.kmInicial;
+        // se kmInicial ou kmFinal não estiver definido, retorna traço
+        if (tire.kmInicial == null || tire.kmFinal == null) return '–';
+        // calcula a diferença entre kmFinal e kmInicial
+        return tire.kmFinal;
     }, []);
+
 
     async function loadVehicles() {
         try {
@@ -346,7 +349,7 @@ export default function VehicleTireManagement() {
             const slot = createSlot({
               code,
               numeroSerie: t.numeroSerie,
-              km: t.kmInicial,
+              km: t.kmFinal,
               dim: t.dimensao
             });
             i === 0 ? col.insertBefore(slot, conn) : col.appendChild(slot);
@@ -379,7 +382,7 @@ export default function VehicleTireManagement() {
           col.insertBefore(createSlot({
             code,
             numeroSerie: t.numeroSerie,
-            km: t.kmInicial,
+            km: t.kmFinal,
             dim: t.dimensao
           }), conn);
         }
