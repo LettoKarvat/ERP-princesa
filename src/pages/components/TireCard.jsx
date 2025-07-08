@@ -12,8 +12,8 @@ export default function TireCard({
     <div
       onClick={onClick}
       className={`relative cursor-pointer p-4 rounded-lg border-2 transition min-w-[120px] ${isSelected
-          ? 'border-blue-500 bg-blue-50 shadow-lg'
-          : 'border-gray-200 bg-white hover:border-gray-300'
+        ? 'border-blue-500 bg-blue-50 shadow-lg'
+        : 'border-gray-200 bg-white hover:border-gray-300'
         }`}
     >
       {/* ícone e posição */}

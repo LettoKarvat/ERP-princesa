@@ -55,8 +55,8 @@ export default function VehicleModal({
           <button
             onClick={() => setSwapMode(!swapMode)}
             className={`px-4 py-2 rounded-lg text-sm font-medium ${swapMode
-                ? 'bg-red-100 text-red-700'
-                : 'bg-gray-100 text-gray-700'
+              ? 'bg-red-100 text-red-700'
+              : 'bg-gray-100 text-gray-700'
               }`}
           >
             <RotateCcw className="inline mr-2 h-4 w-4" />
@@ -68,7 +68,7 @@ export default function VehicleModal({
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
           >
             <FileText className="inline mr-2 h-4 w-4" />
-            Exportar PDF
+            Exportar
           </button>
 
           {swapMode && (swapA || swapB) && (
