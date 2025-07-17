@@ -307,6 +307,13 @@ export default function VehicleDepartureSystem() {
     const currentUserName = localStorage.getItem('fullname') || '';
     const userRole = localStorage.getItem('role') || 'admin';
 
+
+    const motiveOptions = [
+        { code: 1, label: 'Entrega Capital' },
+        { code: 2, label: 'Entrega Interior' },
+        { code: 3, label: 'Matéria Prima' },
+        { code: 4, label: 'Saída Diversas' },
+    ];
     /* ---------- load ---------- */
     useEffect(() => {
         (async () => {
@@ -1150,15 +1157,27 @@ export default function VehicleDepartureSystem() {
 
                         {/* motivo */}
                         <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                label="Motivo *"
-                                required
-                                value={newSaida.motivoSaida}
-                                onChange={(e) => setNewSaida((p) => ({ ...p, motivoSaida: e.target.value }))}
-                                InputProps={{ sx: { bgcolor: '#334155', color: 'white', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#475569' } } }}
-                                InputLabelProps={{ sx: { color: '#94a3b8' } }}
-                            />
+                            <FormControl fullWidth required>
+                                <InputLabel sx={{ color: '#94a3b8' }}>Motivo *</InputLabel>
+                                <Select
+                                    value={newSaida.motivoSaida}
+                                    label="Motivo *"
+                                    onChange={(e) =>
+                                        setNewSaida((p) => ({ ...p, motivoSaida: e.target.value }))
+                                    }
+                                    sx={{
+                                        bgcolor: '#334155',
+                                        color: 'white',
+                                        '& .MuiOutlinedInput-notchedOutline': { borderColor: '#475569' },
+                                    }}
+                                >
+                                    {motiveOptions.map((m) => (
+                                        <MenuItem key={m.code} value={m.label}>
+                                            {m.label}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
                         </Grid>
 
                         {/* semi */}
