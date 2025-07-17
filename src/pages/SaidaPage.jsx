@@ -1112,6 +1112,7 @@ export default function VehicleDepartureSystem() {
 
 
                         {/* km */}
+
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth
@@ -1119,14 +1120,22 @@ export default function VehicleDepartureSystem() {
                                 type="number"
                                 required
                                 value={newSaida.kmSaida}
-                                onChange={(e) => {
-                                    const km = +e.target.value;
-                                    if (km >= initialKm) setNewSaida((p) => ({ ...p, kmSaida: km }));
+                                onChange={e =>
+                                    // permite digitar qualquer coisa (inclusive apagar);
+                                    // a validação “< initialKm” continuará em handleSave
+                                    setNewSaida(p => ({ ...p, kmSaida: e.target.value }))
+                                }
+                                InputProps={{
+                                    sx: {
+                                        bgcolor: '#334155',
+                                        color: 'white',
+                                        '& .MuiOutlinedInput-notchedOutline': { borderColor: '#475569' },
+                                    },
                                 }}
-                                InputProps={{ sx: { bgcolor: '#334155', color: 'white', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#475569' } } }}
                                 InputLabelProps={{ sx: { color: '#94a3b8' } }}
                             />
                         </Grid>
+
 
                         {/* data/hora */}
                         <Grid item xs={12} sm={6}>
@@ -1272,7 +1281,7 @@ export default function VehicleDepartureSystem() {
             <Dialog open={openSignature} onClose={() => setOpenSignature(false)} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <GestureIcon />
-                    Assinatura do Motorista
+                    Assinatura portaria
                 </DialogTitle>
                 <DialogContent dividers>
                     <Typography sx={{ mb: 2 }}>Por favor, assine no campo abaixo:</Typography>
