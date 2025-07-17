@@ -41,7 +41,7 @@ export default function UserManagement() {
 
     /* ---------- BUSCA & FILTRO ----------- */
     const [searchTerm, setSearchTerm] = useState("");
-    const [filterRole, setFilterRole] = useState(""); // <— NOVO
+    const [filterRole, setFilterRole] = useState("");
 
     /* ---------- MODAL CREDENCIAIS -------- */
     const [modalCredOpen, setModalCredOpen] = useState(false);
@@ -56,7 +56,7 @@ export default function UserManagement() {
     const [editPassword, setEditPassword] = useState("");
     const [editRole, setEditRole] = useState("");
 
-    /* ---------- MODAL EXCLUSÃO ----------- */
+    /* ---------- MODAL DESATIVAÇÃO -------- */
     const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
     const [deleteUserId, setDeleteUserId] = useState("");
 
@@ -67,7 +67,8 @@ export default function UserManagement() {
 
     const loadUsers = async () => {
         try {
-            const response = await api.get("/users"); // is_active=true
+            // traz ativos + inativos
+            const response = await api.get("/users?include_inactive=1");
             setUsers(response.data);
         } catch (err) {
             console.error("Erro ao listar usuários:", err);
@@ -98,8 +99,7 @@ export default function UserManagement() {
             if (role === "admin") payload.email = email.trim().toLowerCase();
             else payload.matricula = matricula.trim();
 
-            const response = await api.post("/users", payload);
-            const newUser = response.data;
+            const { data: newUser } = await api.post("/users", payload);
 
             setCreatedUser({
                 fullname: newUser.fullname,
@@ -124,10 +124,13 @@ export default function UserManagement() {
     /* ---------- CÓPIA DE CREDENCIAIS ----- */
     const handleCopy = () => {
         if (!createdUser) return;
-        const creds = `Nome: ${createdUser.fullname}\nUsuário: ${createdUser.username}\nTipo: ${createdUser.role}\nSenha: ${createdUser.password}`;
-        navigator.clipboard.writeText(creds).then(() =>
-            alert("Credenciais copiadas para a área de transferência!")
-        );
+        const creds =
+            `Nome: ${createdUser.fullname}
+Usuário: ${createdUser.username}
+Tipo: ${createdUser.role}
+Senha: ${createdUser.password}`;
+        navigator.clipboard.writeText(creds)
+            .then(() => alert("Credenciais copiadas para a área de transferência!"));
     };
 
     /* ---------- ABERTURA/FECHO MODAIS ---- */
@@ -189,6 +192,7 @@ export default function UserManagement() {
         }
     };
 
+    /* ---------- DESATIVAÇÃO -------------- */
     const openDeleteModal = (userId) => {
         setDeleteUserId(userId);
         setModalDeleteOpen(true);
@@ -204,21 +208,39 @@ export default function UserManagement() {
             closeDeleteModal();
             loadUsers();
         } catch (err) {
-            console.error("Erro ao excluir usuário:", err);
-            alert(err.response?.data?.error || "Erro ao excluir usuário.");
+            console.error("Erro ao desativar usuário:", err);
+            alert(err.response?.data?.error || "Erro ao desativar usuário.");
+        }
+    };
+
+    /* ---------- REATIVAÇÃO --------------- */
+    const handleReactivate = async (userId) => {
+        try {
+            await api.post(`/users/${userId}/restore`);
+            loadUsers();
+        } catch (err) {
+            console.error("Erro ao reativar usuário:", err);
+            alert(err.response?.data?.error || "Erro ao reativar usuário.");
         }
     };
 
     /* ---------- FILTRO & BUSCA ----------- */
+    const lowerSearch = searchTerm.toLowerCase();
     const activeUsers = users.filter((u) => u.is_active);
-    const filteredUsers = activeUsers.filter((u) => {
-        const lowerSearch = searchTerm.toLowerCase();
-        const matchesFullname = u.fullname.toLowerCase().includes(lowerSearch);
-        const matchesIdentifier = (u.username || "")
-            .toLowerCase()
-            .includes(lowerSearch);
-        const matchesRole = filterRole ? u.role === filterRole : true; // <— NOVO
-        return (matchesFullname || matchesIdentifier) && matchesRole;
+    const inactiveUsers = users.filter((u) => !u.is_active);
+
+    const filteredActive = activeUsers.filter((u) => {
+        const nameMatch = u.fullname.toLowerCase().includes(lowerSearch);
+        const idMatch = (u.username || "").toLowerCase().includes(lowerSearch);
+        const roleMatch = filterRole ? u.role === filterRole : true;
+        return (nameMatch || idMatch) && roleMatch;
+    });
+
+    const filteredInactive = inactiveUsers.filter((u) => {
+        const nameMatch = u.fullname.toLowerCase().includes(lowerSearch);
+        const idMatch = (u.username || "").toLowerCase().includes(lowerSearch);
+        const roleMatch = filterRole ? u.role === filterRole : true;
+        return (nameMatch || idMatch) && roleMatch;
     });
 
     /* ================ RENDER =============== */
@@ -333,12 +355,12 @@ export default function UserManagement() {
                 </Select>
             </FormControl>
 
-            {/* -------- LISTA DE USUÁRIOS ------- */}
+            {/* -------- LISTA DE USUÁRIOS ATIVOS ------- */}
             <Typography variant="h6" sx={{ mb: 2 }}>
                 Usuários Ativos
             </Typography>
 
-            {filteredUsers.map((u) => (
+            {filteredActive.map((u) => (
                 <Paper
                     key={u.id}
                     sx={{
@@ -350,15 +372,9 @@ export default function UserManagement() {
                     }}
                 >
                     <Box>
-                        <Typography>
-                            <strong>Nome:</strong> {u.fullname}
-                        </Typography>
-                        <Typography>
-                            <strong>Usuário:</strong> {u.username}
-                        </Typography>
-                        <Typography>
-                            <strong>Tipo:</strong> {u.role}
-                        </Typography>
+                        <Typography><strong>Nome:</strong> {u.fullname}</Typography>
+                        <Typography><strong>Usuário:</strong> {u.username}</Typography>
+                        <Typography><strong>Tipo:</strong> {u.role}</Typography>
                     </Box>
                     <Box sx={{ display: "flex", gap: 1 }}>
                         <Button variant="outlined" onClick={() => openEditModal(u)}>
@@ -369,7 +385,52 @@ export default function UserManagement() {
                             color="error"
                             onClick={() => openDeleteModal(u.id)}
                         >
-                            Excluir
+                            Desativar
+                        </Button>
+                    </Box>
+                </Paper>
+            ))}
+
+            {/* -------- LISTA DE USUÁRIOS DESATIVADOS ------- */}
+            <Typography variant="h6" sx={{ mt: 4, mb: 2 }}>
+                Usuários Desativados
+            </Typography>
+
+            {filteredInactive.length === 0 && (
+                <Typography variant="body2" sx={{ mb: 2 }}>
+                    Nenhum usuário desativado.
+                </Typography>
+            )}
+
+            {filteredInactive.map((u) => (
+                <Paper
+                    key={u.id}
+                    sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        p: 2,
+                        mb: 1,
+                        opacity: 0.75,
+                        bgcolor: "#f8d7da22",
+                    }}
+                >
+                    <Box>
+                        <Typography><strong>Nome:</strong> {u.fullname}</Typography>
+                        <Typography><strong>Usuário:</strong> {u.username}</Typography>
+                        <Typography><strong>Tipo:</strong> {u.role}</Typography>
+                        <Typography color="error.main" variant="body2">(Desativado)</Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                        <Button
+                            variant="contained"
+                            color="success"
+                            onClick={() => handleReactivate(u.id)}
+                        >
+                            Reativar
+                        </Button>
+                        <Button variant="outlined" onClick={() => openEditModal(u)}>
+                            Editar
                         </Button>
                     </Box>
                 </Paper>
@@ -383,18 +444,10 @@ export default function UserManagement() {
                 <DialogContent dividers sx={{ bgcolor: "#f0f4ff" }}>
                     {createdUser && (
                         <Box sx={{ p: 2 }}>
-                            <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                                <strong>Nome:</strong> {createdUser.fullname}
-                            </Typography>
-                            <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                                <strong>Usuário:</strong> {createdUser.username}
-                            </Typography>
-                            <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                                <strong>Tipo de Usuário:</strong> {createdUser.role}
-                            </Typography>
-                            <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                                <strong>Senha:</strong> {createdUser.password}
-                            </Typography>
+                            <Typography variant="subtitle1" sx={{ mb: 1 }}><strong>Nome:</strong> {createdUser.fullname}</Typography>
+                            <Typography variant="subtitle1" sx={{ mb: 1 }}><strong>Usuário:</strong> {createdUser.username}</Typography>
+                            <Typography variant="subtitle1" sx={{ mb: 1 }}><strong>Tipo de Usuário:</strong> {createdUser.role}</Typography>
+                            <Typography variant="subtitle1" sx={{ mb: 1 }}><strong>Senha:</strong> {createdUser.password}</Typography>
                             <Typography variant="body2" color="text.secondary">
                                 Copie e entregue ao usuário. Ele poderá alterar a senha depois.
                             </Typography>
@@ -402,9 +455,7 @@ export default function UserManagement() {
                     )}
                 </DialogContent>
                 <DialogActions sx={{ bgcolor: "#f0f4ff" }}>
-                    <Button onClick={handleCopy} variant="contained">
-                        Copiar Credenciais
-                    </Button>
+                    <Button onClick={handleCopy} variant="contained">Copiar Credenciais</Button>
                     <Button onClick={handleCloseCredModal}>Fechar</Button>
                 </DialogActions>
             </Dialog>
@@ -463,31 +514,27 @@ export default function UserManagement() {
                             onChange={(e) => setEditRole(e.target.value)}
                         >
                             {roleOptions.map((r) => (
-                                <MenuItem key={r.value} value={r.value}>
-                                    {r.label}
-                                </MenuItem>
+                                <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>
                             ))}
                         </Select>
                     </FormControl>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={closeEditModal}>Cancelar</Button>
-                    <Button variant="contained" onClick={handleSaveEdit}>
-                        Salvar
-                    </Button>
+                    <Button variant="contained" onClick={handleSaveEdit}>Salvar</Button>
                 </DialogActions>
             </Dialog>
 
-            {/* -------- MODAL EXCLUSÃO --------- */}
+            {/* -------- MODAL DESATIVAÇÃO --------- */}
             <Dialog open={modalDeleteOpen} onClose={closeDeleteModal}>
-                <DialogTitle>Excluir Usuário</DialogTitle>
+                <DialogTitle>Desativar Usuário</DialogTitle>
                 <DialogContent dividers>
-                    <Typography>Tem certeza que deseja excluir este usuário?</Typography>
+                    <Typography>Tem certeza que deseja desativar este usuário?</Typography>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={closeDeleteModal}>Cancelar</Button>
                     <Button variant="contained" color="error" onClick={handleConfirmDelete}>
-                        Excluir
+                        Desativar
                     </Button>
                 </DialogActions>
             </Dialog>
