@@ -1,543 +1,664 @@
-// src/pages/UserManagement.jsx
-import React, { useEffect, useState } from "react";
+import React, { useState, useCallback } from 'react';
 import {
-    Box,
-    TextField,
-    Button,
-    Typography,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    Alert,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Paper,
-} from "@mui/material";
-import api from "../services/apiFlask"; // Axios configurado para o Flask
-
-/* --------- ROLES DISPONÍVEIS ---------- */
-const roleOptions = [
-    { value: "admin", label: "Administrador" },
-    { value: "abastecimento", label: "Abastecimento" },
-    { value: "manutencao", label: "Manutenção" },
-    { value: "portaria", label: "Portaria" },
-    { value: "motorista", label: "Motorista" },
-];
+  Box,
+  Typography,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Snackbar,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Stack,
+  Backdrop,
+  CircularProgress,
+  useTheme,
+  useMediaQuery,
+  Container,
+  InputAdornment,
+  Fade,
+  Card,
+  CardContent,
+} from '@mui/material';
+import { Search, FilterList, ManageAccounts } from '@mui/icons-material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { useUsers } from '../hooks/useUsers';
+import { UserForm } from '../components/UserForm';
+import { UserList } from '../components/UserList';
+import { CredentialsModal } from '../components/modals/CredentialsModal';
+import { ROLE_OPTIONS } from '../constants/roles';
 
 export default function UserManagement() {
-    /* ---------- ESTADOS: CRIAÇÃO --------- */
-    const [fullname, setFullname] = useState("");
-    const [email, setEmail] = useState("");
-    const [matricula, setMatricula] = useState("");
-    const [password, setPassword] = useState("");
-    const [role, setRole] = useState("");
-    const [error, setError] = useState("");
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-    /* ---------- ESTADOS: LISTA ----------- */
-    const [users, setUsers] = useState([]);
+  const {
+    users,
+    loading,
+    error,
+    createUser,
+    updateUser,
+    deleteUser,
+    reactivateUser,
+    clearError,
+  } = useUsers();
 
-    /* ---------- BUSCA & FILTRO ----------- */
-    const [searchTerm, setSearchTerm] = useState("");
-    const [filterRole, setFilterRole] = useState("");
+  // Search and filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
 
-    /* ---------- MODAL CREDENCIAIS -------- */
-    const [modalCredOpen, setModalCredOpen] = useState(false);
-    const [createdUser, setCreatedUser] = useState(null);
+  // Snackbar states
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
-    /* ---------- MODAL EDIÇÃO ------------- */
-    const [modalEditOpen, setModalEditOpen] = useState(false);
-    const [editUserId, setEditUserId] = useState("");
-    const [editFullname, setEditFullname] = useState("");
-    const [editEmail, setEditEmail] = useState("");
-    const [editMatricula, setEditMatricula] = useState("");
-    const [editPassword, setEditPassword] = useState("");
-    const [editRole, setEditRole] = useState("");
+  // Credentials modal states
+  const [credentialsModal, setCredentialsModal] = useState({
+    open: false,
+    credentials: null,
+  });
 
-    /* ---------- MODAL DESATIVAÇÃO -------- */
-    const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
-    const [deleteUserId, setDeleteUserId] = useState("");
+  // Edit modal states
+  const [editModal, setEditModal] = useState({
+    open: false,
+    user: null,
+    formData: {
+      fullname: '',
+      email: '',
+      matricula: '',
+      password: '',
+      role: '',
+    },
+  });
 
-    /* ---------- CARREGAR USUÁRIOS -------- */
-    useEffect(() => {
-        loadUsers();
-    }, []);
+  // Delete modal states
+  const [deleteModal, setDeleteModal] = useState({
+    open: false,
+    userId: null,
+  });
 
-    const loadUsers = async () => {
-        try {
-            // traz ativos + inativos
-            const response = await api.get("/users?include_inactive=1");
-            setUsers(response.data);
-        } catch (err) {
-            console.error("Erro ao listar usuários:", err);
-            setError("Não foi possível listar usuários");
-        }
-    };
+  // Validation function
+  const validateUserForm = useCallback((formData, isEdit = false) => {
+    if (!formData.fullname || (!isEdit && !formData.password) || !formData.role) {
+      return 'Preencha nome completo, senha e tipo de usuário.';
+    }
+    if (formData.role === 'admin' && !formData.email) {
+      return 'Para criar um Admin, informe o email.';
+    }
+    if (formData.role !== 'admin' && !formData.matricula) {
+      return 'Para criar usuários não-admin, informe a matrícula.';
+    }
+    return null;
+  }, []);
 
-    /* ---------- CRIAR USUÁRIO ------------ */
-    const handleCreateUser = async (e) => {
-        e.preventDefault();
-        setError("");
+  // Snackbar handlers
+  const showSnackbar = useCallback((message, severity = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  }, []);
 
-        if (!fullname || !password || !role) {
-            setError("Preencha nome completo, senha e tipo de usuário.");
-            return;
-        }
-        if (role === "admin" && !email) {
-            setError("Para criar um Admin, informe o email.");
-            return;
-        }
-        if (role !== "admin" && !matricula) {
-            setError("Para criar usuários não-admin, informe a matrícula.");
-            return;
-        }
+  const closeSnackbar = useCallback(() => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  }, []);
 
-        try {
-            const payload = { fullname, password, role };
-            if (role === "admin") payload.email = email.trim().toLowerCase();
-            else payload.matricula = matricula.trim();
+  // Create user handler
+  const handleCreateUser = useCallback(async (payload) => {
+    const validationError = validateUserForm(payload);
+    if (validationError) {
+      showSnackbar(validationError, 'error');
+      return;
+    }
 
-            const { data: newUser } = await api.post("/users", payload);
+    try {
+      const credentials = await createUser(payload);
+      setCredentialsModal({ open: true, credentials });
+      showSnackbar('Usuário criado com sucesso!');
+    } catch (err) {
+      showSnackbar(err.message, 'error');
+    }
+  }, [createUser, validateUserForm, showSnackbar]);
 
-            setCreatedUser({
-                fullname: newUser.fullname,
-                role: newUser.role,
-                password,
-                username: newUser.username,
-            });
-            setModalCredOpen(true);
+  // Credentials modal handlers
+  const closeCredentialsModal = useCallback(() => {
+    setCredentialsModal({ open: false, credentials: null });
+  }, []);
 
-            loadUsers();
-            setFullname("");
-            setEmail("");
-            setMatricula("");
-            setPassword("");
-            setRole("");
-        } catch (err) {
-            console.error("Erro ao criar usuário:", err);
-            setError(err.response?.data?.error || "Erro na criação do usuário");
-        }
-    };
+  const handleCopyCredentials = useCallback(() => {
+    if (!credentialsModal.credentials) return;
 
-    /* ---------- CÓPIA DE CREDENCIAIS ----- */
-    const handleCopy = () => {
-        if (!createdUser) return;
-        const creds =
-            `Nome: ${createdUser.fullname}
-Usuário: ${createdUser.username}
-Tipo: ${createdUser.role}
-Senha: ${createdUser.password}`;
-        navigator.clipboard.writeText(creds)
-            .then(() => alert("Credenciais copiadas para a área de transferência!"));
-    };
+    const { credentials } = credentialsModal;
+    const credentialsText = `Nome: ${credentials.fullname}\nUsuário: ${credentials.username}\nTipo: ${credentials.role}\nSenha: ${credentials.password}`;
 
-    /* ---------- ABERTURA/FECHO MODAIS ---- */
-    const handleCloseCredModal = () => {
-        setModalCredOpen(false);
-        setCreatedUser(null);
-    };
+    navigator.clipboard.writeText(credentialsText)
+      .then(() => showSnackbar('Credenciais copiadas para a área de transferência!'))
+      .catch(() => showSnackbar('Erro ao copiar credenciais', 'error'));
+  }, [credentialsModal.credentials, showSnackbar]);
 
-    const openEditModal = (user) => {
-        setEditUserId(user.id);
-        setEditFullname(user.fullname);
-        setEditPassword("");
-        setEditRole(user.role);
-
-        if (user.role === "admin") {
-            setEditEmail(user.username || "");
-            setEditMatricula("");
-        } else {
-            setEditEmail("");
-            setEditMatricula(user.username || "");
-        }
-        setModalEditOpen(true);
-    };
-
-    const closeEditModal = () => {
-        setModalEditOpen(false);
-        setEditUserId("");
-        setEditFullname("");
-        setEditEmail("");
-        setEditMatricula("");
-        setEditPassword("");
-        setEditRole("");
-    };
-
-    const handleSaveEdit = async () => {
-        if (!editUserId) return;
-        if (editRole === "admin" && !editEmail) {
-            alert("Admin precisa de e-mail");
-            return;
-        }
-        if (editRole !== "admin" && !editMatricula) {
-            alert("Usuário não-admin precisa de matrícula");
-            return;
-        }
-
-        try {
-            const payload = { fullname: editFullname, role: editRole };
-            if (editPassword) payload.password = editPassword;
-            if (editRole === "admin")
-                payload.email = editEmail.trim().toLowerCase();
-            else payload.matricula = editMatricula.trim();
-
-            await api.put(`/users/${editUserId}`, payload);
-            closeEditModal();
-            loadUsers();
-        } catch (err) {
-            console.error("Erro ao editar usuário:", err);
-            alert(err.response?.data?.error || "Erro ao editar usuário.");
-        }
-    };
-
-    /* ---------- DESATIVAÇÃO -------------- */
-    const openDeleteModal = (userId) => {
-        setDeleteUserId(userId);
-        setModalDeleteOpen(true);
-    };
-    const closeDeleteModal = () => {
-        setDeleteUserId("");
-        setModalDeleteOpen(false);
-    };
-    const handleConfirmDelete = async () => {
-        if (!deleteUserId) return;
-        try {
-            await api.delete(`/users/${deleteUserId}`);
-            closeDeleteModal();
-            loadUsers();
-        } catch (err) {
-            console.error("Erro ao desativar usuário:", err);
-            alert(err.response?.data?.error || "Erro ao desativar usuário.");
-        }
-    };
-
-    /* ---------- REATIVAÇÃO --------------- */
-    const handleReactivate = async (userId) => {
-        try {
-            await api.post(`/users/${userId}/restore`);
-            loadUsers();
-        } catch (err) {
-            console.error("Erro ao reativar usuário:", err);
-            alert(err.response?.data?.error || "Erro ao reativar usuário.");
-        }
-    };
-
-    /* ---------- FILTRO & BUSCA ----------- */
-    const lowerSearch = searchTerm.toLowerCase();
-    const activeUsers = users.filter((u) => u.is_active);
-    const inactiveUsers = users.filter((u) => !u.is_active);
-
-    const filteredActive = activeUsers.filter((u) => {
-        const nameMatch = u.fullname.toLowerCase().includes(lowerSearch);
-        const idMatch = (u.username || "").toLowerCase().includes(lowerSearch);
-        const roleMatch = filterRole ? u.role === filterRole : true;
-        return (nameMatch || idMatch) && roleMatch;
+  // Edit modal handlers
+  const openEditModal = useCallback((user) => {
+    setEditModal({
+      open: true,
+      user,
+      formData: {
+        fullname: user.fullname,
+        email: user.role === 'admin' ? user.username || '' : '',
+        matricula: user.role !== 'admin' ? user.username || '' : '',
+        password: '',
+        role: user.role,
+      },
     });
+  }, []);
 
-    const filteredInactive = inactiveUsers.filter((u) => {
-        const nameMatch = u.fullname.toLowerCase().includes(lowerSearch);
-        const idMatch = (u.username || "").toLowerCase().includes(lowerSearch);
-        const roleMatch = filterRole ? u.role === filterRole : true;
-        return (nameMatch || idMatch) && roleMatch;
+  const closeEditModal = useCallback(() => {
+    setEditModal({
+      open: false,
+      user: null,
+      formData: {
+        fullname: '',
+        email: '',
+        matricula: '',
+        password: '',
+        role: '',
+      },
     });
+  }, []);
 
-    /* ================ RENDER =============== */
-    return (
-        <Box sx={{ maxWidth: 900, mx: "auto", mt: 4 }}>
-            <Typography variant="h5" sx={{ mb: 2 }}>
-                Gerenciamento de Usuários
-            </Typography>
+  const handleEditFormChange = useCallback((field, value) => {
+    setEditModal(prev => ({
+      ...prev,
+      formData: { ...prev.formData, [field]: value },
+    }));
+  }, []);
 
-            {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                    {error}
-                </Alert>
-            )}
+  const handleEditRoleChange = useCallback((newRole) => {
+    setEditModal(prev => ({
+      ...prev,
+      formData: {
+        ...prev.formData,
+        role: newRole,
+        email: newRole === 'admin' ? prev.formData.email : '',
+        matricula: newRole !== 'admin' ? prev.formData.matricula : '',
+      },
+    }));
+  }, []);
 
-            {/* -------- FORM: CRIAR USUÁRIO -------- */}
-            <Box
-                component="form"
-                onSubmit={handleCreateUser}
-                sx={{ p: 2, mb: 3, border: "1px solid #ccc", borderRadius: 2 }}
-            >
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                    Criar Novo Usuário
-                </Typography>
+  const handleSaveEdit = useCallback(async () => {
+    const { user, formData } = editModal;
+    if (!user) return;
 
-                <TextField
-                    label="Nome Completo"
-                    variant="outlined"
-                    fullWidth
-                    sx={{ mb: 2 }}
-                    value={fullname}
-                    onChange={(e) => setFullname(e.target.value)}
-                />
+    const validationError = validateUserForm(formData, true);
+    if (validationError) {
+      showSnackbar(validationError, 'error');
+      return;
+    }
 
-                {role === "admin" ? (
-                    <TextField
-                        label="Email"
-                        type="email"
-                        variant="outlined"
-                        fullWidth
-                        sx={{ mb: 2 }}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                    />
-                ) : (
-                    <TextField
-                        label="Matrícula"
-                        variant="outlined"
-                        fullWidth
-                        sx={{ mb: 2 }}
-                        value={matricula}
-                        onChange={(e) => setMatricula(e.target.value)}
-                    />
-                )}
+    try {
+      const payload = { fullname: formData.fullname, role: formData.role };
+      if (formData.password) payload.password = formData.password;
+      if (formData.role === 'admin') {
+        payload.email = formData.email.trim().toLowerCase();
+      } else {
+        payload.matricula = formData.matricula.trim();
+      }
 
-                <TextField
-                    label="Senha"
-                    type="password"
-                    variant="outlined"
-                    fullWidth
-                    sx={{ mb: 2 }}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                />
+      await updateUser(user.id, payload);
+      closeEditModal();
+      showSnackbar('Usuário editado com sucesso!');
+    } catch (err) {
+      showSnackbar(err.message, 'error');
+    }
+  }, [editModal, updateUser, validateUserForm, showSnackbar, closeEditModal]);
 
-                <FormControl fullWidth sx={{ mb: 2 }}>
-                    <InputLabel id="role-label">Tipo de Usuário</InputLabel>
-                    <Select
-                        labelId="role-label"
-                        label="Tipo de Usuário"
-                        value={role}
-                        onChange={(e) => setRole(e.target.value)}
-                    >
-                        <MenuItem value="">Selecione...</MenuItem>
-                        {roleOptions.map((r) => (
-                            <MenuItem key={r.value} value={r.value}>
-                                {r.label}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
+  // Delete modal handlers
+  const openDeleteModal = useCallback((userId) => {
+    setDeleteModal({ open: true, userId });
+  }, []);
 
-                <Button type="submit" variant="contained">
-                    Criar Usuário
-                </Button>
-            </Box>
+  const closeDeleteModal = useCallback(() => {
+    setDeleteModal({ open: false, userId: null });
+  }, []);
 
-            {/* -------- BUSCA & FILTRO -------- */}
-            <TextField
-                label="Pesquisar usuário por nome ou usuário"
-                variant="outlined"
-                fullWidth
-                sx={{ mb: 2 }}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteModal.userId) return;
+
+    try {
+      await deleteUser(deleteModal.userId);
+      closeDeleteModal();
+      showSnackbar('Usuário desativado com sucesso!');
+    } catch (err) {
+      showSnackbar(err.message, 'error');
+    }
+  }, [deleteModal.userId, deleteUser, closeDeleteModal, showSnackbar]);
+
+  // Reactivate user handler
+  const handleReactivateUser = useCallback(async (userId) => {
+    try {
+      await reactivateUser(userId);
+      showSnackbar('Usuário reativado com sucesso!');
+    } catch (err) {
+      showSnackbar(err.message, 'error');
+    }
+  }, [reactivateUser, showSnackbar]);
+
+  // Toggle inactive users visibility
+  const handleToggleInactive = useCallback(() => {
+    setShowInactive(prev => !prev);
+  }, []);
+
+  // Clear error when snackbar closes
+  React.useEffect(() => {
+    if (error && !snackbar.open) {
+      clearError();
+    }
+  }, [error, snackbar.open, clearError]);
+
+  return (
+    <Box sx={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+      py: 4
+    }}>
+      <Container maxWidth="lg">
+        {/* Header */}
+        <Fade in timeout={500}>
+          <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <ManageAccounts
+              sx={{
+                fontSize: 64,
+                color: 'primary.main',
+                mb: 2,
+                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))'
+              }}
             />
+            <Typography
+              variant="h3"
+              sx={{
+                fontWeight: 700,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                mb: 1
+              }}
+            >
+              Gerenciamento de Usuários
+            </Typography>
+            <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 400 }}>
+              Controle completo de usuários do sistema
+            </Typography>
+          </Box>
+        </Fade>
 
-            <FormControl fullWidth sx={{ mb: 3 }}>
-                <InputLabel id="filter-role-label">Filtrar por Tipo</InputLabel>
-                <Select
+        {/* User Creation Form */}
+        <Fade in timeout={700}>
+          <Box>
+            <UserForm onSubmit={handleCreateUser} loading={loading} />
+          </Box>
+        </Fade>
+
+        {/* Search and Filter Controls */}
+        <Fade in timeout={900}>
+          <Card
+            elevation={0}
+            sx={{
+              mb: 4,
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 3,
+              overflow: 'hidden'
+            }}
+          >
+            <CardContent sx={{ p: 3 }}>
+              <Stack
+                direction={isMobile ? 'column' : 'row'}
+                spacing={3}
+                alignItems="center"
+              >
+                <TextField
+                  label="Pesquisar usuários"
+                  placeholder="Digite o nome ou usuário..."
+                  variant="outlined"
+                  fullWidth
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Search color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                  inputProps={{ 'aria-label': 'Pesquisar usuários' }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    }
+                  }}
+                />
+
+                <FormControl sx={{ minWidth: isMobile ? '100%' : 240 }}>
+                  <InputLabel id="filter-role-label">Filtrar por Tipo</InputLabel>
+                  <Select
                     labelId="filter-role-label"
                     label="Filtrar por Tipo"
                     value={filterRole}
                     onChange={(e) => setFilterRole(e.target.value)}
-                >
-                    <MenuItem value="">Todos</MenuItem>
-                    {roleOptions.map((r) => (
-                        <MenuItem key={r.value} value={r.value}>
-                            {r.label}
-                        </MenuItem>
+                    startAdornment={
+                      <InputAdornment position="start">
+                        <FilterList color="action" />
+                      </InputAdornment>
+                    }
+                    inputProps={{ 'aria-label': 'Filtrar por tipo de usuário' }}
+                    sx={{
+                      borderRadius: 2,
+                    }}
+                  >
+                    <MenuItem value="">Todos os tipos</MenuItem>
+                    {ROLE_OPTIONS.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
                     ))}
-                </Select>
+                  </Select>
+                </FormControl>
+
+                <Button
+                  variant={showInactive ? "contained" : "outlined"}
+                  color="error"
+                  startIcon={showInactive ? <VisibilityOff /> : <Visibility />}
+                  onClick={handleToggleInactive}
+                  sx={{
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    minWidth: 160,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {showInactive ? 'Ocultar Inativos' : 'Mostrar Inativos'}
+                </Button>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Fade>
+
+        {/* User List */}
+        <Fade in timeout={1100}>
+          <Box>
+            <UserList
+              users={users}
+              loading={loading}
+              searchTerm={searchTerm}
+              filterRole={filterRole}
+              showInactive={showInactive}
+              onToggleInactive={handleToggleInactive}
+              onEdit={openEditModal}
+              onDelete={openDeleteModal}
+              onReactivate={handleReactivateUser}
+            />
+          </Box>
+        </Fade>
+      </Container>
+
+      {/* Credentials Modal */}
+      <CredentialsModal
+        open={credentialsModal.open}
+        credentials={credentialsModal.credentials}
+        onClose={closeCredentialsModal}
+        onCopy={handleCopyCredentials}
+      />
+
+      {/* Edit User Modal */}
+      <Dialog
+        open={editModal.open}
+        onClose={closeEditModal}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+          }
+        }}
+      >
+        <DialogTitle sx={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          py: 3
+        }}>
+          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+            Editar Usuário
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ p: 4 }}>
+          <Stack spacing={3} sx={{ pt: 1 }}>
+            <TextField
+              label="Nome Completo"
+              variant="outlined"
+              fullWidth
+              value={editModal.formData.fullname}
+              onChange={(e) => handleEditFormChange('fullname', e.target.value)}
+              disabled={loading}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                }
+              }}
+            />
+
+            <FormControl fullWidth>
+              <InputLabel id="edit-role-label">Tipo de Usuário</InputLabel>
+              <Select
+                labelId="edit-role-label"
+                label="Tipo de Usuário"
+                value={editModal.formData.role}
+                onChange={(e) => handleEditRoleChange(e.target.value)}
+                disabled={loading}
+                sx={{
+                  borderRadius: 2,
+                }}
+              >
+                {ROLE_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
             </FormControl>
 
-            {/* -------- LISTA DE USUÁRIOS ATIVOS ------- */}
-            <Typography variant="h6" sx={{ mb: 2 }}>
-                Usuários Ativos
-            </Typography>
-
-            {filteredActive.map((u) => (
-                <Paper
-                    key={u.id}
-                    sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        p: 2,
-                        mb: 1,
-                    }}
-                >
-                    <Box>
-                        <Typography><strong>Nome:</strong> {u.fullname}</Typography>
-                        <Typography><strong>Usuário:</strong> {u.username}</Typography>
-                        <Typography><strong>Tipo:</strong> {u.role}</Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", gap: 1 }}>
-                        <Button variant="outlined" onClick={() => openEditModal(u)}>
-                            Editar
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            color="error"
-                            onClick={() => openDeleteModal(u.id)}
-                        >
-                            Desativar
-                        </Button>
-                    </Box>
-                </Paper>
-            ))}
-
-            {/* -------- LISTA DE USUÁRIOS DESATIVADOS ------- */}
-            <Typography variant="h6" sx={{ mt: 4, mb: 2 }}>
-                Usuários Desativados
-            </Typography>
-
-            {filteredInactive.length === 0 && (
-                <Typography variant="body2" sx={{ mb: 2 }}>
-                    Nenhum usuário desativado.
-                </Typography>
+            {editModal.formData.role === 'admin' ? (
+              <TextField
+                label="Email"
+                type="email"
+                variant="outlined"
+                fullWidth
+                value={editModal.formData.email}
+                onChange={(e) => handleEditFormChange('email', e.target.value)}
+                disabled={loading}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  }
+                }}
+              />
+            ) : editModal.formData.role && (
+              <TextField
+                label="Matrícula"
+                variant="outlined"
+                fullWidth
+                value={editModal.formData.matricula}
+                onChange={(e) => handleEditFormChange('matricula', e.target.value)}
+                disabled={loading}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  }
+                }}
+              />
             )}
 
-            {filteredInactive.map((u) => (
-                <Paper
-                    key={u.id}
-                    sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        p: 2,
-                        mb: 1,
-                        opacity: 0.75,
-                        bgcolor: "#f8d7da22",
-                    }}
-                >
-                    <Box>
-                        <Typography><strong>Nome:</strong> {u.fullname}</Typography>
-                        <Typography><strong>Usuário:</strong> {u.username}</Typography>
-                        <Typography><strong>Tipo:</strong> {u.role}</Typography>
-                        <Typography color="error.main" variant="body2">(Desativado)</Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", gap: 1 }}>
-                        <Button
-                            variant="contained"
-                            color="success"
-                            onClick={() => handleReactivate(u.id)}
-                        >
-                            Reativar
-                        </Button>
-                        <Button variant="outlined" onClick={() => openEditModal(u)}>
-                            Editar
-                        </Button>
-                    </Box>
-                </Paper>
-            ))}
+            <TextField
+              label="Nova Senha"
+              type="password"
+              variant="outlined"
+              fullWidth
+              value={editModal.formData.password}
+              onChange={(e) => handleEditFormChange('password', e.target.value)}
+              disabled={loading}
+              helperText="Deixe em branco se não quiser alterar a senha."
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                }
+              }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, gap: 2 }}>
+          <Button
+            onClick={closeEditModal}
+            disabled={loading}
+            variant="outlined"
+            size="large"
+            sx={{ borderRadius: 2, textTransform: 'none' }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveEdit}
+            disabled={loading}
+            size="large"
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3
+            }}
+          >
+            {loading ? <CircularProgress size={20} color="inherit" /> : 'Salvar Alterações'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-            {/* -------- MODAL CREDENCIAIS ------- */}
-            <Dialog open={modalCredOpen} onClose={handleCloseCredModal}>
-                <DialogTitle sx={{ bgcolor: "primary.main", color: "#fff" }}>
-                    Credenciais do Usuário
-                </DialogTitle>
-                <DialogContent dividers sx={{ bgcolor: "#f0f4ff" }}>
-                    {createdUser && (
-                        <Box sx={{ p: 2 }}>
-                            <Typography variant="subtitle1" sx={{ mb: 1 }}><strong>Nome:</strong> {createdUser.fullname}</Typography>
-                            <Typography variant="subtitle1" sx={{ mb: 1 }}><strong>Usuário:</strong> {createdUser.username}</Typography>
-                            <Typography variant="subtitle1" sx={{ mb: 1 }}><strong>Tipo de Usuário:</strong> {createdUser.role}</Typography>
-                            <Typography variant="subtitle1" sx={{ mb: 1 }}><strong>Senha:</strong> {createdUser.password}</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Copie e entregue ao usuário. Ele poderá alterar a senha depois.
-                            </Typography>
-                        </Box>
-                    )}
-                </DialogContent>
-                <DialogActions sx={{ bgcolor: "#f0f4ff" }}>
-                    <Button onClick={handleCopy} variant="contained">Copiar Credenciais</Button>
-                    <Button onClick={handleCloseCredModal}>Fechar</Button>
-                </DialogActions>
-            </Dialog>
+      {/* Delete Confirmation Modal */}
+      <Dialog
+        open={deleteModal.open}
+        onClose={closeDeleteModal}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+          }
+        }}
+      >
+        <DialogTitle sx={{
+          background: 'linear-gradient(135deg, #f56565 0%, #e53e3e 100%)',
+          color: 'white',
+          py: 3
+        }}>
+          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+            Desativar Usuário
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ p: 4 }}>
+          <Typography variant="body1" sx={{ fontSize: '1.1rem' }}>
+            Tem certeza que deseja desativar este usuário? Esta ação pode ser revertida posteriormente.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, gap: 2 }}>
+          <Button
+            onClick={closeDeleteModal}
+            disabled={loading}
+            variant="outlined"
+            size="large"
+            sx={{ borderRadius: 2, textTransform: 'none' }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleConfirmDelete}
+            disabled={loading}
+            size="large"
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3
+            }}
+          >
+            {loading ? <CircularProgress size={20} color="inherit" /> : 'Desativar Usuário'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-            {/* -------- MODAL EDIÇÃO ----------- */}
-            <Dialog open={modalEditOpen} onClose={closeEditModal}>
-                <DialogTitle>Editar Usuário</DialogTitle>
-                <DialogContent dividers>
-                    <TextField
-                        label="Nome Completo"
-                        variant="outlined"
-                        fullWidth
-                        sx={{ mb: 2 }}
-                        value={editFullname}
-                        onChange={(e) => setEditFullname(e.target.value)}
-                    />
-
-                    {editRole === "admin" ? (
-                        <TextField
-                            label="Email"
-                            type="email"
-                            variant="outlined"
-                            fullWidth
-                            sx={{ mb: 2 }}
-                            value={editEmail}
-                            onChange={(e) => setEditEmail(e.target.value)}
-                        />
-                    ) : (
-                        <TextField
-                            label="Matrícula"
-                            variant="outlined"
-                            fullWidth
-                            sx={{ mb: 2 }}
-                            value={editMatricula}
-                            onChange={(e) => setEditMatricula(e.target.value)}
-                        />
-                    )}
-
-                    <TextField
-                        label="Nova Senha"
-                        type="password"
-                        variant="outlined"
-                        fullWidth
-                        sx={{ mb: 2 }}
-                        value={editPassword}
-                        onChange={(e) => setEditPassword(e.target.value)}
-                        helperText="Deixe em branco se não quiser alterar a senha."
-                    />
-
-                    <FormControl fullWidth>
-                        <InputLabel id="edit-role-label">Tipo de Usuário</InputLabel>
-                        <Select
-                            labelId="edit-role-label"
-                            label="Tipo de Usuário"
-                            value={editRole}
-                            onChange={(e) => setEditRole(e.target.value)}
-                        >
-                            {roleOptions.map((r) => (
-                                <MenuItem key={r.value} value={r.value}>{r.label}</MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={closeEditModal}>Cancelar</Button>
-                    <Button variant="contained" onClick={handleSaveEdit}>Salvar</Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* -------- MODAL DESATIVAÇÃO --------- */}
-            <Dialog open={modalDeleteOpen} onClose={closeDeleteModal}>
-                <DialogTitle>Desativar Usuário</DialogTitle>
-                <DialogContent dividers>
-                    <Typography>Tem certeza que deseja desativar este usuário?</Typography>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={closeDeleteModal}>Cancelar</Button>
-                    <Button variant="contained" color="error" onClick={handleConfirmDelete}>
-                        Desativar
-                    </Button>
-                </DialogActions>
-            </Dialog>
+      {/* Global Loading Backdrop */}
+      <Backdrop
+        sx={{
+          color: '#fff',
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          backdropFilter: 'blur(4px)',
+        }}
+        open={loading}
+      >
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress color="inherit" size={60} />
+          <Typography variant="h6" sx={{ mt: 2, fontWeight: 500 }}>
+            Processando...
+          </Typography>
         </Box>
-    );
+      </Backdrop>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={closeSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={closeSnackbar}
+          severity={snackbar.severity}
+          sx={{
+            width: '100%',
+            borderRadius: 2,
+            fontWeight: 500,
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
+      {/* Error Snackbar */}
+      {error && (
+        <Snackbar
+          open={!!error}
+          autoHideDuration={6000}
+          onClose={clearError}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        >
+          <Alert
+            onClose={clearError}
+            severity="error"
+            sx={{
+              width: '100%',
+              borderRadius: 2,
+              fontWeight: 500,
+            }}
+          >
+            {error}
+          </Alert>
+        </Snackbar>
+      )}
+    </Box>
+  );
 }
