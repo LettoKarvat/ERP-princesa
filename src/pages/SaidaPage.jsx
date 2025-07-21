@@ -839,7 +839,7 @@ export default function VehicleDepartureSystem() {
                                             >
                                                 <VisibilityIcon />
                                             </IconButton>
-                                            {userRole !== 'portaria' && (
+                                            {(userRole === "admin" || userRole === "portaria") && (
                                                 <>
                                                     <IconButton
                                                         size="small"

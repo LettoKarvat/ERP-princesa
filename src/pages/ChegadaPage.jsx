@@ -605,7 +605,7 @@ export default function ChegadaPage() {
                                                     </IconButton>
                                                 </Tooltip>
 
-                                                {userRole !== "portaria" && (
+                                                {(userRole === "admin" || userRole === "portaria") && (
                                                     <>
                                                         <Tooltip title="Editar">
                                                             <IconButton
