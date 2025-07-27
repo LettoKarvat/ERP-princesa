@@ -70,7 +70,7 @@ export default function LoginPage() {
         }}
       >
         <Paper elevation={3} sx={{ p: 4, width: "100%", textAlign: "center" }}>
-          <Typography variant="h5"> Painel Princesa</Typography>
+          <Typography variant="h5">Princesa</Typography>
 
           {error && (
             <Alert severity="error" sx={{ mt: 2 }}>
