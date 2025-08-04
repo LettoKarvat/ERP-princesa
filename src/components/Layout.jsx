@@ -143,6 +143,7 @@ function Layout() {
           {/* Controle de Portaria -> admin, portaria, manutencao */}
           {["admin", "portaria", "manutencao"].includes(role) && (
             <>
+              {/* Cabeçalho do grupo */}
               <ListItem disablePadding>
                 <ListItemButton
                   onClick={() => setOpenPortaria(!openPortaria)}
@@ -155,8 +156,11 @@ function Layout() {
                   {openPortaria ? <ExpandLess /> : <ExpandMore />}
                 </ListItemButton>
               </ListItem>
+
+              {/* Conteúdo colapsável */}
               <Collapse in={openPortaria} timeout="auto" unmountOnExit>
                 <List component="div" disablePadding>
+                  {/* Saída — qualquer perfil do bloco pode ver */}
                   <ListItem disablePadding>
                     <ListItemButton
                       component={NavLink}
@@ -167,6 +171,8 @@ function Layout() {
                       <ListItemText primary="Saída" />
                     </ListItemButton>
                   </ListItem>
+
+                  {/* Chegada — qualquer perfil do bloco pode ver */}
                   <ListItem disablePadding>
                     <ListItemButton
                       component={NavLink}
@@ -177,10 +183,27 @@ function Layout() {
                       <ListItemText primary="Chegada" />
                     </ListItemButton>
                   </ListItem>
+
+                  {/* Relatório — SOMENTE admin */}
+                  {role === "admin" && (
+                    <ListItem disablePadding>
+                      <ListItemButton
+                        component={NavLink}
+                        to="/travel-report"
+                        sx={{ pl: 4, ...listItemButtonStyle }}
+                        selected={location.pathname === "/travel-report"}
+                      >
+                        <ListItemText primary="Relatório" />
+                      </ListItemButton>
+                    </ListItem>
+                  )}
                 </List>
               </Collapse>
             </>
           )}
+
+
+
 
           {/* Consumo -> admin, fiscal, manutencao */}
           {["admin", "fiscal", "manutencao"].includes(role) && (

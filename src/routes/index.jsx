@@ -1,4 +1,3 @@
-// src/routes/AppRoutes.jsx
 import { Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "../pages/LoginPage";
 import Dashboard from "../pages/Dashboard";
@@ -10,13 +9,14 @@ import Layout from "../components/Layout";
 import UserManagement from "../pages/UserManagement";
 import DriverChecklist from "../pages/DriverChecklist";
 import DriverChecklistsList from "../pages/DriverChecklistsList";
-import DecendialChecklist from "../pages/DecendialChecklist";            // <<< nova import
-import DecendialChecklistsList from "../pages/DecendialChecklistsList";  // <<< se você tiver uma listagem específica
+import DecendialChecklist from "../pages/DecendialChecklist";
+import DecendialChecklistsList from "../pages/DecendialChecklistsList";
 import ChegadaPage from "../pages/ChegadaPage";
 import SaidaPage from "../pages/SaidaPage";
 import PartsReplacementReport from "../pages/PartsReplacementReport";
 import PartsReplacementMaintenance from "../pages/PartsReplacementMaintenance";
 import RefuelingsReport from "../pages/RefuelingsReport";
+import TravelReportPage from "../pages/TravelReportPage";   // <<< novo
 
 /* ────────────── guards ────────────── */
 const PrivateRoute = ({ children }) => {
@@ -33,6 +33,14 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
+/* ─────── guard específico p/ várias funções ─────── */       // <<< novo
+const RoleRoute = ({ roles, children }) => {                    // <<< novo
+  const token = localStorage.getItem("token");                  // <<< novo
+  const role = localStorage.getItem("role");                   // <<< novo
+  if (!token) return <Navigate to="/login" replace />;          // <<< novo
+  return roles.includes(role) ? children : <Navigate to="/" replace />; // <<< novo
+};                                                              // <<< novo
+
 /* ───────── redireciona conforme papel ───────── */
 function RoleBasedRedirect() {
   const role = localStorage.getItem("role");
@@ -47,7 +55,6 @@ function RoleBasedRedirect() {
     case "abastecimento":
       return <Navigate to="/refueling" replace />;
     case "motorista":
-      // por padrão, leva o motorista para a lista de checklists diários
       return <Navigate to="/driver-checklists" replace />;
     default:
       return <Navigate to="/login" replace />;
@@ -61,7 +68,7 @@ export default function AppRoutes() {
       {/* rota pública */}
       <Route path="/login" element={<LoginPage />} />
 
-      {/* todas as outras só podem ser acessadas com token (PrivateRoute) */}
+      {/* rotas protegidas */}
       <Route
         path="/"
         element={
@@ -70,7 +77,6 @@ export default function AppRoutes() {
           </PrivateRoute>
         }
       >
-        {/* rota raiz redireciona conforme papel */}
         <Route index element={<RoleBasedRedirect />} />
 
         {/* ——————————— ADMINISTRADOR ——————————— */}
@@ -82,7 +88,6 @@ export default function AppRoutes() {
             </AdminRoute>
           }
         />
-
         <Route
           path="user-management"
           element={
@@ -92,7 +97,7 @@ export default function AppRoutes() {
           }
         />
 
-        {/* ————— rotas comuns a quem estiver logado ————— */}
+        {/* ————— rotas comuns ————— */}
         <Route path="vehicles" element={<VehicleList />} />
         <Route path="consumption" element={<ConsumptionControl />} />
         <Route path="tire-replacement" element={<TireManagement />} />
@@ -101,17 +106,20 @@ export default function AppRoutes() {
         <Route path="refueling" element={<Refueling />} />
         <Route path="refueling/report" element={<RefuelingsReport />} />
 
+
+        <Route
+          path="travel-report"
+          element={
+            <AdminRoute>
+              <TravelReportPage />             {/* seu componente de relatório */}
+            </AdminRoute>
+          }
+        />                                                        {/* <<< novo */}
+
         {/* ————— CHECKLISTS MOTORISTA ————— */}
-        {/* Página de cadastro do checklist diário */}
         <Route path="driver-checklist" element={<DriverChecklist />} />
-
-        {/* Página que lista todos os checklists diários (admin vê todos; motorista vê só os seus) */}
         <Route path="driver-checklists" element={<DriverChecklistsList />} />
-
-        {/* Página de cadastro do checklist decendial */}
         <Route path="driver-checklist-decendial" element={<DecendialChecklist />} />
-
-        {/* Página que lista todos os checklists decendiais */}
         <Route path="driver-checklists-decendial" element={<DecendialChecklistsList />} />
 
         {/* ————— CHECKLISTS PORTARIA ————— */}
