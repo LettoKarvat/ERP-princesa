@@ -95,7 +95,7 @@ function Layout() {
       >
         <Typography variant="h6" sx={{ display: "flex", alignItems: "center" }}>
           <img
-            src="https://iili.io/39JTE5Q.png"
+            src="https://iili.io/F6BcJtf.png"
             alt="Logo Princesa"
             style={{ height: "100px", marginRight: "2px" }}
           />
