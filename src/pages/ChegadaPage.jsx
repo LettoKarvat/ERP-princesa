@@ -1,5 +1,5 @@
 // src/pages/ChegadaPage.jsx
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
     Box,
     Typography,
@@ -82,6 +82,9 @@ const emptyForm = () => ({
     attachments: [],
 });
 
+// normaliza id para string consistente (evita falsy/NaN etc.)
+const normId = (v) => (v === undefined || v === null || v === "" ? "" : String(v));
+
 /* ─────────────────────── Componente Principal ─────────────────────── */
 export default function ChegadaPage() {
     const theme = useTheme();
@@ -97,6 +100,9 @@ export default function ChegadaPage() {
 
     const [motoristas, setMotoristas] = useState([]);
     const [form, setForm] = useState(emptyForm());
+
+    // Observações num estado leve (evita re-renders pesados enquanto digita)
+    const [obsText, setObsText] = useState("");
 
     /* loading / paginação */
     const [loadingList, setLoadingList] = useState(true);
@@ -151,60 +157,60 @@ export default function ChegadaPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const fetchInitialLists = useCallback(
-        async (search) => {
-            setLoadingList(true);
-            try {
-                // 1) saidas em trânsito (trazemos um page grande; normalmente são poucas)
-                const saidasResp = await api.get("/checklists/operacao", {
-                    params: {
-                        status: "Em trânsito",
-                        page: 1,
-                        per_page: 200,
-                        search: search || undefined,
-                    },
-                });
-                const saidasItems = (saidasResp.data?.items || []).map((c) => ({
-                    id: String(c.id),
-                    placa: c.veiculo?.placa ?? "",
-                    km_saida: c.km_saida ?? 0,
-                    horimetro_saida: c.horimetro_saida ?? 0,
-                    motoristaId: c.motorista?.id || "",
-                    motoristaNome: c.motorista?.fullname || "",
-                    destino: c.destino?.nome ?? "Destino não informado",
-                    checklist: c,
-                }));
-                setSaidas(saidasItems);
-                setSaidasTotal(saidasResp.data?.total ?? saidasItems.length);
+    const fetchInitialLists = useCallback(async (search) => {
+        setLoadingList(true);
+        try {
+            // 1) saidas em trânsito (trazemos um page grande; normalmente são poucas)
+            const saidasResp = await api.get("/checklists/operacao", {
+                params: {
+                    status: "Em trânsito",
+                    page: 1,
+                    per_page: 200,
+                    search: search || undefined,
+                },
+            });
+            const saidasItems = (saidasResp.data?.items || []).map((c) => ({
+                id: String(c.id),
+                placa: c.veiculo?.placa ?? "",
+                km_saida: c.km_saida ?? 0,
+                horimetro_saida: c.horimetro_saida ?? 0,
+                // ⬇️ FALLBACKS: aceita `motorista.id` OU `motorista_id` OU campos nomeados
+                motoristaId: normId(c?.motorista?.id ?? c?.motorista_id ?? ""),
+                motoristaNome: c?.motorista?.fullname ?? c?.motorista_nome ?? "",
+                destino: c.destino?.nome ?? "Destino não informado",
+                checklist: c, // guardo bruto pra eventuais fallbacks
+            }));
+            setSaidas(saidasItems);
+            setSaidasTotal(saidasResp.data?.total ?? saidasItems.length);
 
-                // 2) chegadas (página 1)
-                const arrResp = await api.get("/arrivals", {
-                    params: { page: 1, per_page: 24, search: search || undefined },
-                });
-                const arrItems = (arrResp.data?.items || []).map((a) => ({
-                    ...a,
-                    status: "Concluída", // lista de chegadas já concluídas
-                    criadoPor: "Sistema",
-                }));
-                setChegadas(arrItems);
-                setChegadasTotal(arrResp.data?.total ?? arrItems.length);
-                setArrHasMore(!!arrResp.data?.has_more);
-                setArrPage(1);
-            } catch (e) {
-                console.error("Erro ao carregar listas:", e);
-                alert("Erro ao carregar dados");
-            } finally {
-                setLoadingList(false);
-            }
-        },
-        []
-    );
+            // 2) chegadas (página 1)
+            const arrResp = await api.get("/arrivals", {
+                params: { page: 1, per_page: 24, search: search || undefined },
+            });
+            const arrItems = (arrResp.data?.items || []).map((a) => ({
+                ...a,
+                status: "Concluída", // lista de chegadas já concluídas
+                criadoPor: "Sistema",
+            }));
+            setChegadas(arrItems);
+            setChegadasTotal(arrResp.data?.total ?? arrItems.length);
+            setArrHasMore(!!arrResp.data?.has_more);
+            setArrPage(1);
+        } catch (e) {
+            console.error("Erro ao carregar listas:", e);
+            alert("Erro ao carregar dados");
+        } finally {
+            setLoadingList(false);
+        }
+    }, []);
 
     /* ─────────────── Infinite scroll (IntersectionObserver) ─────────────── */
     useEffect(() => {
+        // Pausa o observer enquanto o modal está aberto (evita re-renders durante digitação)
+        if (dlgOpen) return;
         if (!loadMoreRef.current) return;
-        const el = loadMoreRef.current;
 
+        const el = loadMoreRef.current;
         const io = new IntersectionObserver(
             (entries) => {
                 const [entry] = entries;
@@ -218,36 +224,39 @@ export default function ChegadaPage() {
         io.observe(el);
         return () => io.disconnect();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [loadMoreRef.current, arrHasMore, isFetchingMore, debouncedSearch]);
+    }, [dlgOpen, arrHasMore, isFetchingMore, debouncedSearch, loadingList]);
 
-    const loadMoreArrivals = useCallback(async () => {
-        if (!arrHasMore || isFetchingMore || loadingList) return;
-        setIsFetchingMore(true);
-        try {
-            const nextPage = arrPage + 1;
-            const resp = await api.get("/arrivals", {
-                params: {
-                    page: nextPage,
-                    per_page: 24,
-                    search: debouncedSearch || undefined,
-                },
-            });
-            const newItems = (resp.data?.items || []).map((a) => ({
-                ...a,
-                status: "Concluída",
-                criadoPor: "Sistema",
-            }));
-            setChegadas((prev) => [...prev, ...newItems]);
-            setChegadasTotal(resp.data?.total ?? chegadasTotal);
-            setArrHasMore(!!resp.data?.has_more);
-            setArrPage(nextPage);
-        } catch (e) {
-            console.error("Erro ao paginar chegadas:", e);
-        } finally {
-            setIsFetchingMore(false);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [arrHasMore, isFetchingMore, arrPage, debouncedSearch, loadingList]);
+    const loadMoreArrivals = useCallback(
+        async () => {
+            if (!arrHasMore || isFetchingMore || loadingList) return;
+            setIsFetchingMore(true);
+            try {
+                const nextPage = arrPage + 1;
+                const resp = await api.get("/arrivals", {
+                    params: {
+                        page: nextPage,
+                        per_page: 24,
+                        search: debouncedSearch || undefined,
+                    },
+                });
+                const newItems = (resp.data?.items || []).map((a) => ({
+                    ...a,
+                    status: "Concluída",
+                    criadoPor: "Sistema",
+                }));
+                setChegadas((prev) => [...prev, ...newItems]);
+                setChegadasTotal(resp.data?.total ?? chegadasTotal);
+                setArrHasMore(!!resp.data?.has_more);
+                setArrPage(nextPage);
+            } catch (e) {
+                console.error("Erro ao paginar chegadas:", e);
+            } finally {
+                setIsFetchingMore(false);
+            }
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        },
+        [arrHasMore, isFetchingMore, arrPage, debouncedSearch, loadingList]
+    );
 
     /* ─────────────── Helpers de formulário ─────────────── */
     function fillFromSaida(idStr) {
@@ -256,13 +265,26 @@ export default function ChegadaPage() {
             console.warn("Saída não encontrada pra id", idStr);
             return;
         }
+        // ⬇️ tenta obter o ID do motorista com vários fallbacks
+        const candId =
+            s.motoristaId ||
+            normId(s.checklist?.motorista?.id) ||
+            normId(s.checklist?.motorista_id) ||
+            normId(s.checklist?.motoristaId) ||
+            "";
+        const candNome =
+            s.motoristaNome ||
+            s.checklist?.motorista?.fullname ||
+            s.checklist?.motorista_nome ||
+            "";
+
         setForm((f) => ({
             ...f,
             saidaId: idStr,
             kmChegada: s.km_saida,
             horimetroChegada: s.horimetro_saida,
-            motoristaId: String(s.motoristaId || ""),
-            motoristaNome: s.motoristaNome,
+            motoristaId: normId(candId),
+            motoristaNome: candNome,
             editDriver: false,
         }));
     }
@@ -276,10 +298,11 @@ export default function ChegadaPage() {
     async function upsertArrival(sigURL) {
         const body = {
             dataChegada: form.dataChegada,
-            horimetroChegada: +form.horimetroChegada,
-            kmChegada: +form.kmChegada,
+            horimetroChegada: Number(form.horimetroChegada),
+            kmChegada: Number(form.kmChegada),
+            // back-end aceita string de número e normaliza
             motorista1Cheg: form.motoristaId,
-            observacoesChegada: form.observacoesChegada,
+            observacoesChegada: obsText,
             assinaturaMotorista: sigURL ?? form.assinaturaMotorista,
         };
 
@@ -315,7 +338,19 @@ export default function ChegadaPage() {
     function trySave() {
         const s = saidas.find((x) => x.id === form.saidaId);
         if ((!s && !editId)) return alert("Selecione saída válida.");
-        if (!form.motoristaId) return alert("Informe o motorista.");
+
+        // Se veio só o nome do motorista, tenta resolver o ID automaticamente
+        if (!form.motoristaId && form.motoristaNome) {
+            const guess = motoristas.find(
+                (m) => (m.fullname || "").toLowerCase() === (form.motoristaNome || "").toLowerCase()
+            );
+            if (guess?.id) {
+                setForm((f) => ({ ...f, motoristaId: String(guess.id) }));
+            } else {
+                return alert("Informe o motorista.");
+            }
+        }
+
         if (s && parseInt(form.kmChegada) < parseInt(s.km_saida)) {
             return alert("KM de chegada deve ser maior que KM de saída.");
         }
@@ -358,9 +393,7 @@ export default function ChegadaPage() {
     /* ─────────────── Detalhes e Comparação ─────────────── */
     const openDetailsDialog = async (id) => {
         try {
-            // detalhe completo da chegada (inclui anexos)
             const { data: arrivalDetail } = await api.get(`/arrivals/${id}`);
-            // detalhe da saída
             const { data: checklistData } = await api.get(
                 `/checklists/operacao/${arrivalDetail.checklist.id}`
             );
@@ -405,6 +438,158 @@ export default function ChegadaPage() {
             alert("Erro ao carregar dados para comparação");
         }
     };
+
+    // Lista memoizada para não re-renderizar durante digitação no modal
+    const listaChegadas = useMemo(() => {
+        return (
+            <Grid container spacing={3}>
+                {chegadas.map((c) => (
+                    <Grid item xs={12} sm={6} lg={4} key={c.id}>
+                        <Card
+                            elevation={3}
+                            sx={{
+                                borderRadius: 3,
+                                transition: "all 0.3s ease",
+                                "&:hover": {
+                                    transform: "translateY(-4px)",
+                                    boxShadow: theme.shadows[12],
+                                },
+                                position: "relative",
+                                overflow: "visible",
+                            }}
+                        >
+                            <CardContent sx={{ p: 3 }}>
+                                {/* Header do Card */}
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "flex-start",
+                                        mb: 2,
+                                    }}
+                                >
+                                    <Box>
+                                        <Typography
+                                            variant="h6"
+                                            sx={{
+                                                fontWeight: 700,
+                                                color: "primary.main",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                            }}
+                                        >
+                                            <InIcon />
+                                            {c.placa || "—"}
+                                        </Typography>
+                                        <Chip
+                                            label={c.status || "Concluída"}
+                                            color="success"
+                                            size="small"
+                                            sx={{ mt: 1, fontWeight: 600 }}
+                                        />
+                                    </Box>
+
+                                    {/* Menu de Ações */}
+                                    <Box sx={{ display: "flex", gap: 0.5 }}>
+                                        <Tooltip title="Ver detalhes">
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => openDetailsDialog(c.id)}
+                                                sx={{ color: "primary.main" }}
+                                            >
+                                                <VisibilityIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+
+                                        <Tooltip title="Comparar">
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => openCompareDialog(c.id)}
+                                                sx={{ color: "info.main" }}
+                                            >
+                                                <CompareIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+
+                                        {(userRole === "admin" || userRole === "portaria") && (
+                                            <>
+                                                <Tooltip title="Editar">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => {
+                                                            setEditId(c.id);
+                                                            setForm({
+                                                                saidaId: c.checklist?.id,
+                                                                dataChegada: c.data_chegada
+                                                                    ? c.data_chegada.slice(0, 16)
+                                                                    : nowISO(),
+                                                                horimetroChegada: c.horimetro_chegada || 0,
+                                                                kmChegada: c.km_chegada || 0,
+                                                                motoristaId: normId(c.motorista?.id),
+                                                                motoristaNome: c.motorista?.fullname || "",
+                                                                editDriver: false,
+                                                                assinaturaMotorista: c.assinatura || "",
+                                                                observacoesChegada: c.observacoes || "",
+                                                                attachments: [],
+                                                            });
+                                                            setObsText(c.observacoes || "");
+                                                            setDlgOpen(true);
+                                                        }}
+                                                        sx={{ color: "warning.main" }}
+                                                    >
+                                                        <EditIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Excluir">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => confirmDelete(c.id)}
+                                                        sx={{ color: "error.main" }}
+                                                    >
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </>
+                                        )}
+                                    </Box>
+                                </Box>
+
+                                {/* Informações */}
+                                <Stack spacing={1.5}>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                        <PersonIcon sx={{ color: "text.secondary", fontSize: 20 }} />
+                                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                            {c.motorista?.fullname || "N/A"}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                        <TimeIcon sx={{ color: "text.secondary", fontSize: 20 }} />
+                                        <Typography variant="body2">
+                                            {c.data_chegada
+                                                ? new Date(c.data_chegada).toLocaleString("pt-BR")
+                                                : "N/A"}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                        <SpeedIcon sx={{ color: "text.secondary", fontSize: 20 }} />
+                                        <Typography variant="body2">KM: {c.km_chegada ?? "N/A"}</Typography>
+                                    </Box>
+                                </Stack>
+
+                                <Divider sx={{ my: 2 }} />
+
+                                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                                    Criado por {c.criadoPor || "Sistema"}
+                                </Typography>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                ))}
+            </Grid>
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chegadas, userRole]); // theme fora pra não invalidar à toa
 
     /* ─────────────────────────── UI ────────────────────────── */
     return (
@@ -461,7 +646,11 @@ export default function ChegadaPage() {
                                 </Typography>
                             </Grid>
                             <Grid item>
-                                <Divider orientation="vertical" flexItem sx={{ bgcolor: "rgba(255,255,255,0.3)" }} />
+                                <Divider
+                                    orientation="vertical"
+                                    flexItem
+                                    sx={{ bgcolor: "rgba(255,255,255,0.3)" }}
+                                />
                             </Grid>
                             <Grid item>
                                 <Typography variant="h5" sx={{ fontWeight: 700, color: "white" }}>
@@ -478,7 +667,14 @@ export default function ChegadaPage() {
 
             <Container maxWidth="xl" sx={{ py: 4 }}>
                 {/* Ações */}
-                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        mb: 4,
+                    }}
+                >
                     <Typography variant="h5" sx={{ fontWeight: 600, color: "text.primary" }}>
                         Chegadas Registradas
                     </Typography>
@@ -489,6 +685,7 @@ export default function ChegadaPage() {
                         onClick={() => {
                             setForm(emptyForm());
                             setEditId(null);
+                            setObsText("");
                             setDlgOpen(true);
                         }}
                         sx={{
@@ -562,6 +759,7 @@ export default function ChegadaPage() {
                             onClick={() => {
                                 setForm(emptyForm());
                                 setEditId(null);
+                                setObsText("");
                                 setDlgOpen(true);
                             }}
                             sx={{
@@ -575,127 +773,19 @@ export default function ChegadaPage() {
                     </Paper>
                 ) : (
                     <>
-                        <Grid container spacing={3}>
-                            {chegadas.map((c) => (
-                                <Grid item xs={12} sm={6} lg={4} key={c.id}>
-                                    <Card
-                                        elevation={3}
-                                        sx={{
-                                            borderRadius: 3,
-                                            transition: "all 0.3s ease",
-                                            "&:hover": {
-                                                transform: "translateY(-4px)",
-                                                boxShadow: theme.shadows[12],
-                                            },
-                                            position: "relative",
-                                            overflow: "visible",
-                                        }}
-                                    >
-                                        <CardContent sx={{ p: 3 }}>
-                                            {/* Header do Card */}
-                                            <Box
-                                                sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}
-                                            >
-                                                <Box>
-                                                    <Typography
-                                                        variant="h6"
-                                                        sx={{
-                                                            fontWeight: 700,
-                                                            color: "primary.main",
-                                                            display: "flex",
-                                                            alignItems: "center",
-                                                            gap: 1,
-                                                        }}
-                                                    >
-                                                        <InIcon />
-                                                        {c.placa || "—"}
-                                                    </Typography>
-                                                    <Chip label={c.status || "Concluída"} color="success" size="small" sx={{ mt: 1, fontWeight: 600 }} />
-                                                </Box>
-
-                                                {/* Menu de Ações */}
-                                                <Box sx={{ display: "flex", gap: 0.5 }}>
-                                                    <Tooltip title="Ver detalhes">
-                                                        <IconButton size="small" onClick={() => openDetailsDialog(c.id)} sx={{ color: "primary.main" }}>
-                                                            <VisibilityIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Tooltip>
-
-                                                    <Tooltip title="Comparar">
-                                                        <IconButton size="small" onClick={() => openCompareDialog(c.id)} sx={{ color: "info.main" }}>
-                                                            <CompareIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Tooltip>
-
-                                                    {(userRole === "admin" || userRole === "portaria") && (
-                                                        <>
-                                                            <Tooltip title="Editar">
-                                                                <IconButton
-                                                                    size="small"
-                                                                    onClick={() => {
-                                                                        setEditId(c.id);
-                                                                        setForm({
-                                                                            saidaId: c.checklist?.id,
-                                                                            dataChegada: c.data_chegada ? c.data_chegada.slice(0, 16) : nowISO(),
-                                                                            horimetroChegada: c.horimetro_chegada || 0,
-                                                                            kmChegada: c.km_chegada || 0,
-                                                                            motoristaId: c.motorista?.id || "",
-                                                                            motoristaNome: c.motorista?.fullname || "",
-                                                                            editDriver: false,
-                                                                            assinaturaMotorista: c.assinatura || "",
-                                                                            observacoesChegada: c.observacoes || "",
-                                                                            attachments: [],
-                                                                        });
-                                                                        setDlgOpen(true);
-                                                                    }}
-                                                                    sx={{ color: "warning.main" }}
-                                                                >
-                                                                    <EditIcon fontSize="small" />
-                                                                </IconButton>
-                                                            </Tooltip>
-                                                            <Tooltip title="Excluir">
-                                                                <IconButton size="small" onClick={() => confirmDelete(c.id)} sx={{ color: "error.main" }}>
-                                                                    <DeleteIcon fontSize="small" />
-                                                                </IconButton>
-                                                            </Tooltip>
-                                                        </>
-                                                    )}
-                                                </Box>
-                                            </Box>
-
-                                            {/* Informações */}
-                                            <Stack spacing={1.5}>
-                                                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                                    <PersonIcon sx={{ color: "text.secondary", fontSize: 20 }} />
-                                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                                        {c.motorista?.fullname || "N/A"}
-                                                    </Typography>
-                                                </Box>
-                                                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                                    <TimeIcon sx={{ color: "text.secondary", fontSize: 20 }} />
-                                                    <Typography variant="body2">
-                                                        {c.data_chegada ? new Date(c.data_chegada).toLocaleString("pt-BR") : "N/A"}
-                                                    </Typography>
-                                                </Box>
-                                                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                                    <SpeedIcon sx={{ color: "text.secondary", fontSize: 20 }} />
-                                                    <Typography variant="body2">KM: {c.km_chegada ?? "N/A"}</Typography>
-                                                </Box>
-                                            </Stack>
-
-                                            <Divider sx={{ my: 2 }} />
-
-                                            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                                                Criado por {c.criadoPor || "Sistema"}
-                                            </Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                            ))}
-                        </Grid>
+                        {listaChegadas}
 
                         {/* Sentinel para infinite scroll */}
-                        <Box ref={loadMoreRef} sx={{ height: 24, mt: 2, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                        <Box
+                            ref={loadMoreRef}
+                            sx={{
+                                height: 24,
+                                mt: 2,
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center",
+                            }}
+                        >
                             {isFetchingMore && <CircularProgress size={28} />}
                             {!arrHasMore && (
                                 <Typography variant="caption" sx={{ color: "text.secondary" }}>
@@ -720,6 +810,7 @@ export default function ChegadaPage() {
                 onClick={() => {
                     setForm(emptyForm());
                     setEditId(null);
+                    setObsText("");
                     setDlgOpen(true);
                 }}
             >
@@ -733,6 +824,7 @@ export default function ChegadaPage() {
                 maxWidth="md"
                 fullWidth
                 fullScreen={isMobile}
+                keepMounted
                 PaperProps={{
                     sx: {
                         borderRadius: isMobile ? 0 : 3,
@@ -764,14 +856,23 @@ export default function ChegadaPage() {
                             <Autocomplete
                                 freeSolo
                                 fullWidth
+                                disablePortal
                                 options={saidas}
                                 getOptionLabel={(opt) =>
-                                    typeof opt === "string" ? opt : `${opt.placa} • ${opt.motoristaNome} • ${opt.destino}`
+                                    typeof opt === "string"
+                                        ? opt
+                                        : `${opt.placa} • ${opt.motoristaNome} • ${opt.destino}`
                                 }
-                                onChange={(_, sel) => sel && fillFromSaida(sel.id)}
+                                onChange={(_, sel) => sel && sel.id && fillFromSaida(sel.id)}
                                 renderInput={(params) => (
-                                    <TextField {...params} label="Saída em Trânsito *" variant="outlined" InputLabelProps={{ shrink: true }} />
+                                    <TextField
+                                        {...params}
+                                        label="Saída em Trânsito *"
+                                        variant="outlined"
+                                        InputLabelProps={{ shrink: true }}
+                                    />
                                 )}
+                                ListboxProps={{ style: { maxHeight: 280 } }}
                             />
                         )}
 
@@ -782,23 +883,36 @@ export default function ChegadaPage() {
 
                             {form.editDriver ? (
                                 <Autocomplete
+                                    disablePortal
                                     options={motoristas}
                                     getOptionLabel={(o) => o.fullname}
-                                    value={motoristas.find((m) => m.id === form.motoristaId) || null}
+                                    isOptionEqualToValue={(opt, val) => String(opt.id) === String(val?.id)}
+                                    value={
+                                        motoristas.find((m) => String(m.id) === String(form.motoristaId)) || null
+                                    }
                                     onChange={(_, v) =>
-                                        setForm({
-                                            ...form,
-                                            motoristaId: v?.id || "",
+                                        setForm((f) => ({
+                                            ...f,
+                                            motoristaId: v?.id ? String(v.id) : "",
                                             motoristaNome: v?.fullname || "",
                                             editDriver: false,
-                                        })
+                                        }))
                                     }
                                     renderInput={(p) => <TextField {...p} variant="outlined" />}
+                                    ListboxProps={{ style: { maxHeight: 280 } }}
                                 />
                             ) : (
                                 <Box sx={{ position: "relative" }}>
-                                    <TextField fullWidth variant="outlined" value={form.motoristaNome} InputProps={{ readOnly: true }} />
-                                    <IconButton sx={{ position: "absolute", right: 8, top: 8 }} onClick={() => setForm({ ...form, editDriver: true })}>
+                                    <TextField
+                                        fullWidth
+                                        variant="outlined"
+                                        value={form.motoristaNome}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                    <IconButton
+                                        sx={{ position: "absolute", right: 8, top: 8 }}
+                                        onClick={() => setForm({ ...form, editDriver: true })}
+                                    >
                                         <EditIcon />
                                     </IconButton>
                                 </Box>
@@ -844,8 +958,11 @@ export default function ChegadaPage() {
                             label="Observações"
                             multiline
                             minRows={3}
-                            value={form.observacoesChegada}
-                            onChange={(e) => setForm({ ...form, observacoesChegada: e.target.value })}
+                            value={obsText}
+                            onChange={(e) => setObsText(e.target.value)} // leve
+                            onBlur={() => setForm((f) => ({ ...f, observacoesChegada: obsText }))} // sincroniza no blur
+                            autoComplete="off"
+                            spellCheck={false}
                         />
 
                         {/* Anexos */}
@@ -853,7 +970,12 @@ export default function ChegadaPage() {
                             <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
                                 Anexos
                             </Typography>
-                            <Button variant="outlined" component="label" startIcon={<AttachIcon />} sx={{ borderRadius: 2 }}>
+                            <Button
+                                variant="outlined"
+                                component="label"
+                                startIcon={<AttachIcon />}
+                                sx={{ borderRadius: 2 }}
+                            >
                                 Selecionar arquivos
                                 <input hidden multiple type="file" onChange={fileChange} />
                             </Button>
@@ -871,7 +993,8 @@ export default function ChegadaPage() {
                     <Button
                         variant="contained"
                         onClick={trySave}
-                        disabled={!form.motoristaId || saving}
+                        // ⬇️ libera o botão quando já tem NOME (pré-preenchido); o trySave resolve o ID
+                        disabled={saving || !form.saidaId || (!form.motoristaId && !form.motoristaNome)}
                         startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
                         sx={{
                             background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
@@ -885,7 +1008,14 @@ export default function ChegadaPage() {
             </Dialog>
 
             {/* ─────────────────── Dialog Assinatura ─────────────────── */}
-            <Dialog open={sigOpen} onClose={() => setSigOpen(false)} fullScreen={isMobile} maxWidth="sm" fullWidth>
+            <Dialog
+                open={sigOpen}
+                onClose={() => setSigOpen(false)}
+                fullScreen={isMobile}
+                maxWidth="sm"
+                fullWidth
+                keepMounted
+            >
                 <DialogTitle
                     sx={{
                         background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
@@ -913,7 +1043,12 @@ export default function ChegadaPage() {
                         />
                     </Paper>
                     <Box sx={{ mt: 2 }}>
-                        <Button onClick={() => sigRef.current?.clear()} disabled={saving} variant="outlined" sx={{ borderRadius: 2 }}>
+                        <Button
+                            onClick={() => sigRef.current?.clear()}
+                            disabled={saving}
+                            variant="outlined"
+                            sx={{ borderRadius: 2 }}
+                        >
                             Limpar
                         </Button>
                     </Box>
@@ -938,7 +1073,14 @@ export default function ChegadaPage() {
             </Dialog>
 
             {/* ─────────────────── Dialog Detalhes ─────────────────── */}
-            <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} fullWidth maxWidth="lg" fullScreen={isMobile}>
+            <Dialog
+                open={detailOpen}
+                onClose={() => setDetailOpen(false)}
+                fullWidth
+                maxWidth="lg"
+                fullScreen={isMobile}
+                keepMounted
+            >
                 {detailData && (
                     <>
                         <DialogTitle
@@ -955,7 +1097,9 @@ export default function ChegadaPage() {
                                 <Box>
                                     <Typography variant="h6">Detalhes — {detailData.placa}</Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                                        {detailData.data_chegada ? new Date(detailData.data_chegada).toLocaleString("pt-BR") : "N/A"}
+                                        {detailData.data_chegada
+                                            ? new Date(detailData.data_chegada).toLocaleString("pt-BR")
+                                            : "N/A"}
                                     </Typography>
                                 </Box>
                             </Box>
@@ -984,9 +1128,24 @@ export default function ChegadaPage() {
                                             Informações da Chegada
                                         </Typography>
                                         <Stack spacing={2}>
-                                            <InfoItem icon={PersonIcon} label="Motorista" value={detailData.motorista?.fullname || "N/A"} accent="primary" />
-                                            <InfoItem icon={SpeedIcon} label="KM Chegada" value={`${detailData.km_chegada ?? "N/A"} km`} accent="success" />
-                                            <InfoItem icon={TimeIcon} label="Horímetro" value={`${detailData.horimetro_chegada ?? "N/A"}h`} accent="info" />
+                                            <InfoItem
+                                                icon={PersonIcon}
+                                                label="Motorista"
+                                                value={detailData.motorista?.fullname || "N/A"}
+                                                accent="primary"
+                                            />
+                                            <InfoItem
+                                                icon={SpeedIcon}
+                                                label="KM Chegada"
+                                                value={`${detailData.km_chegada ?? "N/A"} km`}
+                                                accent="success"
+                                            />
+                                            <InfoItem
+                                                icon={TimeIcon}
+                                                label="Horímetro"
+                                                value={`${detailData.horimetro_chegada ?? "N/A"}h`}
+                                                accent="info"
+                                            />
                                         </Stack>
                                     </Paper>
                                 </Grid>
@@ -1020,8 +1179,18 @@ export default function ChegadaPage() {
                                                     }
                                                     accent="secondary"
                                                 />
-                                                <InfoItem icon={SpeedIcon} label="KM Saída" value={`${detailData.saida.kmSaida ?? "N/A"} km`} accent="warning" />
-                                                <InfoItem icon={FlagIcon} label="Destino" value={detailData.saida.destino || "N/A"} accent="info" />
+                                                <InfoItem
+                                                    icon={SpeedIcon}
+                                                    label="KM Saída"
+                                                    value={`${detailData.saida.kmSaida ?? "N/A"} km`}
+                                                    accent="warning"
+                                                />
+                                                <InfoItem
+                                                    icon={FlagIcon}
+                                                    label="Destino"
+                                                    value={detailData.saida.destino || "N/A"}
+                                                    accent="info"
+                                                />
                                             </Stack>
                                         </Paper>
                                     </Grid>
@@ -1035,7 +1204,8 @@ export default function ChegadaPage() {
                                             sx={{
                                                 p: 3,
                                                 borderRadius: 3,
-                                                background: "linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)",
+                                                background:
+                                                    "linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)",
                                                 border: "1px solid rgba(16, 185, 129, 0.2)",
                                             }}
                                         >
@@ -1056,7 +1226,10 @@ export default function ChegadaPage() {
                                             <Grid container spacing={3}>
                                                 <Grid item xs={12} sm={6}>
                                                     <Box sx={{ textAlign: "center" }}>
-                                                        <Typography variant="h4" sx={{ fontWeight: 700, color: "success.main", mb: 1 }}>
+                                                        <Typography
+                                                            variant="h4"
+                                                            sx={{ fontWeight: 700, color: "success.main", mb: 1 }}
+                                                        >
                                                             {(detailData.km_chegada || 0) - (detailData.saida.kmSaida || 0)}
                                                         </Typography>
                                                         <Typography variant="body1" sx={{ color: "text.secondary" }}>
@@ -1066,8 +1239,12 @@ export default function ChegadaPage() {
                                                 </Grid>
                                                 <Grid item xs={12} sm={6}>
                                                     <Box sx={{ textAlign: "center" }}>
-                                                        <Typography variant="h4" sx={{ fontWeight: 700, color: "info.main", mb: 1 }}>
-                                                            {(detailData.horimetro_chegada || 0) - (detailData.saida.horimetroSaida || 0)}
+                                                        <Typography
+                                                            variant="h4"
+                                                            sx={{ fontWeight: 700, color: "info.main", mb: 1 }}
+                                                        >
+                                                            {(detailData.horimetro_chegada || 0) -
+                                                                (detailData.saida.horimetroSaida || 0)}
                                                         </Typography>
                                                         <Typography variant="body1" sx={{ color: "text.secondary" }}>
                                                             Horas de operação
@@ -1158,7 +1335,10 @@ export default function ChegadaPage() {
                                         </Typography>
 
                                         {!detailData.anexos?.length ? (
-                                            <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center", py: 2 }}>
+                                            <Typography
+                                                variant="body2"
+                                                sx={{ color: "text.secondary", textAlign: "center", py: 2 }}
+                                            >
                                                 Nenhum anexo disponível.
                                             </Typography>
                                         ) : (
@@ -1219,6 +1399,7 @@ export default function ChegadaPage() {
                 fullWidth
                 maxWidth="md"
                 fullScreen={isMobile}
+                keepMounted
             >
                 <DialogTitle
                     sx={{
@@ -1254,7 +1435,8 @@ export default function ChegadaPage() {
                                     sx={{
                                         p: 3,
                                         borderRadius: 3,
-                                        background: "linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)",
+                                        background:
+                                            "linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)",
                                         border: "1px solid rgba(59, 130, 246, 0.2)",
                                         height: "100%",
                                     }}
@@ -1286,7 +1468,9 @@ export default function ChegadaPage() {
                                         </Box>
                                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                                             <SpeedIcon sx={{ color: "text.secondary", transform: "rotate(90deg)" }} />
-                                            <Typography variant="body2">Horímetro: {cmpData.checklist.horimetro_saida}</Typography>
+                                            <Typography variant="body2">
+                                                Horímetro: {cmpData.checklist.horimetro_saida}
+                                            </Typography>
                                         </Box>
                                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                                             <PersonIcon sx={{ color: "text.secondary" }} />
@@ -1303,7 +1487,8 @@ export default function ChegadaPage() {
                                     sx={{
                                         p: 3,
                                         borderRadius: 3,
-                                        background: "linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)",
+                                        background:
+                                            "linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)",
                                         border: "1px solid rgba(16, 185, 129, 0.2)",
                                         height: "100%",
                                     }}
@@ -1334,14 +1519,18 @@ export default function ChegadaPage() {
                                             <Typography variant="body2">KM: {cmpData.arrival.km_chegada}</Typography>
                                         </Box>
                                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                            <SpeedIcon sx={{ color: "text.secondary", transform: "rotate(90deg)" }} />
+                                            <SpeedIcon
+                                                sx={{ color: "text.secondary", transform: "rotate(90deg)" }}
+                                            />
                                             <Typography variant="body2">
                                                 Horímetro: {cmpData.arrival.horimetro_chegada}
                                             </Typography>
                                         </Box>
                                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                                             <PersonIcon sx={{ color: "text.secondary" }} />
-                                            <Typography variant="body2">{cmpData.arrival.motorista?.fullname}</Typography>
+                                            <Typography variant="body2">
+                                                {cmpData.arrival.motorista?.fullname}
+                                            </Typography>
                                         </Box>
                                     </Stack>
                                 </Paper>
@@ -1354,7 +1543,8 @@ export default function ChegadaPage() {
                                     sx={{
                                         p: 3,
                                         borderRadius: 3,
-                                        background: "linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%)",
+                                        background:
+                                            "linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%)",
                                         border: "1px solid rgba(245, 158, 11, 0.2)",
                                     }}
                                 >
@@ -1441,7 +1631,10 @@ function InfoItem({ icon: Icon, label, value, accent = "primary" }) {
         >
             <Icon sx={{ color: theme.palette[accent].main, fontSize: 28 }} />
             <Box>
-                <Typography variant="caption" sx={{ fontWeight: "bold", color: "text.secondary", display: "block" }}>
+                <Typography
+                    variant="caption"
+                    sx={{ fontWeight: "bold", color: "text.secondary", display: "block" }}
+                >
                     {label}
                 </Typography>
                 <Typography variant="body1" sx={{ fontWeight: 600, color: "text.primary" }}>
