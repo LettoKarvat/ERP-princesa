@@ -1,6 +1,16 @@
 // src/pages/ChecklistPrint.jsx
 import React, { useMemo, useState } from "react";
-import { Box, Button, Stack, FormControlLabel, Checkbox } from "@mui/material";
+import {
+    Box,
+    Button,
+    Stack,
+    FormControlLabel,
+    Checkbox,
+    TextField,
+    IconButton,
+    Typography,
+} from "@mui/material";
+import { Add, Remove, Today as TodayIcon, Event as EventIcon, Print as PrintIcon } from "@mui/icons-material";
 
 /** Itens do modelo impresso (ajuste livremente os textos) */
 const DEFAULT_ITEMS = [
@@ -34,56 +44,90 @@ const DEFAULT_ITEMS = [
     { code: "1.28", description: "Lanternas traseiras e luz de placa" },
 ];
 
-export default function DecendialChecklist({
+export default function ChecklistPrint({
     companyName = "298 - DISTRIBUIDORA PRINCESA",
-    logoUrl = "https://iili.io/F6BcJtf.png", // opcional: coloque a URL do logo
+    logoUrl = "https://iili.io/F6BcJtf.png", // opcional
     items = DEFAULT_ITEMS,
 }) {
+    const rows = useMemo(() => items.map((it, i) => ({ ...it, idx: i + 1 })), [items]);
     const [twoCopies, setTwoCopies] = useState(false);
-    const rows = useMemo(
-        () => items.map((it, i) => ({ ...it, idx: i + 1 })),
-        [items]
-    );
+    const [dateISO, setDateISO] = useState(""); // yyyy-mm-dd
+
+    // Helpers de data
+    const pad = (n) => String(n).padStart(2, "0");
+    const formatISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const toBR = (iso) => (!iso ? "" : iso.split("-").reverse().join("/"));
+
+    const setToday = () => {
+        const d = new Date();
+        setDateISO(formatISO(d));
+    };
+    const setTomorrow = () => {
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        setDateISO(formatISO(d));
+    };
+    const shiftDays = (delta) => {
+        // se vazio, parte de hoje
+        const base = dateISO ? new Date(dateISO + "T00:00:00") : new Date();
+        base.setDate(base.getDate() + delta);
+        setDateISO(formatISO(base));
+    };
+
+    const dateBR = toBR(dateISO);
 
     return (
         <Box sx={{ p: 2 }}>
             {/* Barra de ações (não imprime) */}
-            <Stack
-                direction="row"
-                spacing={2}
-                alignItems="center"
-                className="screen-only"
-                sx={{ mb: 2 }}
-            >
-                <Button variant="contained" onClick={() => window.print()}>
-                    Imprimir / Salvar em PDF
-                </Button>
-                <FormControlLabel
-                    control={
-                        <Checkbox
-                            checked={twoCopies}
-                            onChange={(e) => setTwoCopies(e.target.checked)}
+            <Stack className="screen-only" spacing={1.5} sx={{ mb: 2 }}>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                    <Button variant="contained" startIcon={<PrintIcon />} onClick={() => window.print()}>
+                        Imprimir / Salvar em PDF
+                    </Button>
+
+                    <Button variant="outlined" startIcon={<TodayIcon />} onClick={setToday}>
+                        Hoje
+                    </Button>
+                    <Button variant="outlined" startIcon={<EventIcon />} onClick={setTomorrow}>
+                        Amanhã
+                    </Button>
+
+                    {/* Controle de data com – / + */}
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: { xs: 0, sm: 1 } }}>
+                        <Typography variant="body2" sx={{ minWidth: 36 }}>
+                            Data:
+                        </Typography>
+                        <IconButton aria-label="diminuir 1 dia" onClick={() => shiftDays(-1)}>
+                            <Remove />
+                        </IconButton>
+                        <TextField
+                            type="date"
+                            size="small"
+                            value={dateISO}
+                            onChange={(e) => setDateISO(e.target.value)}
+                            InputLabelProps={{ shrink: true }}
+                            sx={{ minWidth: 165, "& input": { paddingY: "7px" } }}
                         />
-                    }
-                    label="Imprimir em 2 vias"
-                />
+                        <IconButton aria-label="aumentar 1 dia" onClick={() => shiftDays(1)}>
+                            <Add />
+                        </IconButton>
+                    </Stack>
+
+                    <FormControlLabel
+                        sx={{ ml: { xs: 0, sm: 2 } }}
+                        control={
+                            <Checkbox checked={twoCopies} onChange={(e) => setTwoCopies(e.target.checked)} />
+                        }
+                        label="Imprimir em 2 vias"
+                    />
+                </Stack>
             </Stack>
 
             {/* 🔒 Só o que está dentro de #print-root aparece na impressão */}
             <div id="print-root">
-                <PrintPage
-                    companyName={companyName}
-                    logoUrl={logoUrl}
-                    rows={rows}
-                    isCopy={false}
-                />
+                <PrintPage companyName={companyName} logoUrl={logoUrl} rows={rows} dateStr={dateBR} isCopy={false} />
                 {twoCopies && (
-                    <PrintPage
-                        companyName={companyName}
-                        logoUrl={logoUrl}
-                        rows={rows}
-                        isCopy
-                    />
+                    <PrintPage companyName={companyName} logoUrl={logoUrl} rows={rows} dateStr={dateBR} isCopy />
                 )}
             </div>
 
@@ -92,34 +136,24 @@ export default function DecendialChecklist({
     );
 }
 
-function PrintPage({ companyName, logoUrl, rows, isCopy }) {
+function PrintPage({ companyName, logoUrl, rows, dateStr, isCopy }) {
     return (
         <div className="print-page">
             {/* Cabeçalho */}
             <div className="header">
                 <div className="brand">
-                    {logoUrl ? (
-                        <img src={logoUrl} alt="logo" />
-                    ) : (
-                        <div className="logo-fallback">LOGO</div>
-                    )}
+                    {logoUrl ? <img src={logoUrl} alt="logo" /> : <div className="logo-fallback">LOGO</div>}
                     <div className="company">{companyName}</div>
                     {isCopy && <div className="copy-tag">2ª VIA</div>}
                 </div>
                 <div className="head-fields">
-                    <div>
-                        <strong>Data:</strong> ____ / ____ / ______
-                    </div>
-                    <div>
-                        <strong>Motorista:</strong> _________________________________________
-                    </div>
+                    <div><strong>Data:</strong> {dateStr || "____ / ____ / ______"}</div>
+                    <div><strong>Motorista:</strong> _________________________________________</div>
                     <div>
                         <strong>Placa veículo:</strong> ____________________{" "}
                         <strong>Placa carreta:</strong> ____________________
                     </div>
-                    <div>
-                        <strong>Rota / Viagem:</strong> ____________________________________
-                    </div>
+                    <div><strong>Rota / Viagem:</strong> ____________________________________</div>
                 </div>
             </div>
 
@@ -142,15 +176,9 @@ function PrintPage({ companyName, logoUrl, rows, isCopy }) {
                         <tr key={r.code ?? r.idx}>
                             <td className="col-num">{r.code ?? r.idx}</td>
                             <td>{r.description}</td>
-                            <td className="col-check">
-                                <div className="box" />
-                            </td>
-                            <td className="col-check">
-                                <div className="box" />
-                            </td>
-                            <td className="col-check">
-                                <div className="box" />
-                            </td>
+                            <td className="col-check"><div className="box" /></td>
+                            <td className="col-check"><div className="box" /></td>
+                            <td className="col-check"><div className="box" /></td>
                             <td className="col-obs" />
                         </tr>
                     ))}
