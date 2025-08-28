@@ -12,9 +12,9 @@ import {
 } from "@mui/material";
 import { Add, Remove, Today as TodayIcon, Event as EventIcon, Print as PrintIcon } from "@mui/icons-material";
 
-/** Itens do modelo impresso (ajuste livremente os textos) */
+/** Itens do modelo impresso (atualizado conforme solicitação) */
 const DEFAULT_ITEMS = [
-    { code: "1.1", description: "CNH do motorista" },
+    { code: "1.1", description: "Documentos do motorista (CNH e toxicológico)" },   // alterado
     { code: "1.2", description: "Documentos do veículo e carga" },
     { code: "1.3", description: "Cinto de segurança retrátil de 3 pontos" },
     { code: "1.4", description: "Banco em bom estado" },
@@ -25,7 +25,7 @@ const DEFAULT_ITEMS = [
     { code: "1.9", description: "Portas e janelas" },
     { code: "1.10", description: "Limpador de para-brisa (funcionando e com água)" },
     { code: "1.11", description: "Buzina" },
-    { code: "1.12", description: "Freio de mão" },
+    { code: "1.12", description: "Freio" },                                          // alterado
     { code: "1.13", description: "Cabine limpa e organizada" },
     { code: "1.14", description: "Pneus (estado de conservação e fixação das rodas)" },
     { code: "1.15", description: "Ausência de vazamentos" },
@@ -42,33 +42,31 @@ const DEFAULT_ITEMS = [
     { code: "1.26", description: "Macaco / Chave de rodas / Estepe" },
     { code: "1.27", description: "Condições do baú" },
     { code: "1.28", description: "Lanternas traseiras e luz de placa" },
+    // novos
+    { code: "1.29", description: "EPI do motorista validado" },                      // novo
+    { code: "1.30", description: "Câmbio do veículo" },                              // novo
+    { code: "1.31", description: "Água e óleo do veículo" },                         // novo
 ];
 
 export default function ChecklistPrint({
     companyName = "298 - DISTRIBUIDORA PRINCESA",
-    logoUrl = "https://iili.io/F6BcJtf.png", // opcional
+    logoUrl = "https://iili.io/F6BcJtf.png",
     items = DEFAULT_ITEMS,
 }) {
     const rows = useMemo(() => items.map((it, i) => ({ ...it, idx: i + 1 })), [items]);
     const [twoCopies, setTwoCopies] = useState(false);
     const [dateISO, setDateISO] = useState(""); // yyyy-mm-dd
 
-    // Helpers de data
+    // helpers de data
     const pad = (n) => String(n).padStart(2, "0");
     const formatISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     const toBR = (iso) => (!iso ? "" : iso.split("-").reverse().join("/"));
 
-    const setToday = () => {
-        const d = new Date();
-        setDateISO(formatISO(d));
-    };
+    const setToday = () => setDateISO(formatISO(new Date()));
     const setTomorrow = () => {
-        const d = new Date();
-        d.setDate(d.getDate() + 1);
-        setDateISO(formatISO(d));
+        const d = new Date(); d.setDate(d.getDate() + 1); setDateISO(formatISO(d));
     };
     const shiftDays = (delta) => {
-        // se vazio, parte de hoje
         const base = dateISO ? new Date(dateISO + "T00:00:00") : new Date();
         base.setDate(base.getDate() + delta);
         setDateISO(formatISO(base));
@@ -85,21 +83,13 @@ export default function ChecklistPrint({
                         Imprimir / Salvar em PDF
                     </Button>
 
-                    <Button variant="outlined" startIcon={<TodayIcon />} onClick={setToday}>
-                        Hoje
-                    </Button>
-                    <Button variant="outlined" startIcon={<EventIcon />} onClick={setTomorrow}>
-                        Amanhã
-                    </Button>
+                    <Button variant="outlined" startIcon={<TodayIcon />} onClick={setToday}>Hoje</Button>
+                    <Button variant="outlined" startIcon={<EventIcon />} onClick={setTomorrow}>Amanhã</Button>
 
                     {/* Controle de data com – / + */}
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: { xs: 0, sm: 1 } }}>
-                        <Typography variant="body2" sx={{ minWidth: 36 }}>
-                            Data:
-                        </Typography>
-                        <IconButton aria-label="diminuir 1 dia" onClick={() => shiftDays(-1)}>
-                            <Remove />
-                        </IconButton>
+                        <Typography variant="body2" sx={{ minWidth: 36 }}>Data:</Typography>
+                        <IconButton aria-label="diminuir 1 dia" onClick={() => shiftDays(-1)}><Remove /></IconButton>
                         <TextField
                             type="date"
                             size="small"
@@ -108,16 +98,12 @@ export default function ChecklistPrint({
                             InputLabelProps={{ shrink: true }}
                             sx={{ minWidth: 165, "& input": { paddingY: "7px" } }}
                         />
-                        <IconButton aria-label="aumentar 1 dia" onClick={() => shiftDays(1)}>
-                            <Add />
-                        </IconButton>
+                        <IconButton aria-label="aumentar 1 dia" onClick={() => shiftDays(1)}><Add /></IconButton>
                     </Stack>
 
                     <FormControlLabel
                         sx={{ ml: { xs: 0, sm: 2 } }}
-                        control={
-                            <Checkbox checked={twoCopies} onChange={(e) => setTwoCopies(e.target.checked)} />
-                        }
+                        control={<Checkbox checked={twoCopies} onChange={(e) => setTwoCopies(e.target.checked)} />}
                         label="Imprimir em 2 vias"
                     />
                 </Stack>
@@ -126,9 +112,7 @@ export default function ChecklistPrint({
             {/* 🔒 Só o que está dentro de #print-root aparece na impressão */}
             <div id="print-root">
                 <PrintPage companyName={companyName} logoUrl={logoUrl} rows={rows} dateStr={dateBR} isCopy={false} />
-                {twoCopies && (
-                    <PrintPage companyName={companyName} logoUrl={logoUrl} rows={rows} dateStr={dateBR} isCopy />
-                )}
+                {twoCopies && <PrintPage companyName={companyName} logoUrl={logoUrl} rows={rows} dateStr={dateBR} isCopy />}
             </div>
 
             <style>{css}</style>
@@ -154,6 +138,9 @@ function PrintPage({ companyName, logoUrl, rows, dateStr, isCopy }) {
                         <strong>Placa carreta:</strong> ____________________
                     </div>
                     <div><strong>Rota / Viagem:</strong> ____________________________________</div>
+                    {/* novos campos solicitados */}
+                    <div><strong>KM de Saída:</strong> ____________________</div>
+                    <div><strong>KM de Entrada:</strong> __________________</div>
                 </div>
             </div>
 
@@ -213,8 +200,8 @@ const css = `
 @media print {
   html, body { background: #fff !important; }
   body { margin: 0 !important; }
-  body * { visibility: hidden !important; }                  /* esconde tudo */
-  #print-root, #print-root * { visibility: visible !important; } /* mostra só o checklist */
+  body * { visibility: hidden !important; }
+  #print-root, #print-root * { visibility: visible !important; }
   #print-root { position: absolute; left: 0; top: 0; width: 100%; z-index: 9999; }
 }
 
@@ -240,7 +227,7 @@ const css = `
 
 .box { width: 10mm; height: 6mm; border: 0.5pt solid #000; margin: 0 auto; }
 
-.tbl tbody td.col-obs { height: 9mm; }       /* altura boa para escrever à caneta */
+.tbl tbody td.col-obs { height: 9mm; }  /* altura para escrita */
 .tbl tbody tr { page-break-inside: avoid; }
 
 .obs-block { margin-top: 6mm; }
