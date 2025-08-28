@@ -28,6 +28,7 @@ import {
   FaSignOutAlt,
   FaCog,
   FaUsers,
+  FaPrint, // ⬅ novo
 } from "react-icons/fa";
 import { PiTireLight } from "react-icons/pi";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -66,7 +67,9 @@ function Layout() {
   const [openDriverDecendial, setOpenDriverDecendial] = useState(false);
 
   const handleLogout = () => {
+    // mantém o que você já tinha e garante remoção do token principal também
     localStorage.removeItem("sessionToken");
+    localStorage.removeItem("token");      // ⬅ adiciona por garantia
     localStorage.removeItem("role");
     localStorage.removeItem("fullname");
     navigate("/login");
@@ -160,7 +163,7 @@ function Layout() {
               {/* Conteúdo colapsável */}
               <Collapse in={openPortaria} timeout="auto" unmountOnExit>
                 <List component="div" disablePadding>
-                  {/* Saída — qualquer perfil do bloco pode ver */}
+                  {/* Saída */}
                   <ListItem disablePadding>
                     <ListItemButton
                       component={NavLink}
@@ -172,7 +175,7 @@ function Layout() {
                     </ListItemButton>
                   </ListItem>
 
-                  {/* Chegada — qualquer perfil do bloco pode ver */}
+                  {/* Chegada */}
                   <ListItem disablePadding>
                     <ListItemButton
                       component={NavLink}
@@ -201,9 +204,6 @@ function Layout() {
               </Collapse>
             </>
           )}
-
-
-
 
           {/* Consumo -> admin, fiscal, manutencao */}
           {["admin", "fiscal", "manutencao"].includes(role) && (
@@ -383,8 +383,6 @@ function Layout() {
                 </List>
               </Collapse>
 
-
-
               {/* Agrupamento Decendial */}
               <ListItem disablePadding>
                 <ListItemButton
@@ -415,7 +413,9 @@ function Layout() {
                       component={NavLink}
                       to="/driver-checklists-decendial"
                       sx={{ pl: 4, ...listItemButtonStyle }}
-                      selected={location.pathname === "/driver-checklists-decendial"}
+                      selected={
+                        location.pathname === "/driver-checklists-decendial"
+                      }
                     >
                       <ListItemText primary="Meus checklists" />
                     </ListItemButton>
@@ -424,6 +424,25 @@ function Layout() {
               </Collapse>
             </>
           )}
+
+          {/* Impressão de Checklist (A4) */}
+          {["admin", "motorista", "manutencao", "portaria", "abastecimento"].includes(
+            role
+          ) && (
+              <ListItem disablePadding>
+                <ListItemButton
+                  component={NavLink}
+                  to="/checklist/print"
+                  sx={listItemButtonStyle}
+                  selected={location.pathname === "/checklist/print"}
+                >
+                  <ListItemIcon sx={{ color: "inherit" }}>
+                    <FaPrint />
+                  </ListItemIcon>
+                  <ListItemText primary="Impressão de Checklist (A4)" />
+                </ListItemButton>
+              </ListItem>
+            )}
 
           {/* Sair (para todos) */}
           <ListItem disablePadding sx={{ mt: 1 }}>

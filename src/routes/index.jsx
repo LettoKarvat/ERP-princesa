@@ -1,3 +1,4 @@
+// src/routes/index.jsx
 import { Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "../pages/LoginPage";
 import Dashboard from "../pages/Dashboard";
@@ -16,7 +17,10 @@ import SaidaPage from "../pages/SaidaPage";
 import PartsReplacementReport from "../pages/PartsReplacementReport";
 import PartsReplacementMaintenance from "../pages/PartsReplacementMaintenance";
 import RefuelingsReport from "../pages/RefuelingsReport";
-import TravelReportPage from "../pages/TravelReportPage";   // <<< novo
+import TravelReportPage from "../pages/TravelReportPage";
+
+// ✅ Página de impressão A4 do checklist
+import ChecklistPrint from "../pages/ChecklistPrint";
 
 /* ────────────── guards ────────────── */
 const PrivateRoute = ({ children }) => {
@@ -27,24 +31,22 @@ const PrivateRoute = ({ children }) => {
 const AdminRoute = ({ children }) => {
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
-
   if (!token) return <Navigate to="/login" replace />;
   if (role !== "admin") return <Navigate to="/" replace />;
   return children;
 };
 
-/* ─────── guard específico p/ várias funções ─────── */       // <<< novo
-const RoleRoute = ({ roles, children }) => {                    // <<< novo
-  const token = localStorage.getItem("token");                  // <<< novo
-  const role = localStorage.getItem("role");                   // <<< novo
-  if (!token) return <Navigate to="/login" replace />;          // <<< novo
-  return roles.includes(role) ? children : <Navigate to="/" replace />; // <<< novo
-};                                                              // <<< novo
+/* ─────── guard específico p/ várias funções ─────── */
+const RoleRoute = ({ roles, children }) => {
+  const token = localStorage.getItem("token");
+  const role = localStorage.getItem("role");
+  if (!token) return <Navigate to="/login" replace />;
+  return roles.includes(role) ? children : <Navigate to="/" replace />;
+};
 
 /* ───────── redireciona conforme papel ───────── */
 function RoleBasedRedirect() {
   const role = localStorage.getItem("role");
-
   switch (role) {
     case "admin":
       return <Navigate to="/dashboard" replace />;
@@ -65,10 +67,10 @@ function RoleBasedRedirect() {
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* rota pública */}
+      {/* pública */}
       <Route path="/login" element={<LoginPage />} />
 
-      {/* rotas protegidas */}
+      {/* protegidas */}
       <Route
         path="/"
         element={
@@ -79,7 +81,7 @@ export default function AppRoutes() {
       >
         <Route index element={<RoleBasedRedirect />} />
 
-        {/* ——————————— ADMINISTRADOR ——————————— */}
+        {/* ——————————— ADMIN ——————————— */}
         <Route
           path="dashboard"
           element={
@@ -97,7 +99,7 @@ export default function AppRoutes() {
           }
         />
 
-        {/* ————— rotas comuns ————— */}
+        {/* ————— comuns ————— */}
         <Route path="vehicles" element={<VehicleList />} />
         <Route path="consumption" element={<ConsumptionControl />} />
         <Route path="tire-replacement" element={<TireManagement />} />
@@ -106,15 +108,14 @@ export default function AppRoutes() {
         <Route path="refueling" element={<Refueling />} />
         <Route path="refueling/report" element={<RefuelingsReport />} />
 
-
         <Route
           path="travel-report"
           element={
             <AdminRoute>
-              <TravelReportPage />             {/* seu componente de relatório */}
+              <TravelReportPage />
             </AdminRoute>
           }
-        />                                                        {/* <<< novo */}
+        />
 
         {/* ————— CHECKLISTS MOTORISTA ————— */}
         <Route path="driver-checklist" element={<DriverChecklist />} />
@@ -122,7 +123,19 @@ export default function AppRoutes() {
         <Route path="driver-checklist-decendial" element={<DecendialChecklist />} />
         <Route path="driver-checklists-decendial" element={<DecendialChecklistsList />} />
 
-        {/* ————— CHECKLISTS PORTARIA ————— */}
+        {/* ————— IMPRESSÃO DO CHECKLIST (A4) ————— */}
+        <Route
+          path="checklist/print"
+          element={
+            // Abra pra todos logados, ou restrinja com RoleRoute se quiser
+            <ChecklistPrint />
+            // <RoleRoute roles={["admin","motorista","manutencao","portaria","abastecimento"]}>
+            //   <ChecklistPrint />
+            // </RoleRoute>
+          }
+        />
+
+        {/* ————— PORTARIA ————— */}
         <Route path="portaria">
           <Route path="chegada" element={<ChegadaPage />} />
           <Route path="saida" element={<SaidaPage />} />
