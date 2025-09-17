@@ -17,7 +17,7 @@ api.interceptors.response.use(
   },
   (error) => {
     // Caso seja code 1001 (que você definiu no Cloud Code)
-    // ou a mensagem contenha "Invalid session token", então faça logoff
+    // ou a mensagem contenha "Invalid session token", então faça logof
     const code = error?.response?.data?.code;
     const message = error?.response?.data?.error || "";
 
